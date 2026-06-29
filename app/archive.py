@@ -20,6 +20,7 @@ ein WORM-/Backup-Medium außerhalb dieses Rechners.
 import hashlib
 import json
 import os
+import shutil
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -120,3 +121,56 @@ def verify():
 def read_pdf(rel_file):
     with open(os.path.join(ARCHIVE_DIR, rel_file), "rb") as f:
         return f.read()
+
+
+# ----------------------------------------------------- Spiegel (z. B. Nextcloud)
+def _copy_ro(src, dst):
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if os.path.exists(dst):
+        try:
+            os.chmod(dst, 0o644)  # falls vorherige Kopie schreibgeschützt
+        except OSError:
+            pass
+    shutil.copy2(src, dst)
+    try:
+        os.chmod(dst, 0o444)
+    except OSError:
+        pass
+
+
+def mirror_entry(entry, mirror_base):
+    """Eine abgelegte PDF + den aktuellen Ledger in den Spiegel-Ordner kopieren.
+
+    mirror_base z. B. ein synchronisierter Nextcloud-Ordner. Struktur bleibt
+    erhalten: <mirror_base>/<jahr>/<datei>.pdf und <mirror_base>/ledger.jsonl.
+    """
+    if not mirror_base:
+        return None
+    _copy_ro(os.path.join(ARCHIVE_DIR, entry["file"]),
+             os.path.join(mirror_base, entry["file"]))
+    # Ledger als prüfbaren Nachweis mitspiegeln (bleibt beschreibbar)
+    led_dst = os.path.join(mirror_base, "ledger.jsonl")
+    os.makedirs(mirror_base, exist_ok=True)
+    if os.path.exists(LEDGER_PATH):
+        shutil.copy2(LEDGER_PATH, led_dst)
+    return os.path.join(mirror_base, entry["file"])
+
+
+def mirror_all(mirror_base):
+    """Alle bisher abgelegten Dokumente + Ledger in den Spiegel kopieren.
+
+    Für Erst-Einrichtung oder nachträglich gesetzten Spiegel-Ordner.
+    Gibt die Anzahl kopierter Dateien zurück.
+    """
+    if not mirror_base:
+        return 0
+    n = 0
+    for e in list_entries():
+        src = os.path.join(ARCHIVE_DIR, e["file"])
+        if os.path.exists(src):
+            _copy_ro(src, os.path.join(mirror_base, e["file"]))
+            n += 1
+    if os.path.exists(LEDGER_PATH):
+        os.makedirs(mirror_base, exist_ok=True)
+        shutil.copy2(LEDGER_PATH, os.path.join(mirror_base, "ledger.jsonl"))
+    return n

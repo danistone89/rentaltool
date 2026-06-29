@@ -62,9 +62,15 @@ Archiv festgeschrieben (Modul `app/archive.py`):
   listet alle Ablagen und prüft die Integrität – jede nachträgliche Änderung an
   Datei oder Eintrag wird erkannt.
 
-> Pragmatische Revisionssicherheit (Integrität, Unveränderbarkeit, Nachweis). Für
-> volle GoBD-Konformität das `archive/`-Verzeichnis zusätzlich auf ein WORM-/
-> Backup-Medium außerhalb dieses Rechners spiegeln. `archive/` ist gitignored.
+**Externer Spiegel (Nextcloud):** In den Einstellungen lässt sich ein
+**Spiegel-Ordner** wählen (erkannte Cloud-Ordner unter `~/Library/CloudStorage`
+oder freier Pfad). Jede Festschreibung kopiert die PDF + den Ledger dorthin; der
+Nextcloud-Sync lädt sie hoch → Ablage „außer Haus". Über das Archiv (📚) lässt
+sich mit **„🔁 Alles nach Nextcloud spiegeln"** der Bestand nachträglich sichern.
+Schlägt die Spiegelung fehl, bleibt die lokale Ablage trotzdem gültig.
+
+> Pragmatische Revisionssicherheit (Integrität, Unveränderbarkeit, Nachweis +
+> externe Kopie). `archive/` ist gitignored.
 
 ## Datenaktualität
 

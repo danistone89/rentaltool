@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 from nicegui.testing import User
 
-from app import data, steuer, web  # noqa: F401
+from app import data, steuer, web, archive  # noqa: F401
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixture_2025-12.json")
 
@@ -39,3 +39,18 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     await user.should_see("341,90")          # Steuer-KPI
     await user.should_see("Buchungen")        # Tabellen-Überschrift
     await user.should_see("revisionssicher ablegen")  # Festschreiben-Button
+
+
+async def test_einstellungen_dialog(user: User, mock_backend):
+    await user.open("/")
+    user.find("Einstellungen").click()
+    await user.should_see("Spiegel-Ordner")   # Nextcloud-Feld
+    await user.should_see("Betreiberdaten")
+
+
+async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
+    monkeypatch.setattr(archive, "ARCHIVE_DIR", str(tmp_path))
+    monkeypatch.setattr(archive, "LEDGER_PATH", str(tmp_path / "ledger.jsonl"))
+    await user.open("/")
+    user.find("Archiv").click()
+    await user.should_see("revisionssicher abgelegte")

@@ -79,3 +79,18 @@ def compute(year, month, *, apt_ids=None, airbnb_override=None, befreit=0.0):
 
 def euro(v):
     return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def detect_cloud_folders():
+    """Synchronisierte Cloud-Ordner (Nextcloud/iCloud/Dropbox …) als Vorschläge.
+
+    macOS legt sie unter ~/Library/CloudStorage ab.
+    """
+    out = []
+    base = os.path.expanduser("~/Library/CloudStorage")
+    if os.path.isdir(base):
+        for name in sorted(os.listdir(base)):
+            p = os.path.join(base, name)
+            if os.path.isdir(p):
+                out.append(p)
+    return out

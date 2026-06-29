@@ -25,6 +25,19 @@ def test_revisionen_und_kette(tmp_path, monkeypatch):
     assert not (mode & 0o222)
 
 
+def test_spiegelung(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    mirror = tmp_path / "nextcloud"
+    e1 = archive.archive_pdf(b"PDF-A", "2025-12", {"steuer": 341.90})
+    archive.mirror_entry(e1, str(mirror))
+    assert (mirror / e1["file"]).exists()
+    assert (mirror / "ledger.jsonl").exists()
+    # zweite Ablage, dann komplette Spiegelung
+    archive.archive_pdf(b"PDF-B", "2026-05", {"steuer": 429.35})
+    n = archive.mirror_all(str(mirror))
+    assert n == 2
+
+
 def test_manipulation_wird_erkannt(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     e = archive.archive_pdf(b"ORIGINAL", "2025-12", {"steuer": 341.90})

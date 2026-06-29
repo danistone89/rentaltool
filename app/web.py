@@ -59,6 +59,28 @@ def open_settings():
                               value=float(CFG.get("unterschrift_x", 210)), step=5)
             steuer_pct = ui.number("Steuersatz (%)",
                                    value=CFG.get("steuersatz", 0.06) * 100, step=0.1, format="%.1f")
+        ui.label("Revisionssicheres Archiv – externer Speicherort").classes("text-sm text-gray-500 mt-3")
+        cur = CFG.get("archiv_spiegel", "")
+        folder_opts = data.detect_cloud_folders()
+        if cur and cur not in folder_opts:
+            folder_opts = [cur] + folder_opts
+        spiegel = ui.select(folder_opts, value=cur or None, label="Spiegel-Ordner (z. B. Nextcloud)",
+                            with_input=True, new_value_mode="add-unique",
+                            clearable=True).classes("w-full") \
+            .tooltip("Erkannte Cloud-Ordner wählen oder vollständigen Pfad eintippen. "
+                     "Jede Festschreibung wird dorthin kopiert (Nextcloud-Sync lädt hoch).")
+
+        def check_folder():
+            p = spiegel.value
+            if not p:
+                ui.notify("Kein Ordner gewählt.", type="warning"); return
+            if not os.path.isdir(p):
+                ui.notify(f"Ordner existiert nicht: {p}", type="negative"); return
+            if not os.access(p, os.W_OK):
+                ui.notify("Ordner ist nicht beschreibbar.", type="negative"); return
+            ui.notify("Ordner OK und beschreibbar ✓", type="positive")
+        ui.button("Ordner prüfen", on_click=check_folder).props("flat dense")
+
         ui.label("Smoobu").classes("text-sm text-gray-500 mt-3")
         with ui.grid(columns=2).classes("w-full gap-3"):
             api = ui.input("API-Key (leer = unverändert)",
@@ -72,6 +94,7 @@ def open_settings():
             v = sig_x.value
             CFG["unterschrift_x"] = int(v) if v == int(v) else v
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
+            CFG["archiv_spiegel"] = spiegel.value or ""
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()
             if (api.value or "").strip():
@@ -122,7 +145,22 @@ def open_archive():
                 ui.label(f"SHA-256: {e['sha256']}").classes("text-xs text-gray-400 font-mono")
                 if not res["ok"]:
                     ui.label("⚠️ " + "; ".join(res["issues"])).classes("text-xs text-red-700")
-        with ui.row().classes("w-full justify-end"):
+        with ui.row().classes("w-full justify-between items-center"):
+            mirror = CFG.get("archiv_spiegel", "")
+
+            def mirror_all():
+                if not mirror:
+                    ui.notify("Kein Spiegel-Ordner gesetzt (Einstellungen).", type="warning")
+                    return
+                try:
+                    n = archive.mirror_all(mirror)
+                    ui.notify(f"{n} Dokument(e) nach Nextcloud gespiegelt.", type="positive")
+                except Exception as ex:
+                    ui.notify(f"Spiegelung fehlgeschlagen: {ex}", type="negative", timeout=9000)
+            if mirror:
+                ui.button("🔁 Alles nach Nextcloud spiegeln", on_click=mirror_all).props("flat")
+            else:
+                ui.label("Kein externer Spiegel gesetzt (→ Einstellungen)").classes("text-xs text-gray-400")
             ui.button("Schließen", on_click=dialog.close).props("flat")
     dialog.open()
 
@@ -209,8 +247,17 @@ def render_result(container, result):
             entry = archive.archive_pdf(pdf, period, _values())
             ui.download.content(pdf, f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
                                 media_type="application/pdf")
-            ui.notify(f"Revisionssicher abgelegt: Revision {entry['revision']} · "
-                      f"SHA-256 {entry['sha256'][:12]}…", type="positive", timeout=7000)
+            msg = (f"Revisionssicher abgelegt: Revision {entry['revision']} · "
+                   f"SHA-256 {entry['sha256'][:12]}…")
+            mirror = CFG.get("archiv_spiegel", "")
+            if mirror:
+                try:
+                    archive.mirror_entry(entry, mirror)
+                    msg += " · in Nextcloud gesichert"
+                except Exception as ex:  # Spiegel-Fehler darf lokale Ablage nicht kippen
+                    ui.notify(f"Lokal abgelegt, aber Spiegelung fehlgeschlagen: {ex}",
+                              type="warning", timeout=9000)
+            ui.notify(msg, type="positive", timeout=7000)
 
         def vorschau():
             pdf = build_pdf()
