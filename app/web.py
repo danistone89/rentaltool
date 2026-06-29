@@ -43,6 +43,46 @@ async def smoobu_webhook():
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- Ordner-Browser
+def open_folder_picker(start, on_pick):
+    state = {"dir": start if (start and os.path.isdir(start)) else os.path.expanduser("~")}
+    with ui.dialog() as dlg, ui.card().classes("w-[680px] max-w-full"):
+        ui.label("📁 Ordner wählen").classes("text-lg font-bold")
+        path_lbl = ui.label().classes("text-xs font-mono text-gray-600 break-all")
+        listing = ui.column().classes("w-full gap-1").style("max-height:60vh;overflow:auto")
+
+        def go(p):
+            state["dir"] = p
+            render()
+
+        def render():
+            path_lbl.text = state["dir"]
+            listing.clear()
+            with listing:
+                parent = os.path.dirname(state["dir"].rstrip("/"))
+                if parent and parent != state["dir"]:
+                    ui.button("⬆  übergeordneter Ordner", on_click=lambda: go(parent)) \
+                        .props("flat dense align=left").classes("w-full")
+                try:
+                    subs = sorted(d for d in os.listdir(state["dir"])
+                                  if not d.startswith(".")
+                                  and os.path.isdir(os.path.join(state["dir"], d)))
+                except OSError as ex:
+                    ui.label(f"Nicht lesbar: {ex}").classes("text-red-700 text-xs")
+                    subs = []
+                for d in subs:
+                    full = os.path.join(state["dir"], d)
+                    ui.button("📁  " + d, on_click=lambda f=full: go(f)) \
+                        .props("flat dense align=left no-caps").classes("w-full")
+
+        render()
+        with ui.row().classes("w-full justify-end items-center"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Diesen Ordner verwenden",
+                      on_click=lambda: (on_pick(state["dir"]), dlg.close())).props("unelevated")
+    dlg.open()
+
+
 # ---------------------------------------------------------------- Einstellungen
 def open_settings():
     betr = CFG.setdefault("betreiber", {})
@@ -61,14 +101,17 @@ def open_settings():
                                    value=CFG.get("steuersatz", 0.06) * 100, step=0.1, format="%.1f")
         ui.label("Revisionssicheres Archiv – externer Speicherort").classes("text-sm text-gray-500 mt-3")
         cur = CFG.get("archiv_spiegel", "")
-        folder_opts = data.detect_cloud_folders()
-        if cur and cur not in folder_opts:
-            folder_opts = [cur] + folder_opts
-        spiegel = ui.select(folder_opts, value=cur or None, label="Spiegel-Ordner (z. B. Nextcloud)",
-                            with_input=True, new_value_mode="add-unique",
-                            clearable=True).classes("w-full") \
-            .tooltip("Erkannte Cloud-Ordner wählen oder vollständigen Pfad eintippen. "
-                     "Jede Festschreibung wird dorthin kopiert (Nextcloud-Sync lädt hoch).")
+        with ui.row().classes("w-full items-end gap-2"):
+            spiegel = ui.input("Spiegel-Ordner (z. B. Nextcloud)", value=cur) \
+                .classes("flex-grow") \
+                .tooltip("Vollständigen Pfad eintippen oder per Durchsuchen wählen. "
+                         "Jede Festschreibung wird dorthin kopiert (Nextcloud-Sync lädt hoch).")
+
+            def browse():
+                detected = data.detect_cloud_folders()
+                start = spiegel.value or (detected[0] if detected else "")
+                open_folder_picker(start, lambda p: spiegel.set_value(p))
+            ui.button("📁 Durchsuchen", on_click=browse).props("outline")
 
         def check_folder():
             p = spiegel.value
