@@ -1,3 +1,5 @@
-# Laufzeit-Abhängigkeit nur für die PDF-Erzeugung (amtliches Formular).
-# Die Berechnung & Web-UI laufen auch ohne (reine Standardbibliothek).
+# Frontend (NiceGUI – reines Python, keine Node-Toolchain).
+nicegui>=2.0
+
+# PDF-Erzeugung (amtliches Formular).
 pymupdf>=1.24

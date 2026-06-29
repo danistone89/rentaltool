@@ -4,20 +4,33 @@ Lokale Webapp, die aus den Smoobu-Buchungen die monatliche
 Beherbergungssteuer-Anmeldung für Dresden berechnet und das **amtliche Formular
 (Vdr 22.040/5) pixelgenau als PDF** erzeugt.
 
-Berechnung & Web-UI: reine Python-Standardbibliothek. Für die PDF-Erzeugung wird
-zusätzlich **PyMuPDF** benötigt (`pip install -r requirements.txt`).
+**Frontend:** NiceGUI (reines Python, keine Node-Toolchain). **Backend:**
+Standardbibliothek (Smoobu/Steuer) + PyMuPDF (PDF). Alles via
+`pip install -r requirements.txt`.
 
 ## Start
 
 ```bash
 cd apps/beherbergungssteuer
-pip install -r requirements.txt   # nur für PDF nötig (PyMuPDF)
-./run-local.sh                    # = python3 app/server.py
+pip install -r requirements.txt
+cp config.example.json config.json   # einmalig: API-Key + Betreiberdaten
+./run-local.sh                       # = python3 app/web.py
 ```
 
 Dann <http://localhost:3001/> öffnen, Jahr/Monat + Apartments wählen,
-**Berechnen** → Ergebnis, Buchungsliste und **„📄 Amtliches Formular (PDF)
-herunterladen"** (Route `/pdf`).
+**Berechnen** → KPIs, Buchungsliste und **„📄 Amtliches Formular (PDF)
+herunterladen"**. Einstellungen oben rechts (⚙️).
+
+## Architektur
+
+| Datei | Aufgabe |
+|---|---|
+| `app/web.py` | NiceGUI-Oberfläche (Seite, Einstellungs-Dialog, Webhook), Entry-Point |
+| `app/data.py` | Config, Smoobu-Cache, Berechnungs-Glue |
+| `app/steuer.py` | Steuerberechnung (Golden-Tests) |
+| `app/smoobu.py` | Smoobu-API-Client |
+| `app/pdf_form.py` | Amtliches PDF aus Blanko-Vorlage |
+| `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
 
@@ -77,5 +90,8 @@ Validiert gegen zwei Monate:
 ## Tests
 
 ```bash
-python3 -m unittest discover tests   # Golden-Test gegen Dez 2025
+python3 -m pytest        # Steuer-Golden-Tests (Dez 2025, Mai 2026) + UI-Test
 ```
+
+`tests/test_steuer.py` prüft die Berechnung gegen zwei Monate, `tests/test_web.py`
+testet die NiceGUI-Oberfläche headless (Seite lädt, „Berechnen" rendert Ergebnis).
