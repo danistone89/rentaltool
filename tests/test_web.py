@@ -38,4 +38,4 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     user.find("Berechnen").click()
     await user.should_see("341,90")          # Steuer-KPI
     await user.should_see("Buchungen")        # Tabellen-Überschrift
-    await user.should_see("Amtliches Formular")  # PDF-Button
+    await user.should_see("revisionssicher ablegen")  # Festschreiben-Button

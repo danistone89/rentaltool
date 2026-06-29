@@ -14,7 +14,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nicegui import app, ui  # noqa: E402
 
-from app import data, smoobu  # noqa: E402
+from app import data, smoobu, archive  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -87,6 +87,46 @@ def open_settings():
     dialog.open()
 
 
+# ---------------------------------------------------------------- Archiv
+def open_archive():
+    all_ok, results = archive.verify()
+    status_by_seq = {res["seq"]: res for res in results}
+    entries = list(reversed(archive.list_entries()))  # neueste zuerst
+    with ui.dialog() as dialog, ui.card().classes("w-[820px] max-w-full"):
+        with ui.row().classes("w-full items-center"):
+            ui.label("📚 Archiv – revisionssicher abgelegte Anmeldungen").classes("text-xl font-bold")
+            ui.space()
+            badge = "✓ Integrität geprüft" if all_ok else "⚠️ Integrität verletzt!"
+            ui.label(badge).classes("text-sm " + ("text-green-700" if all_ok else "text-red-700"))
+        if not entries:
+            ui.label("Noch keine Dokumente abgelegt.").classes("text-gray-500")
+        for e in entries:
+            res = status_by_seq.get(e["seq"], {"ok": True, "issues": []})
+            with ui.card().classes("w-full p-3"):
+                with ui.row().classes("w-full items-center gap-3"):
+                    ok_icon = "✅" if res["ok"] else "❌"
+                    ui.label(f"{ok_icon} {e['period']} · Revision {e['revision']}").classes("font-semibold")
+                    ui.label(e["ts"].replace("T", " ")).classes("text-xs text-gray-500")
+                    ui.label(f"Steuer {data.euro(e['values'].get('beherbergungssteuer', 0))} €") \
+                        .classes("text-xs")
+                    ui.space()
+
+                    def _dl(entry=e):
+                        try:
+                            ui.download.content(archive.read_pdf(entry["file"]),
+                                                os.path.basename(entry["file"]),
+                                                media_type="application/pdf")
+                        except FileNotFoundError:
+                            ui.notify("Datei fehlt im Archiv!", type="negative")
+                    ui.button("PDF", on_click=_dl).props("flat dense")
+                ui.label(f"SHA-256: {e['sha256']}").classes("text-xs text-gray-400 font-mono")
+                if not res["ok"]:
+                    ui.label("⚠️ " + "; ".join(res["issues"])).classes("text-xs text-red-700")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Schließen", on_click=dialog.close).props("flat")
+    dialog.open()
+
+
 # ---------------------------------------------------------------- Ergebnis
 def _kpi(container, label, value, accent=False):
     with container:
@@ -143,20 +183,48 @@ def render_result(container, result):
                          f"Steuer {data.euro(r['beherbergungssteuer'])} €").classes("font-semibold")
                 ui.label(f"Airbnb: {r['uebernachtungen_airbnb']} ÜN (keine Steuer)").classes("text-gray-500")
 
-        # PDF-Download
-        def download_pdf():
+        # PDF erzeugen (gemeinsame Logik)
+        def build_pdf():
             if pdf_form is None:
                 ui.notify("PDF benötigt PyMuPDF (pip install -r requirements.txt)", type="negative")
-                return
+                return None
             if not os.path.exists(pdf_form.TEMPLATE):
                 ui.notify("Blanko-Vorlage fehlt – siehe templates/README.md", type="negative")
-                return
-            pdf = pdf_form.render_pdf(r, CFG, datum=date.today().strftime("%d.%m.%Y"))
-            ui.download.content(pdf, f"Beherbergungssteuer_{r['year']}-{r['month']:02d}.pdf",
-                                media_type="application/pdf")
+                return None
+            return pdf_form.render_pdf(r, CFG, datum=date.today().strftime("%d.%m.%Y"))
 
-        ui.button("📄 Amtliches Formular (PDF) herunterladen",
-                  on_click=download_pdf).props("unelevated")
+        def _values():
+            return {k: r[k] for k in (
+                "uebernachtungen_insgesamt", "uebernachtungen_airbnb",
+                "uebernachtungen_verbleibend", "umsatz_verbleibend",
+                "umsatz_steuerbefreit", "umsatz_steuerpflichtig", "beherbergungssteuer")}
+
+        period = f"{r['year']}-{r['month']:02d}"
+        fname = f"Beherbergungssteuer_{period}.pdf"
+
+        def festschreiben():
+            pdf = build_pdf()
+            if pdf is None:
+                return
+            entry = archive.archive_pdf(pdf, period, _values())
+            ui.download.content(pdf, f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
+                                media_type="application/pdf")
+            ui.notify(f"Revisionssicher abgelegt: Revision {entry['revision']} · "
+                      f"SHA-256 {entry['sha256'][:12]}…", type="positive", timeout=7000)
+
+        def vorschau():
+            pdf = build_pdf()
+            if pdf is not None:
+                ui.download.content(pdf, fname, media_type="application/pdf")
+
+        with ui.row().classes("gap-2 items-center"):
+            ui.button("📥 Erzeugen & revisionssicher ablegen",
+                      on_click=festschreiben).props("unelevated")
+            ui.button("👁 Nur Vorschau", on_click=vorschau).props("flat")
+            existing = sum(1 for e in archive.list_entries() if e["period"] == period)
+            if existing:
+                ui.label(f"⚠️ Für {period} bereits {existing} Ablage(n) – Erzeugen legt "
+                         "eine neue Revision an.").classes("text-xs text-amber-700")
 
 
 # ---------------------------------------------------------------- Hauptseite
@@ -168,7 +236,9 @@ def main_page():
 
     with ui.header().classes("items-center justify-between"):
         ui.label("Beherbergungssteuer Dresden").classes("text-lg font-bold")
-        ui.button("⚙️ Einstellungen", on_click=open_settings).props("flat color=white")
+        with ui.row().classes("gap-1"):
+            ui.button("📚 Archiv", on_click=open_archive).props("flat color=white")
+            ui.button("⚙️ Einstellungen", on_click=open_settings).props("flat color=white")
 
     with ui.column().classes("w-full max-w-5xl mx-auto p-4 gap-4"):
         with ui.card().classes("w-full"):
@@ -183,12 +253,20 @@ def main_page():
                     .props('placeholder="leer = berechnet" clearable')
                 befreit = ui.number("Steuerbefr. Umsatz €", value=0, step=0.01)
                 ui.button("Berechnen", on_click=lambda: do_compute()).props("unelevated")
-            ui.label("Zuordnung nach Abreisedatum (§6) · nur bereits stattgefundene Buchungen · "
-                     "Airbnb wird berechnet, nicht besteuert.").classes("text-xs text-gray-500")
+                ui.button(icon="refresh", on_click=lambda: do_compute(force=True)) \
+                    .props("flat round").tooltip("Frisch von Smoobu laden (Cache leeren)")
+            with ui.row().classes("items-center gap-2"):
+                ui.label("Zuordnung nach Abreisedatum (§6) · nur bereits stattgefundene "
+                         "Buchungen · Airbnb wird berechnet, nicht besteuert.") \
+                    .classes("text-xs text-gray-500")
+                ui.space()
+                status = ui.label("").classes("text-xs text-gray-400")
 
         results = ui.column().classes("w-full gap-4")
 
-        def do_compute():
+        def do_compute(force=False):
+            if force:
+                data.clear_cache()
             try:
                 result = data.compute(
                     int(year.value), int(month.value),
@@ -198,7 +276,11 @@ def main_page():
             except smoobu.SmoobuError as ex:
                 ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
                 return
+            if data.LAST_FETCH:
+                status.text = f"Daten zuletzt von Smoobu geladen: {data.LAST_FETCH.strftime('%H:%M:%S')} (Cache 5 Min.)"
             render_result(results, result)
+            if force:
+                ui.notify("Frisch von Smoobu geladen", type="positive")
 
 
 def run():

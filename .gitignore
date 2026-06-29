@@ -19,3 +19,6 @@ venv/
 
 # Unterschrift (personenbezogen)
 assets/
+
+# Archiv (echte Steuerdokumente, personenbezogen)
+archive/

@@ -30,6 +30,7 @@ BETREIBER_FIELDS = [
 
 _CACHE = {}
 _CACHE_TTL = 300
+LAST_FETCH = None  # Zeitpunkt des letzten echten API-Zugriffs (datetime)
 
 
 def save_config():
@@ -46,12 +47,15 @@ def get_apartments():
 
 
 def _reservations(date_from, date_to):
+    global LAST_FETCH
     key = (date_from, date_to)
     hit = _CACHE.get(key)
     if hit and (time.time() - hit[0]) < _CACHE_TTL:
         return hit[1]
+    from datetime import datetime
     data = smoobu.get_reservations(CONFIG["smoobu_api_key"], date_from, date_to)
     _CACHE[key] = (time.time(), data)
+    LAST_FETCH = datetime.now()
     return data
 
 

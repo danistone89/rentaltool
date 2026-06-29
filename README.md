@@ -30,6 +30,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/steuer.py` | Steuerberechnung (Golden-Tests) |
 | `app/smoobu.py` | Smoobu-API-Client |
 | `app/pdf_form.py` | Amtliches PDF aus Blanko-Vorlage |
+| `app/archive.py` | Revisionssichere Ablage (Hash-Kette, Versionen) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
@@ -45,6 +46,32 @@ dabei nach `assets/signature.png` extrahiert.
 `app/pdf_form.py` setzt je Anmeldung ein: Betreiberdaten + Kassenzeichen aus
 `config.json`, die berechneten Werte, das Monatskreuz und die Unterschrift
 (`assets/signature.png`, Position über `unterschrift_x` einstellbar).
+
+## Revisionssichere Ablage & erneute Erstellung
+
+Über **„📥 Erzeugen & revisionssicher ablegen"** wird das PDF unveränderbar im
+Archiv festgeschrieben (Modul `app/archive.py`):
+
+* Datei → `archive/<jahr>/Beherbergungssteuer_<periode>_v<rev>.pdf`,
+  auf **schreibgeschützt (0444)** gesetzt, wird **nie überschrieben**.
+* **Erneute Erstellung** eines Monats legt eine **neue Revision** an (v2, v3 …) –
+  die alte bleibt erhalten (= „berichtigte Anmeldung"). Über **„👁 Nur Vorschau"**
+  lässt sich ein PDF unverbindlich ansehen, ohne es abzulegen.
+* Jede Ablage wird in einer **append-only Hash-Kette** (`archive/ledger.jsonl`)
+  protokolliert (SHA-256 der PDF + `prev_hash`-Verkettung). Das **Archiv** (📚 oben)
+  listet alle Ablagen und prüft die Integrität – jede nachträgliche Änderung an
+  Datei oder Eintrag wird erkannt.
+
+> Pragmatische Revisionssicherheit (Integrität, Unveränderbarkeit, Nachweis). Für
+> volle GoBD-Konformität das `archive/`-Verzeichnis zusätzlich auf ein WORM-/
+> Backup-Medium außerhalb dieses Rechners spiegeln. `archive/` ist gitignored.
+
+## Datenaktualität
+
+Smoobu-Daten werden beim **Berechnen** geladen und **5 Minuten** pro Monats-
+zeitraum zwischengespeichert. Der **🔄-Button** leert den Cache und lädt frisch;
+unter den Eingaben steht „Daten zuletzt von Smoobu geladen: …". Der Webhook
+(`/api/smoobu/webhook`) leert den Cache automatisch bei Änderungen in Smoobu.
 
 ## Einstellungen
 
