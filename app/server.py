@@ -46,6 +46,37 @@ def _reservations(date_from, date_to):
     return data
 
 
+def _save_settings(form):
+    """Einstellungen aus dem Formular in CFG übernehmen und config.json schreiben."""
+    def g(key, default=""):
+        return form.get(key, [default])[0]
+
+    betr = CFG.setdefault("betreiber", {})
+    for key, _lbl in render._SETTINGS_BETREIBER:
+        betr[key] = g("betreiber." + key, betr.get(key, ""))
+
+    val = g("unterschrift_x", "")
+    if val:
+        f = float(val.replace(",", "."))
+        CFG["unterschrift_x"] = int(f) if f == int(f) else f
+
+    pct = g("steuersatz_pct", "")
+    if pct:
+        CFG["steuersatz"] = round(float(pct.replace(",", ".")) / 100, 4)
+
+    ch = g("airbnb_channel_name", "").strip()
+    if ch:
+        CFG["airbnb_channel_name"] = ch
+
+    api = g("smoobu_api_key", "").strip()
+    if api:
+        CFG["smoobu_api_key"] = api
+        _CACHE.clear()
+
+    with open(os.path.join(HERE, "config.json"), "w", encoding="utf-8") as fh:
+        json.dump(CFG, fh, ensure_ascii=False, indent=2)
+
+
 def _selection(q):
     today = date.today()
     return {
@@ -96,6 +127,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, "ok", "text/plain")
         if parsed.path == "/pdf":
             return self._serve_pdf(urllib.parse.parse_qs(parsed.query))
+        if parsed.path == "/settings":
+            saved = "saved" in urllib.parse.parse_qs(parsed.query)
+            return self._send(200, render.settings_page(CFG, saved))
         if parsed.path != "/":
             return self._send(404, "Not found", "text/plain")
 
@@ -129,7 +163,7 @@ class Handler(BaseHTTPRequestHandler):
         except smoobu.SmoobuError as ex:
             return self._send(502, str(ex), "text/plain; charset=utf-8")
         datum = date.today().strftime("%d.%m.%Y")
-        pdf = pdf_form.render_pdf(result, datum=datum)
+        pdf = pdf_form.render_pdf(result, CFG, datum=datum)
         fname = f"Beherbergungssteuer_{result['year']}-{result['month']:02d}.pdf"
         self.send_response(200)
         self.send_header("Content-Type", "application/pdf")
@@ -140,6 +174,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/settings":
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            form = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8"))
+            _save_settings(form)
+            self.send_response(303)
+            self.send_header("Location", "/settings?saved=1")
+            self.end_headers()
+            return
         if parsed.path == "/api/smoobu/webhook":
             length = int(self.headers.get("Content-Length", 0) or 0)
             _ = self.rfile.read(length)  # Payload aktuell nur als Trigger genutzt

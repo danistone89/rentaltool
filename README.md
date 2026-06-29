@@ -23,13 +23,22 @@ herunterladen"** (Route `/pdf`).
 
 Dresden bietet das Formular nur über ein Online-System (intelliform) an, kein
 Blanko-Download. Daher wurde aus einer eingereichten PDF einmalig eine
-Blanko-Vorlage erzeugt: `templates/anmeldung_blank.pdf` – variable Werte (Zahlen,
-Datum, Jahr, Monatskreuz, abgabe-spezifische Dokument-ID) per Redaction entfernt,
-Betreiberdaten/Kassenzeichen/Layout erhalten (Generator: `tools/make_blank.py`).
+Blanko-Vorlage erzeugt: `templates/anmeldung_blank.pdf` – ALLE variablen/
+personenbezogenen Werte (Zahlen, Datum, Jahr, Monatskreuz, Dokument-ID,
+Betreiberdaten, Kassenzeichen, **Unterschrift**) per Redaction entfernt, nur das
+Formular-Layout bleibt (Generator: `tools/make_blank.py`). Die Unterschrift wird
+dabei nach `assets/signature.png` extrahiert.
 
-`app/pdf_form.py` setzt je Monat nur die berechneten Werte koordinatengenau ein
-und kreuzt den Monat an. Ändern sich Betreiberdaten/Kassenzeichen, Vorlage mit
-`tools/make_blank.py` aus einer aktuellen PDF neu erzeugen.
+`app/pdf_form.py` setzt je Anmeldung ein: Betreiberdaten + Kassenzeichen aus
+`config.json`, die berechneten Werte, das Monatskreuz und die Unterschrift
+(`assets/signature.png`, Position über `unterschrift_x` einstellbar).
+
+## Einstellungen
+
+Unter **⚙️ Einstellungen** (`/settings`) lassen sich die PDF-Felder bearbeiten:
+Betreiberdaten (Name, Adresse, **Telefon**, Kassenzeichen …), Unterschrift-Position,
+Steuersatz, Smoobu-API-Key, Airbnb-Kanalname. Gespeichert wird in `config.json`
+(lokal, nicht im Repo).
 
 ## Rechenregeln (Satzung Dresden v. 7.5.2015 + Vorgaben Betreiber)
 

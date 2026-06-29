@@ -8,9 +8,11 @@
   "steuersatz": 0.06,
   "airbnb_channel_name": "Airbnb",
 
+  "unterschrift_x": 210,
+
   "betreiber": {
-    "name": "Nachname Vorname",
-    "zusatz": "",
+    "name": "Nachname",
+    "zusatz": "Vorname",
     "strasse": "Musterstr.",
     "hausnummer": "1",
     "plz": "01000",

@@ -84,7 +84,8 @@ def dashboard(cfg, apartments, sel, result, error=None):
     body = [f"""<!doctype html><html lang="de"><meta charset="utf-8">
 <title>Beherbergungssteuer Dresden</title><style>{PAGE_CSS}</style>
 <header><h1>Beherbergungssteuer Dresden</h1>
-<span class="sub">{_esc(cfg['betreiber']['name'])} · Kassenzeichen {_esc(cfg['betreiber']['kassenzeichen'])}</span></header>
+<span class="sub">{_esc(cfg['betreiber']['name'])} {_esc(cfg['betreiber'].get('zusatz',''))} · Kassenzeichen {_esc(cfg['betreiber']['kassenzeichen'])}</span>
+<a class="btn" style="margin-left:auto" href="/settings">⚙️ Einstellungen</a></header>
 <main>
 <form class="card noprint" method="get" action="/">
   <div class="controls">
@@ -166,3 +167,58 @@ def _booking_table(r):
 <tbody>{''.join(rows)}</tbody>{foot}</table></div>"""
 
 
+
+
+# Felder für die Einstellungs-Seite: (config-Pfad, Label, Typ)
+_SETTINGS_BETREIBER = [
+    ("name", "Name/Firma"), ("zusatz", "Vorname/Firmenzusatz"),
+    ("strasse", "Straße"), ("hausnummer", "Hausnummer"),
+    ("plz", "PLZ"), ("ort", "Ort"),
+    ("telefon", "Telefon"), ("kassenzeichen", "Kassenzeichen"),
+]
+
+
+def settings_page(cfg, saved=False):
+    b = cfg.get("betreiber", {})
+    betr_inputs = "".join(
+        f'''<label class="fld"><span>{_esc(lbl)}</span>
+        <input type="text" name="betreiber.{key}" value="{_esc(b.get(key,""))}"></label>'''
+        for key, lbl in _SETTINGS_BETREIBER)
+    saved_banner = ('<div class="ok">✓ Einstellungen gespeichert.</div>' if saved else "")
+    return f"""<!doctype html><html lang="de"><meta charset="utf-8">
+<title>Einstellungen · Beherbergungssteuer</title><style>{PAGE_CSS}
+.fld{{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}}
+.fld input{{font:14px inherit;padding:8px 9px;border:1px solid var(--line);border-radius:7px;color:var(--ink)}}
+.grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
+.ok{{background:#e8f8ee;border:1px solid #aee0c0;color:#0a7d33;padding:10px 14px;border-radius:8px;margin-bottom:16px}}
+.sec-title{{font-weight:600;margin:6px 0 2px}}
+</style>
+<header><h1>⚙️ Einstellungen</h1><a class="btn" style="margin-left:auto" href="/">← zurück</a></header>
+<main>
+{saved_banner}
+<form class="card" method="post" action="/settings">
+  <h2>Betreiberdaten (erscheinen im PDF)</h2>
+  <div class="grid">{betr_inputs}</div>
+
+  <h2 style="margin-top:22px">PDF & Steuer</h2>
+  <div class="grid">
+    <label class="fld"><span>Unterschrift X-Position (pt, größer = weiter rechts)</span>
+      <input type="number" step="1" name="unterschrift_x" value="{_esc(cfg.get('unterschrift_x',210))}"></label>
+    <label class="fld"><span>Steuersatz (%)</span>
+      <input type="number" step="0.1" name="steuersatz_pct" value="{cfg.get('steuersatz',0.06)*100:.1f}"></label>
+  </div>
+
+  <h2 style="margin-top:22px">Smoobu</h2>
+  <div class="grid">
+    <label class="fld"><span>API-Key (leer lassen = unverändert)</span>
+      <input type="password" name="smoobu_api_key" value="" placeholder="•••••••• unverändert"></label>
+    <label class="fld"><span>Airbnb-Kanalname (steuerfrei)</span>
+      <input type="text" name="airbnb_channel_name" value="{_esc(cfg.get('airbnb_channel_name','Airbnb'))}"></label>
+  </div>
+
+  <div style="margin-top:20px;display:flex;gap:10px;align-items:center">
+    <button type="submit">Speichern</button>
+    <span class="note">Wird in config.json gespeichert (lokal, nicht im Repo).</span>
+  </div>
+</form>
+</main></html>"""
