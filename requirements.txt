@@ -1,0 +1,3 @@
+# Laufzeit-Abhängigkeit nur für die PDF-Erzeugung (amtliches Formular).
+# Die Berechnung & Web-UI laufen auch ohne (reine Standardbibliothek).
+pymupdf>=1.24

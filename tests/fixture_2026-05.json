@@ -1,0 +1,4885 @@
+[
+{
+"id": 98980388,
+"type": "reservation",
+"arrival": "2025-05-31",
+"departure": "2025-06-02",
+"adults": null,
+"children": null,
+"price": 112.32,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 1",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980383,
+"type": "modification of booking",
+"arrival": "2025-06-03",
+"departure": "2025-06-05",
+"adults": null,
+"children": null,
+"price": 137.7,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 2",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980263,
+"type": "cancellation",
+"arrival": "2025-06-05",
+"departure": "2025-06-06",
+"adults": null,
+"children": null,
+"price": 58.32,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 3",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980268,
+"type": "modification of booking",
+"arrival": "2025-06-06",
+"departure": "2025-06-07",
+"adults": null,
+"children": null,
+"price": 81,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 4",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980308,
+"type": "modification of booking",
+"arrival": "2025-06-07",
+"departure": "2025-06-09",
+"adults": null,
+"children": null,
+"price": 153,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 5",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980288,
+"type": "modification of booking",
+"arrival": "2025-06-10",
+"departure": "2025-06-11",
+"adults": null,
+"children": null,
+"price": 81,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 6",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980373,
+"type": "modification of booking",
+"arrival": "2025-06-12",
+"departure": "2025-06-14",
+"adults": null,
+"children": null,
+"price": 153,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 7",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980338,
+"type": "modification of booking",
+"arrival": "2025-06-14",
+"departure": "2025-06-15",
+"adults": null,
+"children": null,
+"price": 81,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 8",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980278,
+"type": "modification of booking",
+"arrival": "2025-06-15",
+"departure": "2025-06-16",
+"adults": null,
+"children": null,
+"price": 68.85,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 9",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100644238,
+"type": "modification of booking",
+"arrival": "2025-06-16",
+"departure": "2025-06-18",
+"adults": 2,
+"children": 0,
+"price": 175.28,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 6.81\r\nÜbernachtungssteuer - EUR 6.24",
+"is-blocked-booking": false,
+"guest-name": "Gast 10",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980283,
+"type": "cancellation",
+"arrival": "2025-06-16",
+"departure": "2025-06-19",
+"adults": null,
+"children": null,
+"price": 216.75,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 11",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980318,
+"type": "modification of booking",
+"arrival": "2025-06-19",
+"departure": "2025-06-21",
+"adults": null,
+"children": null,
+"price": 134.4,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 12",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980353,
+"type": "cancellation",
+"arrival": "2025-06-21",
+"departure": "2025-06-22",
+"adults": null,
+"children": null,
+"price": 108,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 13",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100215298,
+"type": "cancellation",
+"arrival": "2025-06-21",
+"departure": "2025-06-22",
+"adults": 2,
+"children": 1,
+"price": 148.74,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 5.17\r\nÜbernachtungssteuer - EUR 4.74",
+"is-blocked-booking": false,
+"guest-name": "Gast 14",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100650508,
+"type": "modification of booking",
+"arrival": "2025-06-21",
+"departure": "2025-06-23",
+"adults": 3,
+"children": 0,
+"price": 236.31,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 10.57\r\nÜbernachtungssteuer - EUR 9.7",
+"is-blocked-booking": false,
+"guest-name": "Gast 15",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98995263,
+"type": "modification of booking",
+"arrival": "2025-06-23",
+"departure": "2025-06-28",
+"adults": 2,
+"children": 0,
+"price": 224.8,
+"price-details": "Cancellation Host Fee - EUR 6.74\r\nCancellation Payout - EUR 218.06\r\nAirbnb Collected Tax - EUR 13.49",
+"is-blocked-booking": false,
+"guest-name": "Gast 16",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980328,
+"type": "modification of booking",
+"arrival": "2025-06-28",
+"departure": "2025-06-29",
+"adults": null,
+"children": null,
+"price": 81,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 17",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100685408,
+"type": "cancellation",
+"arrival": "2025-06-30",
+"departure": "2025-07-03",
+"adults": 1,
+"children": 1,
+"price": 278.7,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 13.19\r\nÜbernachtungssteuer - EUR 12.1",
+"is-blocked-booking": false,
+"guest-name": "Gast 18",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 102246058,
+"type": "modification of booking",
+"arrival": "2025-06-30",
+"departure": "2025-07-03",
+"adults": 2,
+"children": 0,
+"price": 243.59,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 11.02\r\nÜbernachtungssteuer - EUR 10.11",
+"is-blocked-booking": false,
+"guest-name": "Gast 19",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980303,
+"type": "modification of booking",
+"arrival": "2025-07-04",
+"departure": "2025-07-06",
+"adults": null,
+"children": null,
+"price": 190,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 20",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 102137873,
+"type": "cancellation",
+"arrival": "2025-07-07",
+"departure": "2025-07-10",
+"adults": 1,
+"children": 1,
+"price": 277.01,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 13.08\r\nÜbernachtungssteuer - EUR 12",
+"is-blocked-booking": false,
+"guest-name": "Gast 21",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 102988228,
+"type": "modification of booking",
+"arrival": "2025-07-07",
+"departure": "2025-07-11",
+"adults": 3,
+"children": 0,
+"price": 343.14,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 17.17\r\nÜbernachtungssteuer - EUR 15.74",
+"is-blocked-booking": false,
+"guest-name": "Gast 22",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980393,
+"type": "cancellation",
+"arrival": "2025-07-08",
+"departure": "2025-07-10",
+"adults": null,
+"children": null,
+"price": 170,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 23",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98995268,
+"type": "modification of booking",
+"arrival": "2025-07-11",
+"departure": "2025-07-13",
+"adults": 2,
+"children": 0,
+"price": 165,
+"price-details": "Cancellation Host Fee - EUR 4.95\r\nCancellation Payout - EUR 160.05\r\nAirbnb Collected Tax - EUR 9.9",
+"is-blocked-booking": false,
+"guest-name": "Gast 24",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980363,
+"type": "modification of booking",
+"arrival": "2025-07-14",
+"departure": "2025-07-17",
+"adults": null,
+"children": null,
+"price": 255,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 25",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980378,
+"type": "reservation",
+"arrival": "2025-07-17",
+"departure": "2025-07-20",
+"adults": null,
+"children": null,
+"price": 280,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 26",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99964508,
+"type": "modification of booking",
+"arrival": "2025-07-20",
+"departure": "2025-07-24",
+"adults": 2,
+"children": 1,
+"price": 398.37,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 20.57\r\nÜbernachtungssteuer - EUR 18.87",
+"is-blocked-booking": false,
+"guest-name": "Gast 27",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980358,
+"type": "cancellation",
+"arrival": "2025-07-24",
+"departure": "2025-07-26",
+"adults": null,
+"children": null,
+"price": 162,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 28",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104206693,
+"type": "cancellation",
+"arrival": "2025-07-25",
+"departure": "2025-07-26",
+"adults": 2,
+"children": 0,
+"price": 179.27,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 6.47",
+"is-blocked-booking": false,
+"guest-name": "Gast 29",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104917532,
+"type": "reservation",
+"arrival": "2025-07-25",
+"departure": "2025-07-26",
+"adults": 3,
+"children": 0,
+"price": 187.54,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 6.94",
+"is-blocked-booking": false,
+"guest-name": "Gast 30",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980368,
+"type": "modification of booking",
+"arrival": "2025-07-26",
+"departure": "2025-07-27",
+"adults": null,
+"children": null,
+"price": 72,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 31",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980323,
+"type": "reservation",
+"arrival": "2025-07-27",
+"departure": "2025-07-30",
+"adults": null,
+"children": null,
+"price": 252,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 32",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98995273,
+"type": "modification of booking",
+"arrival": "2025-07-31",
+"departure": "2025-08-03",
+"adults": 2,
+"children": 2,
+"price": 321,
+"price-details": "Cancellation Host Fee - EUR 9.63\r\nCancellation Payout - EUR 311.37\r\nAirbnb Collected Tax - EUR 19.26",
+"is-blocked-booking": false,
+"guest-name": "Gast 33",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101756853,
+"type": "cancellation",
+"arrival": "2025-08-03",
+"departure": "2025-08-04",
+"adults": 2,
+"children": 1,
+"price": 140.37,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 4.65\r\nÜbernachtungssteuer - EUR 4.27",
+"is-blocked-booking": false,
+"guest-name": "Gast 34",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101151533,
+"type": "modification of booking",
+"arrival": "2025-08-04",
+"departure": "2025-08-06",
+"adults": 1,
+"children": 0,
+"price": 193.98,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 7.96\r\nÜbernachtungssteuer - EUR 7.3",
+"is-blocked-booking": false,
+"guest-name": "Gast 35",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98995278,
+"type": "reservation",
+"arrival": "2025-08-08",
+"departure": "2025-08-10",
+"adults": 2,
+"children": 0,
+"price": 112,
+"price-details": "Cancellation Host Fee - EUR 3.36\r\nCancellation Payout - EUR 108.64\r\nAirbnb Collected Tax - EUR 6.72",
+"is-blocked-booking": false,
+"guest-name": "Gast 36",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980313,
+"type": "cancellation",
+"arrival": "2025-08-11",
+"departure": "2025-08-14",
+"adults": null,
+"children": null,
+"price": 255,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 37",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104155388,
+"type": "reservation",
+"arrival": "2025-08-11",
+"departure": "2025-08-14",
+"adults": 2,
+"children": 0,
+"price": 273.61,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.81",
+"is-blocked-booking": false,
+"guest-name": "Gast 38",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980333,
+"type": "modification of booking",
+"arrival": "2025-08-14",
+"departure": "2025-08-15",
+"adults": null,
+"children": null,
+"price": 85,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 39",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 103018038,
+"type": "cancellation",
+"arrival": "2025-08-15",
+"departure": "2025-08-16",
+"adults": 3,
+"children": 0,
+"price": 137.34,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 4.46\r\nÜbernachtungssteuer - EUR 4.09",
+"is-blocked-booking": false,
+"guest-name": "Gast 40",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 106186271,
+"type": "modification of booking",
+"arrival": "2025-08-15",
+"departure": "2025-08-16",
+"adults": 3,
+"children": 0,
+"price": 141.45,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 4.33",
+"is-blocked-booking": false,
+"guest-name": "Gast 41",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980343,
+"type": "cancellation",
+"arrival": "2025-08-15",
+"departure": "2025-08-17",
+"adults": null,
+"children": null,
+"price": 171,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 42",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 103102673,
+"type": "modification of booking",
+"arrival": "2025-08-16",
+"departure": "2025-08-17",
+"adults": 2,
+"children": 0,
+"price": 134.54,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 4.29\r\nÜbernachtungssteuer - EUR 3.94",
+"is-blocked-booking": false,
+"guest-name": "Gast 43",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980348,
+"type": "reservation",
+"arrival": "2025-08-18",
+"departure": "2025-08-20",
+"adults": null,
+"children": null,
+"price": 162,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 44",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 107969726,
+"type": "modification of booking",
+"arrival": "2025-08-20",
+"departure": "2025-08-22",
+"adults": 2,
+"children": 1,
+"price": 215.73,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 8.53",
+"is-blocked-booking": false,
+"guest-name": "Gast 45",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980273,
+"type": "reservation",
+"arrival": "2025-08-22",
+"departure": "2025-08-24",
+"adults": null,
+"children": null,
+"price": 137.7,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 46",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980293,
+"type": "modification of booking",
+"arrival": "2025-08-24",
+"departure": "2025-08-28",
+"adults": 0,
+"children": 0,
+"price": 333,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 47",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 107569956,
+"type": "modification of booking",
+"arrival": "2025-08-28",
+"departure": "2025-08-29",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 48",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 98980298,
+"type": "cancellation",
+"arrival": "2025-08-28",
+"departure": "2025-08-31",
+"adults": null,
+"children": null,
+"price": 255,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 49",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 105884156,
+"type": "cancellation",
+"arrival": "2025-08-29",
+"departure": "2025-09-01",
+"adults": 2,
+"children": 0,
+"price": 266.83,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.42",
+"is-blocked-booking": false,
+"guest-name": "Gast 50",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 107300991,
+"type": "modification of booking",
+"arrival": "2025-08-29",
+"departure": "2025-09-02",
+"adults": 2,
+"children": 1,
+"price": 377.91,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 17.71",
+"is-blocked-booking": false,
+"guest-name": "Gast 51",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100188558,
+"type": "reservation",
+"arrival": "2025-09-02",
+"departure": "2025-09-05",
+"adults": 3,
+"children": 0,
+"price": 299.68,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 14.48\r\nÜbernachtungssteuer - EUR 13.28",
+"is-blocked-booking": false,
+"guest-name": "Gast 52",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 108340121,
+"type": "modification of booking",
+"arrival": "2025-09-05",
+"departure": "2025-09-07",
+"adults": 2,
+"children": 1,
+"price": 212.76,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 8.36",
+"is-blocked-booking": false,
+"guest-name": "Gast 53",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100103118,
+"type": "cancellation",
+"arrival": "2025-09-06",
+"departure": "2025-09-10",
+"adults": 2,
+"children": 0,
+"price": 385.76,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 19.8\r\nÜbernachtungssteuer - EUR 18.16",
+"is-blocked-booking": false,
+"guest-name": "Gast 54",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 108359176,
+"type": "reservation",
+"arrival": "2025-09-08",
+"departure": "2025-09-10",
+"adults": 2,
+"children": 0,
+"price": 212.55,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 8.35",
+"is-blocked-booking": false,
+"guest-name": "Gast 55",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 102637348,
+"type": "reservation",
+"arrival": "2025-09-10",
+"departure": "2025-09-13",
+"adults": 3,
+"children": 0,
+"price": 305.34,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 14.83\r\nÜbernachtungssteuer - EUR 13.6",
+"is-blocked-booking": false,
+"guest-name": "Gast 56",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100667133,
+"type": "cancellation",
+"arrival": "2025-09-13",
+"departure": "2025-09-16",
+"adults": 2,
+"children": 0,
+"price": 307,
+"price-details": "Cancellation Host Fee - EUR 46.05\r\nCancellation Payout - EUR 260.95\r\nAirbnb Collected Tax - EUR 18.42",
+"is-blocked-booking": false,
+"guest-name": "Gast 57",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 111070801,
+"type": "modification of booking",
+"arrival": "2025-09-15",
+"departure": "2025-09-17",
+"adults": 2,
+"children": 0,
+"price": 196.8,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 7.46",
+"is-blocked-booking": false,
+"guest-name": "Gast 58",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101393618,
+"type": "modification of booking",
+"arrival": "2025-09-17",
+"departure": "2025-09-19",
+"adults": 2,
+"children": 0,
+"price": 190.93,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 7.77\r\nÜbernachtungssteuer - EUR 7.13",
+"is-blocked-booking": false,
+"guest-name": "Gast 59",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100087638,
+"type": "modification of booking",
+"arrival": "2025-09-19",
+"departure": "2025-09-21",
+"adults": 2,
+"children": 0,
+"price": 227.18,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 10.01\r\nÜbernachtungssteuer - EUR 9.18",
+"is-blocked-booking": false,
+"guest-name": "Gast 60",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100161533,
+"type": "cancellation",
+"arrival": "2025-09-22",
+"departure": "2025-09-23",
+"adults": 2,
+"children": 0,
+"price": 140.47,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 4.66\r\nÜbernachtungssteuer - EUR 4.27",
+"is-blocked-booking": false,
+"guest-name": "Gast 61",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 111417891,
+"type": "modification of booking",
+"arrival": "2025-09-22",
+"departure": "2025-09-27",
+"adults": 2,
+"children": 0,
+"price": 323.59,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 14.64",
+"is-blocked-booking": false,
+"guest-name": "Gast 62",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100111093,
+"type": "cancellation",
+"arrival": "2025-09-23",
+"departure": "2025-09-27",
+"adults": 2,
+"children": 0,
+"price": 349.93,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 17.59\r\nÜbernachtungssteuer - EUR 16.13",
+"is-blocked-booking": false,
+"guest-name": "Gast 63",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 109268386,
+"type": "reservation",
+"arrival": "2025-09-27",
+"departure": "2025-09-28",
+"adults": 2,
+"children": 1,
+"price": 145.14,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 4.54",
+"is-blocked-booking": false,
+"guest-name": "Gast 64",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100184043,
+"type": "reservation",
+"arrival": "2025-09-28",
+"departure": "2025-10-02",
+"adults": 1,
+"children": 0,
+"price": 350.09,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 17.59\r\nÜbernachtungssteuer - EUR 16.14",
+"is-blocked-booking": false,
+"guest-name": "Gast 65",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99950263,
+"type": "reservation",
+"arrival": "2025-10-02",
+"departure": "2025-10-05",
+"adults": 2,
+"children": 0,
+"price": 267.73,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 12.51\r\nÜbernachtungssteuer - EUR 11.47",
+"is-blocked-booking": false,
+"guest-name": "Gast 66",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 100446223,
+"type": "reservation",
+"arrival": "2025-10-05",
+"departure": "2025-10-09",
+"adults": 2,
+"children": 0,
+"price": 358.83,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 18.13\r\nÜbernachtungssteuer - EUR 16.63",
+"is-blocked-booking": false,
+"guest-name": "Gast 67",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113560546,
+"type": "cancellation",
+"arrival": "2025-10-06",
+"departure": "2025-10-07",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 68",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113550861,
+"type": "reservation",
+"arrival": "2025-10-07",
+"departure": "2025-10-09",
+"adults": 1,
+"children": 0,
+"price": 136,
+"price-details": "Cancellation Host Fee - EUR 20.4\r\nCancellation Payout - EUR 115.6\r\nAirbnb Collected Tax - EUR 8.16",
+"is-blocked-booking": false,
+"guest-name": "Gast 69",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113560536,
+"type": "cancellation",
+"arrival": "2025-10-09",
+"departure": "2025-10-12",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 70",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 105999836,
+"type": "modification of booking",
+"arrival": "2025-10-09",
+"departure": "2025-10-14",
+"adults": 2,
+"children": 0,
+"price": 425.54,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 20.41",
+"is-blocked-booking": false,
+"guest-name": "Gast 71",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113667556,
+"type": "reservation",
+"arrival": "2025-10-10",
+"departure": "2025-10-12",
+"adults": 2,
+"children": 2,
+"price": 309.65,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 13.25\r\nÜbernachtungssteuer - EUR 12.15",
+"is-blocked-booking": false,
+"guest-name": "Gast 72",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 101040788,
+"type": "cancellation",
+"arrival": "2025-10-10",
+"departure": "2025-10-13",
+"adults": 3,
+"children": 0,
+"price": 354.38,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 17.86\r\nÜbernachtungssteuer - EUR 16.38",
+"is-blocked-booking": false,
+"guest-name": "Gast 73",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422041,
+"type": "cancellation",
+"arrival": "2025-10-12",
+"departure": "2025-10-13",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 74",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113398321,
+"type": "modification of booking",
+"arrival": "2025-10-13",
+"departure": "2025-10-16",
+"adults": 2,
+"children": 2,
+"price": 236.97,
+"price-details": "Mehrwertsteuer - EUR 14.63\r\nÜbernachtungssteuer - EUR 13.41",
+"is-blocked-booking": false,
+"guest-name": "Gast 75",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422081,
+"type": "cancellation",
+"arrival": "2025-10-14",
+"departure": "2025-10-15",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 76",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99960363,
+"type": "modification of booking",
+"arrival": "2025-10-15",
+"departure": "2025-10-18",
+"adults": 2,
+"children": 0,
+"price": 281.24,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 13.35\r\nÜbernachtungssteuer - EUR 12.24",
+"is-blocked-booking": false,
+"guest-name": "Gast 77",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113542871,
+"type": "modification of booking",
+"arrival": "2025-10-16",
+"departure": "2025-10-19",
+"adults": 1,
+"children": 0,
+"price": 291.2,
+"price-details": "Cancellation Host Fee - EUR 43.68\r\nCancellation Payout - EUR 247.52\r\nAirbnb Collected Tax - EUR 17.47",
+"is-blocked-booking": false,
+"guest-name": "Gast 78",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 100313713,
+"type": "modification of booking",
+"arrival": "2025-10-18",
+"departure": "2025-10-26",
+"adults": 2,
+"children": 1,
+"price": 571.34,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 31.25\r\nÜbernachtungssteuer - EUR 28.66",
+"is-blocked-booking": false,
+"guest-name": "Gast 79",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113932811,
+"type": "reservation",
+"arrival": "2025-10-19",
+"departure": "2025-10-23",
+"adults": 1,
+"children": 2,
+"price": 463.24,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 22.73\r\nÜbernachtungssteuer - EUR 20.84",
+"is-blocked-booking": false,
+"guest-name": "Gast 80",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113557876,
+"type": "cancellation",
+"arrival": "2025-10-20",
+"departure": "2025-10-21",
+"adults": 1,
+"children": 0,
+"price": 205,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 81",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114559086,
+"type": "modification of booking",
+"arrival": "2025-10-23",
+"departure": "2025-10-25",
+"adults": 4,
+"children": 0,
+"price": 259,
+"price-details": "Cancellation Host Fee - EUR 46.23\r\nCancellation Payout - EUR 212.77\r\nAirbnb Collected Tax - EUR 15.54",
+"is-blocked-booking": false,
+"guest-name": "Gast 82",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113877961,
+"type": "modification of booking",
+"arrival": "2025-10-25",
+"departure": "2025-10-29",
+"adults": 2,
+"children": 1,
+"price": 420.41,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 20.08\r\nÜbernachtungssteuer - EUR 18.42",
+"is-blocked-booking": false,
+"guest-name": "Gast 83",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422086,
+"type": "cancellation",
+"arrival": "2025-10-26",
+"departure": "2025-10-27",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 84",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101479868,
+"type": "reservation",
+"arrival": "2025-10-27",
+"departure": "2025-10-30",
+"adults": 2,
+"children": 0,
+"price": 291.42,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 13.97\r\nÜbernachtungssteuer - EUR 12.82",
+"is-blocked-booking": false,
+"guest-name": "Gast 85",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 115740211,
+"type": "reservation",
+"arrival": "2025-10-29",
+"departure": "2025-11-01",
+"adults": 3,
+"children": 1,
+"price": 329.68,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 14.48\r\nÜbernachtungssteuer - EUR 13.28",
+"is-blocked-booking": false,
+"guest-name": "Gast 86",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422091,
+"type": "cancellation",
+"arrival": "2025-10-30",
+"departure": "2025-10-31",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 87",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 102546028,
+"type": "reservation",
+"arrival": "2025-10-31",
+"departure": "2025-11-02",
+"adults": 2,
+"children": 0,
+"price": 202,
+"price-details": "Cancellation Host Fee - EUR 30.3\r\nCancellation Payout - EUR 171.7\r\nAirbnb Collected Tax - EUR 12.12",
+"is-blocked-booking": false,
+"guest-name": "Gast 88",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114549376,
+"type": "cancellation",
+"arrival": "2025-11-01",
+"departure": "2025-11-04",
+"adults": 2,
+"children": 3,
+"price": 340.18,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 15.13\r\nÜbernachtungssteuer - EUR 13.88",
+"is-blocked-booking": false,
+"guest-name": "Gast 89",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114357111,
+"type": "reservation",
+"arrival": "2025-11-02",
+"departure": "2025-11-03",
+"adults": 3,
+"children": 0,
+"price": 132.74,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 3.83",
+"is-blocked-booking": false,
+"guest-name": "Gast 90",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116341201,
+"type": "modification of booking",
+"arrival": "2025-11-03",
+"departure": "2025-11-05",
+"adults": 2,
+"children": 1,
+"price": 185.76,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 6.84",
+"is-blocked-booking": false,
+"guest-name": "Gast 91",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 107255346,
+"type": "cancellation",
+"arrival": "2025-11-03",
+"departure": "2025-11-08",
+"adults": 2,
+"children": 0,
+"price": 312.19,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 13.99",
+"is-blocked-booking": false,
+"guest-name": "Gast 92",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422096,
+"type": "cancellation",
+"arrival": "2025-11-04",
+"departure": "2025-11-05",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 93",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 108835426,
+"type": "modification of booking",
+"arrival": "2025-11-05",
+"departure": "2025-11-07",
+"adults": 2,
+"children": 1,
+"price": 209.28,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 8.17",
+"is-blocked-booking": false,
+"guest-name": "Gast 94",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113943736,
+"type": "reservation",
+"arrival": "2025-11-06",
+"departure": "2025-11-09",
+"adults": 2,
+"children": 3,
+"price": 347.81,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 15.6\r\nÜbernachtungssteuer - EUR 14.31",
+"is-blocked-booking": false,
+"guest-name": "Gast 95",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422101,
+"type": "cancellation",
+"arrival": "2025-11-07",
+"departure": "2025-11-08",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 96",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116847821,
+"type": "reservation",
+"arrival": "2025-11-07",
+"departure": "2025-11-08",
+"adults": 1,
+"children": 0,
+"price": 125,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 97",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113783266,
+"type": "cancellation",
+"arrival": "2025-11-07",
+"departure": "2025-11-09",
+"adults": 5,
+"children": 0,
+"price": 299,
+"price-details": "Cancellation Host Fee - EUR 53.37\r\nCancellation Payout - EUR 245.63\r\nAirbnb Collected Tax - EUR 17.94",
+"is-blocked-booking": false,
+"guest-name": "Gast 98",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 102760758,
+"type": "reservation",
+"arrival": "2025-11-08",
+"departure": "2025-11-11",
+"adults": 3,
+"children": 0,
+"price": 260,
+"price-details": "Cancellation Host Fee - EUR 39\r\nCancellation Payout - EUR 221\r\nAirbnb Collected Tax - EUR 15.6\r\nAdditional Guest Fee - EUR 30",
+"is-blocked-booking": false,
+"guest-name": "Gast 99",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116580581,
+"type": "modification of booking",
+"arrival": "2025-11-10",
+"departure": "2025-11-14",
+"adults": 2,
+"children": 0,
+"price": 382.15,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 17.72\r\nÜbernachtungssteuer - EUR 16.25",
+"is-blocked-booking": false,
+"guest-name": "Gast 100",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422106,
+"type": "cancellation",
+"arrival": "2025-11-13",
+"departure": "2025-11-14",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 101",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117468926,
+"type": "modification of booking",
+"arrival": "2025-11-13",
+"departure": "2025-11-14",
+"adults": 1,
+"children": 0,
+"price": 119.84,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 6.78",
+"is-blocked-booking": false,
+"guest-name": "Gast 102",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 115174201,
+"type": "reservation",
+"arrival": "2025-11-14",
+"departure": "2025-11-16",
+"adults": 2,
+"children": 0,
+"price": 285.8,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 11.78\r\nÜbernachtungssteuer - EUR 10.8",
+"is-blocked-booking": false,
+"guest-name": "Gast 103",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 102504863,
+"type": "modification of booking",
+"arrival": "2025-11-14",
+"departure": "2025-11-20",
+"adults": 2,
+"children": 0,
+"price": 352.41,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 16.27",
+"is-blocked-booking": false,
+"guest-name": "Gast 104",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113679456,
+"type": "cancellation",
+"arrival": "2025-11-17",
+"departure": "2025-11-19",
+"adults": 4,
+"children": 0,
+"price": 257.18,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 10.01\r\nÜbernachtungssteuer - EUR 9.18",
+"is-blocked-booking": false,
+"guest-name": "Gast 105",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 116616271,
+"type": "reservation",
+"arrival": "2025-11-17",
+"departure": "2025-11-21",
+"adults": 2,
+"children": 0,
+"price": 428.9,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 20.61\r\nÜbernachtungssteuer - EUR 18.9",
+"is-blocked-booking": false,
+"guest-name": "Gast 106",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422111,
+"type": "cancellation",
+"arrival": "2025-11-20",
+"departure": "2025-11-21",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 107",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104936867,
+"type": "modification of booking",
+"arrival": "2025-11-21",
+"departure": "2025-11-26",
+"adults": 2,
+"children": 0,
+"price": 309.86,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 13.86",
+"is-blocked-booking": false,
+"guest-name": "Gast 108",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116867786,
+"type": "modification of booking",
+"arrival": "2025-11-25",
+"departure": "2025-11-29",
+"adults": 2,
+"children": 1,
+"price": 655.74,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 34.61\r\nÜbernachtungssteuer - EUR 31.74",
+"is-blocked-booking": false,
+"guest-name": "Gast 109",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422116,
+"type": "cancellation",
+"arrival": "2025-11-26",
+"departure": "2025-11-27",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 110",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117782101,
+"type": "reservation",
+"arrival": "2025-11-26",
+"departure": "2025-11-28",
+"adults": 3,
+"children": 0,
+"price": 206.89,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.71",
+"is-blocked-booking": false,
+"guest-name": "Gast 111",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99909173,
+"type": "cancellation",
+"arrival": "2025-11-27",
+"departure": "2025-11-30",
+"adults": 2,
+"children": 0,
+"price": 290.25,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 13.9\r\nÜbernachtungssteuer - EUR 12.75",
+"is-blocked-booking": false,
+"guest-name": "Gast 112",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422046,
+"type": "cancellation",
+"arrival": "2025-11-28",
+"departure": "2025-11-29",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 113",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 117352826,
+"type": "modification of booking",
+"arrival": "2025-11-28",
+"departure": "2025-11-30",
+"adults": 2,
+"children": 0,
+"price": 351.73,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 19.91",
+"is-blocked-booking": false,
+"guest-name": "Gast 114",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113398236,
+"type": "reservation",
+"arrival": "2025-11-29",
+"departure": "2025-11-30",
+"adults": 5,
+"children": 0,
+"price": 110.66,
+"price-details": "Mehrwertsteuer - EUR 6.83\r\nÜbernachtungssteuer - EUR 6.26",
+"is-blocked-booking": false,
+"guest-name": "Gast 115",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 103456748,
+"type": "cancellation",
+"arrival": "2025-11-30",
+"departure": "2025-12-03",
+"adults": 2,
+"children": 0,
+"price": 243.53,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 11.02\r\nÜbernachtungssteuer - EUR 10.11",
+"is-blocked-booking": false,
+"guest-name": "Gast 116",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113083156,
+"type": "reservation",
+"arrival": "2025-11-30",
+"departure": "2025-12-03",
+"adults": 3,
+"children": 0,
+"price": 303.5,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 13.5",
+"is-blocked-booking": false,
+"guest-name": "Gast 117",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119197361,
+"type": "modification of booking",
+"arrival": "2025-12-01",
+"departure": "2025-12-04",
+"adults": 3,
+"children": 0,
+"price": 341.11,
+"price-details": "Reinigungsgebühr - EUR 95\r\nÜbernachtungssteuer - EUR 19.31",
+"is-blocked-booking": false,
+"guest-name": "Gast 118",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 110976621,
+"type": "modification of booking",
+"arrival": "2025-12-03",
+"departure": "2025-12-05",
+"adults": 2,
+"children": 0,
+"price": 212.38,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 8.34",
+"is-blocked-booking": false,
+"guest-name": "Gast 119",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99032198,
+"type": "cancellation",
+"arrival": "2025-12-04",
+"departure": "2025-12-07",
+"adults": 2,
+"children": 0,
+"price": 381.89,
+"price-details": "Reinigungsgebühr - EUR 110\r\nMehrwertsteuer - EUR 16.78\r\nÜbernachtungssteuer - EUR 15.39",
+"is-blocked-booking": false,
+"guest-name": "Gast 120",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113995386,
+"type": "modification of booking",
+"arrival": "2025-12-04",
+"departure": "2025-12-07",
+"adults": 4,
+"children": 0,
+"price": 502.83,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 25.17\r\nÜbernachtungssteuer - EUR 23.09",
+"is-blocked-booking": false,
+"guest-name": "Gast 121",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 109862351,
+"type": "cancellation",
+"arrival": "2025-12-05",
+"departure": "2025-12-06",
+"adults": 2,
+"children": 1,
+"price": 147.07,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 4.65",
+"is-blocked-booking": false,
+"guest-name": "Gast 122",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 110007891,
+"type": "reservation",
+"arrival": "2025-12-05",
+"departure": "2025-12-06",
+"adults": 2,
+"children": 0,
+"price": 140.56,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 4.28",
+"is-blocked-booking": false,
+"guest-name": "Gast 123",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 109698291,
+"type": "modification of booking",
+"arrival": "2025-12-06",
+"departure": "2025-12-07",
+"adults": 2,
+"children": 0,
+"price": 146.57,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 4.62",
+"is-blocked-booking": false,
+"guest-name": "Gast 124",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119692671,
+"type": "reservation",
+"arrival": "2025-12-07",
+"departure": "2025-12-08",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 125",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 101231773,
+"type": "modification of booking",
+"arrival": "2025-12-07",
+"departure": "2025-12-12",
+"adults": 2,
+"children": 0,
+"price": 425.4,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 22.24\r\nÜbernachtungssteuer - EUR 20.4",
+"is-blocked-booking": false,
+"guest-name": "Gast 126",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119685781,
+"type": "modification of booking",
+"arrival": "2025-12-08",
+"departure": "2025-12-11",
+"adults": 2,
+"children": 0,
+"price": 365.91,
+"price-details": "Reinigungsgebühr - EUR 95\r\nÜbernachtungssteuer - EUR 20.71",
+"is-blocked-booking": false,
+"guest-name": "Gast 127",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422051,
+"type": "cancellation",
+"arrival": "2025-12-11",
+"departure": "2025-12-12",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 128",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 120212946,
+"type": "modification of booking",
+"arrival": "2025-12-12",
+"departure": "2025-12-13",
+"adults": 3,
+"children": 0,
+"price": 196,
+"price-details": "Cancellation Host Fee - EUR 36.15\r\nCancellation Payout - EUR 159.85\r\nAirbnb Collected Tax - EUR 11.76\r\nAdditional Guest Fee - EUR 10",
+"is-blocked-booking": false,
+"guest-name": "Gast 129",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 99749568,
+"type": "cancellation",
+"arrival": "2025-12-12",
+"departure": "2025-12-14",
+"adults": 2,
+"children": 0,
+"price": 291.26,
+"price-details": "Reinigungsgebühr - EUR 110\r\nMehrwertsteuer - EUR 11.19\r\nÜbernachtungssteuer - EUR 10.26",
+"is-blocked-booking": false,
+"guest-name": "Gast 130",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113407156,
+"type": "modification of booking",
+"arrival": "2025-12-12",
+"departure": "2025-12-14",
+"adults": 4,
+"children": 0,
+"price": 338.84,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 15.05\r\nÜbernachtungssteuer - EUR 13.8",
+"is-blocked-booking": false,
+"guest-name": "Gast 131",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 119902276,
+"type": "modification of booking",
+"arrival": "2025-12-13",
+"departure": "2025-12-14",
+"adults": 3,
+"children": 0,
+"price": 201.89,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.43",
+"is-blocked-booking": false,
+"guest-name": "Gast 132",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 120655016,
+"type": "modification of booking",
+"arrival": "2025-12-14",
+"departure": "2025-12-15",
+"adults": 1,
+"children": 0,
+"price": 118.7,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 6.72",
+"is-blocked-booking": false,
+"guest-name": "Gast 133",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 118278146,
+"type": "cancellation",
+"arrival": "2025-12-14",
+"departure": "2025-12-16",
+"adults": 2,
+"children": 1,
+"price": 227.39,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 12.87",
+"is-blocked-booking": false,
+"guest-name": "Gast 134",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119690686,
+"type": "cancellation",
+"arrival": "2025-12-14",
+"departure": "2025-12-16",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 135",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119994081,
+"type": "cancellation",
+"arrival": "2025-12-14",
+"departure": "2025-12-16",
+"adults": 0,
+"children": 0,
+"price": 95,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 136",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101108778,
+"type": "cancellation",
+"arrival": "2025-12-14",
+"departure": "2025-12-17",
+"adults": 2,
+"children": 0,
+"price": 268.52,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 12.56\r\nÜbernachtungssteuer - EUR 11.52",
+"is-blocked-booking": false,
+"guest-name": "Gast 137",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 120443926,
+"type": "modification of booking",
+"arrival": "2025-12-14",
+"departure": "2025-12-19",
+"adults": 2,
+"children": 1,
+"price": 487.07,
+"price-details": "Reinigungsgebühr - EUR 95\r\nÜbernachtungssteuer - EUR 27.57",
+"is-blocked-booking": false,
+"guest-name": "Gast 138",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 119051911,
+"type": "cancellation",
+"arrival": "2025-12-15",
+"departure": "2025-12-18",
+"adults": 2,
+"children": 2,
+"price": 405.03,
+"price-details": "Reinigungsgebühr - EUR 95\r\nÜbernachtungssteuer - EUR 22.93",
+"is-blocked-booking": false,
+"guest-name": "Gast 139",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 116536281,
+"type": "reservation",
+"arrival": "2025-12-16",
+"departure": "2025-12-19",
+"adults": 2,
+"children": 0,
+"price": 280.48,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 12.2",
+"is-blocked-booking": false,
+"guest-name": "Gast 140",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 106564731,
+"type": "cancellation",
+"arrival": "2025-12-17",
+"departure": "2025-12-18",
+"adults": 2,
+"children": 0,
+"price": 129.45,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 3.65",
+"is-blocked-booking": false,
+"guest-name": "Gast 141",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422121,
+"type": "cancellation",
+"arrival": "2025-12-18",
+"departure": "2025-12-19",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 142",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422056,
+"type": "cancellation",
+"arrival": "2025-12-19",
+"departure": "2025-12-20",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 143",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 99961473,
+"type": "modification of booking",
+"arrival": "2025-12-19",
+"departure": "2025-12-21",
+"adults": 2,
+"children": 0,
+"price": 218.17,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 9.45\r\nÜbernachtungssteuer - EUR 8.67",
+"is-blocked-booking": false,
+"guest-name": "Gast 144",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 115580316,
+"type": "reservation",
+"arrival": "2025-12-19",
+"departure": "2025-12-22",
+"adults": 4,
+"children": 0,
+"price": 587,
+"price-details": "Cancellation Host Fee - EUR 104.78\r\nCancellation Payout - EUR 482.22\r\nAirbnb Collected Tax - EUR 35.22",
+"is-blocked-booking": false,
+"guest-name": "Gast 145",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113396001,
+"type": "cancellation",
+"arrival": "2025-12-20",
+"departure": "2025-12-23",
+"adults": 4,
+"children": 0,
+"price": 292.56,
+"price-details": "Mehrwertsteuer - EUR 18.06\r\nÜbernachtungssteuer - EUR 16.56",
+"is-blocked-booking": false,
+"guest-name": "Gast 146",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 118586956,
+"type": "modification of booking",
+"arrival": "2025-12-21",
+"departure": "2025-12-22",
+"adults": 2,
+"children": 1,
+"price": 168.55,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 9.54",
+"is-blocked-booking": false,
+"guest-name": "Gast 147",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116765746,
+"type": "modification of booking",
+"arrival": "2025-12-22",
+"departure": "2025-12-25",
+"adults": 4,
+"children": 1,
+"price": 554.38,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 28\r\nÜbernachtungssteuer - EUR 31.38",
+"is-blocked-booking": false,
+"guest-name": "Gast 148",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 115701601,
+"type": "modification of booking",
+"arrival": "2025-12-22",
+"departure": "2025-12-26",
+"adults": 2,
+"children": 1,
+"price": 542.49,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 27.03",
+"is-blocked-booking": false,
+"guest-name": "Gast 149",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114219051,
+"type": "cancellation",
+"arrival": "2025-12-23",
+"departure": "2025-12-26",
+"adults": 2,
+"children": 0,
+"price": 489,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 24.32\r\nÜbernachtungssteuer - EUR 22.3",
+"is-blocked-booking": false,
+"guest-name": "Gast 150",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114904316,
+"type": "cancellation",
+"arrival": "2025-12-24",
+"departure": "2026-01-02",
+"adults": 1,
+"children": 0,
+"price": 1358.66,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 151",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114934386,
+"type": "modification of booking",
+"arrival": "2025-12-25",
+"departure": "2025-12-28",
+"adults": 2,
+"children": 2,
+"price": 431.57,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 20.77\r\nÜbernachtungssteuer - EUR 19.05",
+"is-blocked-booking": false,
+"guest-name": "Gast 152",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422126,
+"type": "cancellation",
+"arrival": "2025-12-26",
+"departure": "2025-12-27",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 153",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 121307776,
+"type": "reservation",
+"arrival": "2025-12-26",
+"departure": "2025-12-28",
+"adults": 2,
+"children": 0,
+"price": 211.49,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.97",
+"is-blocked-booking": false,
+"guest-name": "Gast 154",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114276761,
+"type": "cancellation",
+"arrival": "2025-12-26",
+"departure": "2026-01-02",
+"adults": 2,
+"children": 3,
+"price": 944.84,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 52.45\r\nÜbernachtungssteuer - EUR 48.1",
+"is-blocked-booking": false,
+"guest-name": "Gast 155",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 101309803,
+"type": "cancellation",
+"arrival": "2025-12-27",
+"departure": "2025-12-29",
+"adults": 2,
+"children": 0,
+"price": 223.58,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 9.79\r\nÜbernachtungssteuer - EUR 8.98",
+"is-blocked-booking": false,
+"guest-name": "Gast 156",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104685148,
+"type": "cancellation",
+"arrival": "2025-12-27",
+"departure": "2025-12-30",
+"adults": 2,
+"children": 0,
+"price": 265,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.32",
+"is-blocked-booking": false,
+"guest-name": "Gast 157",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 104754538,
+"type": "cancellation",
+"arrival": "2025-12-27",
+"departure": "2025-12-30",
+"adults": 2,
+"children": 0,
+"price": 265,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.32",
+"is-blocked-booking": false,
+"guest-name": "Gast 158",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 108716906,
+"type": "cancellation",
+"arrival": "2025-12-27",
+"departure": "2025-12-30",
+"adults": 2,
+"children": 0,
+"price": 262.75,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 11.19",
+"is-blocked-booking": false,
+"guest-name": "Gast 159",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 109544316,
+"type": "cancellation",
+"arrival": "2025-12-27",
+"departure": "2025-12-30",
+"adults": 2,
+"children": 0,
+"price": 244.78,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 10.18",
+"is-blocked-booking": false,
+"guest-name": "Gast 160",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 121081721,
+"type": "cancellation",
+"arrival": "2025-12-28",
+"departure": "2025-12-30",
+"adults": 1,
+"children": 0,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 161",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 118079481,
+"type": "modification of booking",
+"arrival": "2025-12-29",
+"departure": "2026-01-01",
+"adults": 4,
+"children": 0,
+"price": 656,
+"price-details": "Cancellation Host Fee - EUR 121\r\nCancellation Payout - EUR 535\r\nAirbnb Collected Tax - EUR 39.36",
+"is-blocked-booking": false,
+"guest-name": "Gast 162",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 117391286,
+"type": "modification of booking",
+"arrival": "2025-12-30",
+"departure": "2026-01-02",
+"adults": 2,
+"children": 0,
+"price": 410.81,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 163",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 115115726,
+"type": "cancellation",
+"arrival": "2025-12-30",
+"departure": "2026-01-03",
+"adults": 2,
+"children": 0,
+"price": 525.87,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 26.09",
+"is-blocked-booking": false,
+"guest-name": "Gast 164",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 101971208,
+"type": "cancellation",
+"arrival": "2025-12-30",
+"departure": "2026-01-06",
+"adults": 2,
+"children": 0,
+"price": 696.37,
+"price-details": "Reinigungsgebühr - EUR 65\r\nMehrwertsteuer - EUR 38.97\r\nÜbernachtungssteuer - EUR 35.74",
+"is-blocked-booking": false,
+"guest-name": "Gast 165",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 121925211,
+"type": "cancellation",
+"arrival": "2026-01-01",
+"departure": "2026-01-03",
+"adults": 1,
+"children": 0,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 166",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 121925356,
+"type": "cancellation",
+"arrival": "2026-01-01",
+"departure": "2026-01-04",
+"adults": 1,
+"children": 0,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 167",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 118574121,
+"type": "modification of booking",
+"arrival": "2026-01-02",
+"departure": "2026-01-04",
+"adults": 3,
+"children": 0,
+"price": 241.12,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 168",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 122576231,
+"type": "reservation",
+"arrival": "2026-01-04",
+"departure": "2026-01-05",
+"adults": 4,
+"children": 0,
+"price": 173,
+"price-details": "Cancellation Host Fee - EUR 31.91\r\nCancellation Payout - EUR 141.09\r\nAirbnb Collected Tax - EUR 10.38",
+"is-blocked-booking": false,
+"guest-name": "Gast 169",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114946776,
+"type": "modification of booking",
+"arrival": "2026-01-04",
+"departure": "2026-01-11",
+"adults": 2,
+"children": 0,
+"price": 362.44,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 170",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117326181,
+"type": "modification of booking",
+"arrival": "2026-01-05",
+"departure": "2026-01-09",
+"adults": 2,
+"children": 0,
+"price": 466.4,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 22.57",
+"is-blocked-booking": false,
+"guest-name": "Gast 171",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 121554856,
+"type": "modification of booking",
+"arrival": "2026-01-09",
+"departure": "2026-04-05",
+"adults": 2,
+"children": 0,
+"price": 6102.99,
+"price-details": "Cancellation Host Fee - EUR 1125.7\r\nCancellation Payout - EUR 4977.29\r\nAirbnb Collected Tax - EUR 366.18",
+"is-blocked-booking": false,
+"guest-name": "Gast 172",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422131,
+"type": "cancellation",
+"arrival": "2026-01-14",
+"departure": "2026-01-15",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 173",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 106683236,
+"type": "modification of booking",
+"arrival": "2026-01-15",
+"departure": "2026-01-24",
+"adults": 3,
+"children": 0,
+"price": 592.31,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 174",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 115481041,
+"type": "modification of booking",
+"arrival": "2026-01-25",
+"departure": "2026-02-01",
+"adults": 1,
+"children": 0,
+"price": 334.8,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 175",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 120332416,
+"type": "modification of booking",
+"arrival": "2026-02-02",
+"departure": "2026-02-08",
+"adults": 2,
+"children": 0,
+"price": 385.15,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 176",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422136,
+"type": "cancellation",
+"arrival": "2026-02-06",
+"departure": "2026-02-07",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 177",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113361836,
+"type": "cancellation",
+"arrival": "2026-02-07",
+"departure": "2026-02-14",
+"adults": 2,
+"children": 0,
+"price": 469.17,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 22.88",
+"is-blocked-booking": false,
+"guest-name": "Gast 178",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119746236,
+"type": "modification of booking",
+"arrival": "2026-02-09",
+"departure": "2026-02-15",
+"adults": 2,
+"children": 0,
+"price": 478.17,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 179",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 116428586,
+"type": "modification of booking",
+"arrival": "2026-02-20",
+"departure": "2026-02-22",
+"adults": 2,
+"children": 0,
+"price": 211.04,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 180",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119265166,
+"type": "modification of booking",
+"arrival": "2026-02-22",
+"departure": "2026-02-27",
+"adults": 1,
+"children": 0,
+"price": 293.94,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 181",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 120060031,
+"type": "cancellation",
+"arrival": "2026-02-27",
+"departure": "2026-03-02",
+"adults": 3,
+"children": 0,
+"price": 266.49,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 15.08",
+"is-blocked-booking": false,
+"guest-name": "Gast 182",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 123011386,
+"type": "reservation",
+"arrival": "2026-03-04",
+"departure": "2026-03-07",
+"adults": 2,
+"children": 0,
+"price": 362,
+"price-details": "Cancellation Host Fee - EUR 66.77\r\nCancellation Payout - EUR 295.23\r\nAirbnb Collected Tax - EUR 21.72",
+"is-blocked-booking": false,
+"guest-name": "Gast 183",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 129832000,
+"type": "modification of booking",
+"arrival": "2026-03-07",
+"departure": "2026-03-08",
+"adults": 3,
+"children": 0,
+"price": 166.86,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 5.39",
+"is-blocked-booking": false,
+"guest-name": "Gast 184",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114203786,
+"type": "cancellation",
+"arrival": "2026-03-07",
+"departure": "2026-03-09",
+"adults": 4,
+"children": 0,
+"price": 250.5,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 9.6\r\nÜbernachtungssteuer - EUR 8.8",
+"is-blocked-booking": false,
+"guest-name": "Gast 185",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 117286076,
+"type": "cancellation",
+"arrival": "2026-03-07",
+"departure": "2026-03-14",
+"adults": 2,
+"children": 0,
+"price": 446.16,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 25.25",
+"is-blocked-booking": false,
+"guest-name": "Gast 186",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119775646,
+"type": "modification of booking",
+"arrival": "2026-03-08",
+"departure": "2026-03-13",
+"adults": 2,
+"children": 0,
+"price": 370.2,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 187",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 119285211,
+"type": "cancellation",
+"arrival": "2026-03-13",
+"departure": "2026-03-15",
+"adults": 2,
+"children": 0,
+"price": 221.15,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 12.52",
+"is-blocked-booking": false,
+"guest-name": "Gast 188",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114938591,
+"type": "modification of booking",
+"arrival": "2026-03-15",
+"departure": "2026-03-19",
+"adults": 2,
+"children": 0,
+"price": 292.94,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 189",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 131267835,
+"type": "cancellation",
+"arrival": "2026-03-19",
+"departure": "2026-03-21",
+"adults": 1,
+"children": 1,
+"price": 247.61,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 10.38\r\nÜbernachtungssteuer - EUR 14.02",
+"is-blocked-booking": false,
+"guest-name": "Gast 190",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 131881677,
+"type": "modification of booking",
+"arrival": "2026-03-19",
+"departure": "2026-03-21",
+"adults": 2,
+"children": 0,
+"price": 226.95,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 9.1",
+"is-blocked-booking": false,
+"guest-name": "Gast 191",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 120824951,
+"type": "modification of booking",
+"arrival": "2026-03-21",
+"departure": "2026-03-28",
+"adults": 2,
+"children": 0,
+"price": 477.74,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 192",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113422141,
+"type": "cancellation",
+"arrival": "2026-03-28",
+"departure": "2026-03-29",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 193",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 129694150,
+"type": "modification of booking",
+"arrival": "2026-03-28",
+"departure": "2026-03-29",
+"adults": 2,
+"children": 0,
+"price": 164.98,
+"price-details": "Reinigungsgebühr - EUR 75",
+"is-blocked-booking": false,
+"guest-name": "Gast 194",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 132500147,
+"type": "modification of booking",
+"arrival": "2026-03-29",
+"departure": "2026-04-03",
+"adults": 2,
+"children": 1,
+"price": 648.64,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 35.13",
+"is-blocked-booking": false,
+"guest-name": "Gast 195",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 112881616,
+"type": "cancellation",
+"arrival": "2026-03-29",
+"departure": "2026-04-05",
+"adults": 2,
+"children": 1,
+"price": 452.79,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 21.95",
+"is-blocked-booking": false,
+"guest-name": "Gast 196",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 133192352,
+"type": "modification of booking",
+"arrival": "2026-04-03",
+"departure": "2026-04-05",
+"adults": 3,
+"children": 0,
+"price": 326.11,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 15.22",
+"is-blocked-booking": false,
+"guest-name": "Gast 197",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117864911,
+"type": "modification of booking",
+"arrival": "2026-04-06",
+"departure": "2026-04-10",
+"adults": 3,
+"children": 1,
+"price": 581.94,
+"price-details": "Reinigungsgebühr - EUR 95\r\nÜbernachtungssteuer - EUR 32.94",
+"is-blocked-booking": false,
+"guest-name": "Gast 198",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 114828106,
+"type": "modification of booking",
+"arrival": "2026-04-06",
+"departure": "2026-04-12",
+"adults": 2,
+"children": 0,
+"price": 573.48,
+"price-details": "Reinigungsgebühr - EUR 65",
+"is-blocked-booking": false,
+"guest-name": "Gast 199",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 132769027,
+"type": "modification of booking",
+"arrival": "2026-04-10",
+"departure": "2026-04-12",
+"adults": 5,
+"children": 0,
+"price": 278.05,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 10.79",
+"is-blocked-booking": false,
+"guest-name": "Gast 200",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 132587692,
+"type": "modification of booking",
+"arrival": "2026-04-12",
+"departure": "2026-04-15",
+"adults": 2,
+"children": 3,
+"price": 352.98,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 15.37\r\nÜbernachtungssteuer - EUR 23.09",
+"is-blocked-booking": false,
+"guest-name": "Gast 201",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 119028011,
+"type": "modification of booking",
+"arrival": "2026-04-13",
+"departure": "2026-04-22",
+"adults": 2,
+"children": 0,
+"price": 581.24,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 32.9",
+"is-blocked-booking": false,
+"guest-name": "Gast 202",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 130694930,
+"type": "modification of booking",
+"arrival": "2026-04-17",
+"departure": "2026-04-19",
+"adults": 4,
+"children": 0,
+"price": 352,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 203",
+"channel": {
+"name": "Website"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 134786972,
+"type": "modification of booking",
+"arrival": "2026-04-20",
+"departure": "2026-04-23",
+"adults": 5,
+"children": 0,
+"price": 331.72,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 14.07\r\nÜbernachtungssteuer - EUR 21.7",
+"is-blocked-booking": false,
+"guest-name": "Gast 204",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 136535037,
+"type": "reservation",
+"arrival": "2026-04-23",
+"departure": "2026-04-24",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 205",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 122036241,
+"type": "cancellation",
+"arrival": "2026-04-23",
+"departure": "2026-04-26",
+"adults": 2,
+"children": 0,
+"price": 369.4,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 20.91",
+"is-blocked-booking": false,
+"guest-name": "Gast 206",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 132584537,
+"type": "modification of booking",
+"arrival": "2026-04-24",
+"departure": "2026-04-27",
+"adults": 2,
+"children": 3,
+"price": 419.08,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 19.41\r\nÜbernachtungssteuer - EUR 27.42",
+"is-blocked-booking": false,
+"guest-name": "Gast 207",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 135420407,
+"type": "modification of booking",
+"arrival": "2026-04-25",
+"departure": "2026-04-26",
+"adults": 3,
+"children": 0,
+"price": 198.47,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 7.34\r\nÜbernachtungssteuer - EUR 11.23",
+"is-blocked-booking": false,
+"guest-name": "Gast 208",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 136725112,
+"type": "modification of booking",
+"arrival": "2026-04-27",
+"departure": "2026-04-30",
+"adults": 2,
+"children": 0,
+"price": 308.96,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 12.68\r\nÜbernachtungssteuer - EUR 20.21",
+"is-blocked-booking": false,
+"guest-name": "Gast 209",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 116237426,
+"type": "cancellation",
+"arrival": "2026-04-28",
+"departure": "2026-04-30",
+"adults": 2,
+"children": 1,
+"price": 258.4,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 10.95",
+"is-blocked-booking": false,
+"guest-name": "Gast 210",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 133188202,
+"type": "modification of booking",
+"arrival": "2026-04-28",
+"departure": "2026-05-02",
+"adults": 4,
+"children": 0,
+"price": 556.81,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 29.46\r\nÜbernachtungssteuer - EUR 31.52",
+"is-blocked-booking": false,
+"guest-name": "Gast 211",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 128513997,
+"type": "modification of booking",
+"arrival": "2026-04-30",
+"departure": "2026-05-03",
+"adults": 2,
+"children": 3,
+"price": 696.57,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 36.37\r\nÜbernachtungssteuer - EUR 45.57",
+"is-blocked-booking": false,
+"guest-name": "Gast 212",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 137707027,
+"type": "reservation",
+"arrival": "2026-05-02",
+"departure": "2026-05-03",
+"adults": 2,
+"children": 1,
+"price": 201.99,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 7.56\r\nÜbernachtungssteuer - EUR 11.43",
+"is-blocked-booking": false,
+"guest-name": "Gast 213",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 114415331,
+"type": "modification of booking",
+"arrival": "2026-05-03",
+"departure": "2026-05-10",
+"adults": 4,
+"children": 0,
+"price": 806.19,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 43.89\r\nÜbernachtungssteuer - EUR 40.26",
+"is-blocked-booking": false,
+"guest-name": "Gast 214",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 122561021,
+"type": "modification of booking",
+"arrival": "2026-05-03",
+"departure": "2026-05-13",
+"adults": 2,
+"children": 0,
+"price": 841.28,
+"price-details": "Reinigungsgebühr - EUR 75\r\nÜbernachtungssteuer - EUR 47.62",
+"is-blocked-booking": false,
+"guest-name": "Gast 215",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 138703537,
+"type": "reservation",
+"arrival": "2026-05-10",
+"departure": "2026-05-11",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 216",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 138703417,
+"type": "reservation",
+"arrival": "2026-05-11",
+"departure": "2026-05-12",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 217",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 133791417,
+"type": "reservation",
+"arrival": "2026-05-12",
+"departure": "2026-05-20",
+"adults": 2,
+"children": 3,
+"price": 991.16,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 54.39\r\nÜbernachtungssteuer - EUR 64.84",
+"is-blocked-booking": false,
+"guest-name": "Gast 218",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 113422146,
+"type": "cancellation",
+"arrival": "2026-05-14",
+"departure": "2026-05-15",
+"adults": null,
+"children": null,
+"price": null,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 219",
+"channel": {
+"name": "Blocked channel auto"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 128388127,
+"type": "reservation",
+"arrival": "2026-05-14",
+"departure": "2026-05-17",
+"adults": 2,
+"children": 0,
+"price": 591.13,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 31.58\r\nÜbernachtungssteuer - EUR 33.46",
+"is-blocked-booking": false,
+"guest-name": "Gast 220",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 113161631,
+"type": "cancellation",
+"arrival": "2026-05-15",
+"departure": "2026-05-19",
+"adults": 2,
+"children": 0,
+"price": 419.46,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 20.06",
+"is-blocked-booking": false,
+"guest-name": "Gast 221",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 131286015,
+"type": "cancellation",
+"arrival": "2026-05-16",
+"departure": "2026-05-19",
+"adults": 5,
+"children": 0,
+"price": 574.59,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 28.92\r\nÜbernachtungssteuer - EUR 37.59",
+"is-blocked-booking": false,
+"guest-name": "Gast 222",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 122103626,
+"type": "modification of booking",
+"arrival": "2026-05-18",
+"departure": "2026-05-22",
+"adults": 2,
+"children": 0,
+"price": 388.79,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 22.01",
+"is-blocked-booking": false,
+"guest-name": "Gast 223",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 140220352,
+"type": "reservation",
+"arrival": "2026-05-20",
+"departure": "2026-05-21",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 224",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 140220247,
+"type": "reservation",
+"arrival": "2026-05-21",
+"departure": "2026-05-22",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 225",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 133506177,
+"type": "modification of booking",
+"arrival": "2026-05-22",
+"departure": "2026-05-25",
+"adults": 4,
+"children": 0,
+"price": 561.49,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 28.12\r\nÜbernachtungssteuer - EUR 36.73",
+"is-blocked-booking": false,
+"guest-name": "Gast 226",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 134769217,
+"type": "modification of booking",
+"arrival": "2026-05-22",
+"departure": "2026-05-25",
+"adults": 3,
+"children": 0,
+"price": 582.2,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 31.03\r\nÜbernachtungssteuer - EUR 32.95",
+"is-blocked-booking": false,
+"guest-name": "Gast 227",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 135241352,
+"type": "modification of booking",
+"arrival": "2026-05-25",
+"departure": "2026-05-28",
+"adults": 2,
+"children": 3,
+"price": 436.56,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 20.48\r\nÜbernachtungssteuer - EUR 28.56",
+"is-blocked-booking": false,
+"guest-name": "Gast 228",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 140352057,
+"type": "modification of booking",
+"arrival": "2026-05-26",
+"departure": "2026-05-29",
+"adults": 2,
+"children": 0,
+"price": 302.06,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 13.74\r\nÜbernachtungssteuer - EUR 17.1",
+"is-blocked-booking": false,
+"guest-name": "Gast 229",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 136349842,
+"type": "modification of booking",
+"arrival": "2026-05-28",
+"departure": "2026-05-30",
+"adults": 3,
+"children": 2,
+"price": 322.82,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 13.52\r\nÜbernachtungssteuer - EUR 21.12",
+"is-blocked-booking": false,
+"guest-name": "Gast 230",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 136697817,
+"type": "cancellation",
+"arrival": "2026-05-28",
+"departure": "2026-05-31",
+"adults": 2,
+"children": 1,
+"price": 497.95,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 25.83\r\nÜbernachtungssteuer - EUR 28.19",
+"is-blocked-booking": false,
+"guest-name": "Gast 231",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 134513972,
+"type": "cancellation",
+"arrival": "2026-05-29",
+"departure": "2026-05-31",
+"adults": 4,
+"children": 0,
+"price": 447.26,
+"price-details": "Cancellation Host Fee - EUR 77.1\r\nCancellation Payout - EUR 370.16\r\nAirbnb Collected Tax - EUR 25.08\r\nOther Fees - EUR 29.26",
+"is-blocked-booking": false,
+"guest-name": "Gast 232",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 140689302,
+"type": "reservation",
+"arrival": "2026-05-29",
+"departure": "2026-05-31",
+"adults": 3,
+"children": 0,
+"price": 328.57,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 15.37\r\nÜbernachtungssteuer - EUR 18.6",
+"is-blocked-booking": false,
+"guest-name": "Gast 233",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 138277782,
+"type": "cancellation",
+"arrival": "2026-05-30",
+"departure": "2026-05-31",
+"adults": 2,
+"children": 3,
+"price": 254.77,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 9.36\r\nÜbernachtungssteuer - EUR 16.67",
+"is-blocked-booking": false,
+"guest-name": "Gast 234",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 141013837,
+"type": "modification of booking",
+"arrival": "2026-05-30",
+"departure": "2026-06-01",
+"adults": 5,
+"children": 0,
+"price": 277.59,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 10.76\r\nÜbernachtungssteuer - EUR 18.16",
+"is-blocked-booking": false,
+"guest-name": "Gast 235",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 126536076,
+"type": "modification of booking",
+"arrival": "2026-05-31",
+"departure": "2026-06-02",
+"adults": 2,
+"children": 0,
+"price": 274.83,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 12.06\r\nÜbernachtungssteuer - EUR 15.56",
+"is-blocked-booking": false,
+"guest-name": "Gast 236",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 141498212,
+"type": "modification of booking",
+"arrival": "2026-06-01",
+"departure": "2026-06-03",
+"adults": 2,
+"children": 3,
+"price": 257.66,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 9.54\r\nÜbernachtungssteuer - EUR 16.86",
+"is-blocked-booking": false,
+"guest-name": "Gast 237",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 122191126,
+"type": "cancellation",
+"arrival": "2026-06-01",
+"departure": "2026-06-15",
+"adults": 1,
+"children": 0,
+"price": 2395,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 238",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 134145812,
+"type": "modification of booking",
+"arrival": "2026-06-04",
+"departure": "2026-06-07",
+"adults": 4,
+"children": 0,
+"price": 724.64,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 38.09\r\nÜbernachtungssteuer - EUR 47.41",
+"is-blocked-booking": false,
+"guest-name": "Gast 239",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 141424027,
+"type": "modification of booking",
+"arrival": "2026-06-04",
+"departure": "2026-06-07",
+"adults": 2,
+"children": 1,
+"price": 550.15,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 29.05\r\nÜbernachtungssteuer - EUR 31.14",
+"is-blocked-booking": false,
+"guest-name": "Gast 240",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117505296,
+"type": "modification of booking",
+"arrival": "2026-06-07",
+"departure": "2026-06-19",
+"adults": 2,
+"children": 0,
+"price": 1080.74,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 61.17",
+"is-blocked-booking": false,
+"guest-name": "Gast 241",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 136445607,
+"type": "modification of booking",
+"arrival": "2026-06-10",
+"departure": "2026-06-11",
+"adults": 4,
+"children": 1,
+"price": 223.54,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 7.45\r\nÜbernachtungssteuer - EUR 14.62",
+"is-blocked-booking": false,
+"guest-name": "Gast 242",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 136452262,
+"type": "cancellation",
+"arrival": "2026-06-11",
+"departure": "2026-06-16",
+"adults": 5,
+"children": 0,
+"price": 753.28,
+"price-details": "Cancellation Host Fee - EUR 129.85\r\nCancellation Payout - EUR 623.43\r\nAirbnb Collected Tax - EUR 42.24\r\nOther Fees - EUR 49.28",
+"is-blocked-booking": false,
+"guest-name": "Gast 243",
+"channel": {
+"name": "Airbnb"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 137123352,
+"type": "modification of booking",
+"arrival": "2026-06-12",
+"departure": "2026-06-14",
+"adults": 4,
+"children": 0,
+"price": 323.76,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 13.58\r\nÜbernachtungssteuer - EUR 21.18",
+"is-blocked-booking": false,
+"guest-name": "Gast 244",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 138044907,
+"type": "modification of booking",
+"arrival": "2026-06-16",
+"departure": "2026-06-20",
+"adults": 2,
+"children": 0,
+"price": 504.86,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 24.65\r\nÜbernachtungssteuer - EUR 33.03",
+"is-blocked-booking": false,
+"guest-name": "Gast 245",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 132345712,
+"type": "cancellation",
+"arrival": "2026-06-18",
+"departure": "2026-06-25",
+"adults": 4,
+"children": 0,
+"price": 776.98,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 41.29\r\nÜbernachtungssteuer - EUR 50.83",
+"is-blocked-booking": false,
+"guest-name": "Gast 246",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 135612752,
+"type": "modification of booking",
+"arrival": "2026-06-19",
+"departure": "2026-06-21",
+"adults": 3,
+"children": 0,
+"price": 297.08,
+"price-details": "Reinigungsgebühr - EUR 75\r\nMehrwertsteuer - EUR 13.43\r\nÜbernachtungssteuer - EUR 16.82",
+"is-blocked-booking": false,
+"guest-name": "Gast 247",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 142201462,
+"type": "reservation",
+"arrival": "2026-06-20",
+"departure": "2026-06-21",
+"adults": 5,
+"children": 0,
+"price": 238.27,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 8.35\r\nÜbernachtungssteuer - EUR 15.59",
+"is-blocked-booking": false,
+"guest-name": "Gast 248",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 144097131,
+"type": "modification of booking",
+"arrival": "2026-06-21",
+"departure": "2026-06-26",
+"adults": 3,
+"children": 0,
+"price": 449.1,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 21.24\r\nÜbernachtungssteuer - EUR 29.38",
+"is-blocked-booking": false,
+"guest-name": "Gast 249",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 121800766,
+"type": "modification of booking",
+"arrival": "2026-06-21",
+"departure": "2026-06-28",
+"adults": 2,
+"children": 1,
+"price": 657.85,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 37.24",
+"is-blocked-booking": false,
+"guest-name": "Gast 250",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 133584227,
+"type": "modification of booking",
+"arrival": "2026-06-26",
+"departure": "2026-06-28",
+"adults": 5,
+"children": 0,
+"price": 355.24,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 15.5\r\nÜbernachtungssteuer - EUR 23.24",
+"is-blocked-booking": false,
+"guest-name": "Gast 251",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 116748736,
+"type": "cancellation",
+"arrival": "2026-06-27",
+"departure": "2026-07-04",
+"adults": 2,
+"children": 0,
+"price": 532.74,
+"price-details": "Reinigungsgebühr - EUR 65\r\nÜbernachtungssteuer - EUR 26.48",
+"is-blocked-booking": false,
+"guest-name": "Gast 252",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 141803677,
+"type": "cancellation",
+"arrival": "2026-06-28",
+"departure": "2026-07-02",
+"adults": 3,
+"children": 1,
+"price": 475.71,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 22.87\r\nÜbernachtungssteuer - EUR 31.12",
+"is-blocked-booking": false,
+"guest-name": "Gast 253",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 117599416,
+"type": "cancellation",
+"arrival": "2026-06-28",
+"departure": "2026-07-04",
+"adults": 2,
+"children": 0,
+"price": 442,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 254",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 117599841,
+"type": "modification of booking",
+"arrival": "2026-06-28",
+"departure": "2026-07-04",
+"adults": 2,
+"children": 0,
+"price": 400.07,
+"price-details": "",
+"is-blocked-booking": false,
+"guest-name": "Gast 255",
+"channel": {
+"name": "Direct booking"
+},
+"apartment": {
+"id": 2748963,
+"name": "Cottaer Straße"
+}
+},
+{
+"id": 127162936,
+"type": "cancellation",
+"arrival": "2026-06-28",
+"departure": "2026-07-04",
+"adults": 4,
+"children": 0,
+"price": 1025.06,
+"price-details": "Reinigungsgebühr - EUR 95\r\nMehrwertsteuer - EUR 56.46\r\nÜbernachtungssteuer - EUR 67.06",
+"is-blocked-booking": false,
+"guest-name": "Gast 256",
+"channel": {
+"name": "Booking.com"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+},
+{
+"id": 144671401,
+"type": "modification of booking",
+"arrival": "2026-06-30",
+"departure": "2026-07-01",
+"adults": null,
+"children": null,
+"price": 0,
+"price-details": "",
+"is-blocked-booking": true,
+"guest-name": "Gast 257",
+"channel": {
+"name": "Blocked channel"
+},
+"apartment": {
+"id": 2960031,
+"name": "Wernerstraße"
+}
+}
+]

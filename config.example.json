@@ -1,0 +1,27 @@
+{
+  "_hinweis": "Kopiere diese Datei zu config.json und trage deine Werte ein. config.json ist in .gitignore und wird NICHT eingecheckt (enthält API-Key + Betreiberdaten).",
+
+  "smoobu_api_key": "DEIN_SMOOBU_API_KEY",
+  "settings_channel_id": 0,
+  "port": 3001,
+
+  "steuersatz": 0.06,
+  "airbnb_channel_name": "Airbnb",
+
+  "betreiber": {
+    "name": "Nachname Vorname",
+    "zusatz": "",
+    "strasse": "Musterstr.",
+    "hausnummer": "1",
+    "plz": "01000",
+    "ort": "Dresden",
+    "telefon": "",
+    "kassenzeichen": "0000.00.000000"
+  },
+
+  "empfaenger": {
+    "name": "Landeshauptstadt Dresden",
+    "iban": "DE95 8505 0300 3120 0005 81",
+    "bic": "OSDDDE81XXX"
+  }
+}

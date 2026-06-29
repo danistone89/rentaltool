@@ -1,0 +1,18 @@
+# Secrets & personenbezogene Daten – NIEMALS einchecken
+config.json
+
+# PDF-Vorlage enthält Betreiberdaten + Kassenzeichen
+templates/anmeldung_blank.pdf
+templates/*.pdf
+
+# Erzeugte / temporäre PDFs
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
