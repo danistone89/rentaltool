@@ -30,7 +30,9 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/steuer.py` | Steuerberechnung (Golden-Tests) |
 | `app/smoobu.py` | Smoobu-API-Client |
 | `app/pdf_form.py` | Amtliches PDF aus Blanko-Vorlage |
-| `app/archive.py` | Revisionssichere Ablage (Hash-Kette, Versionen) |
+| `app/archive.py` | Revisionssichere Ablage (Hash-Kette, Versionen, Spiegel) |
+| `app/mailer.py` | E-Mail-Versand über Gmail (Vorlagen) |
+| `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
@@ -78,6 +80,20 @@ Smoobu-Daten werden beim **Berechnen** geladen und **5 Minuten** pro Monats-
 zeitraum zwischengespeichert. Der **🔄-Button** leert den Cache und lädt frisch;
 unter den Eingaben steht „Daten zuletzt von Smoobu geladen: …". Der Webhook
 (`/api/smoobu/webhook`) leert den Cache automatisch bei Änderungen in Smoobu.
+
+## Login & 2FA
+
+Die App ist durch einen **Login** geschützt (Single-User, `app/auth.py`). Beim
+ersten Aufruf legst du unter `/login` ein Passwort fest (PBKDF2-gehasht in
+`config.auth`). Ausgenommen vom Login-Zwang: die Login-Seite, der Smoobu-Webhook
+(`/api/…`) und NiceGUI-Interna.
+
+Optional **2FA mit Google Authenticator** (TOTP): in den Einstellungen unter
+„Sicherheit / Login" aktivieren → QR-Code scannen → ab dann Passwort **+**
+6-stelliger Code beim Login. Passwort ändern ebenfalls dort.
+
+> Passwort vergessen? In `config.json` unter `auth.password_hash` leeren – beim
+> nächsten Aufruf kannst du ein neues festlegen. `config.json` ist gitignored.
 
 ## E-Mail-Versand (Gmail)
 

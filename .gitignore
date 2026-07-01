@@ -22,3 +22,6 @@ assets/
 
 # Archiv (echte Steuerdokumente, personenbezogen)
 archive/
+
+# NiceGUI Session-Storage (enthält Login-Sessions)
+.nicegui/

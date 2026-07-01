@@ -13,14 +13,38 @@ from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nicegui import app, ui  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer  # noqa: E402
+from app import data, smoobu, archive, mailer, auth  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
     pdf_form = None
 
 CFG = data.CONFIG
+AUTH = CFG.setdefault("auth", {})
+_new_secret = not AUTH.get("storage_secret")
+STORAGE_SECRET = auth.ensure_storage_secret(AUTH)
+if _new_secret:
+    data.save_config()  # neu erzeugtes storage_secret persistieren
+
+# Pfade ohne Login-Zwang: Login-Seite, Smoobu-Webhook, NiceGUI-Interna.
+_UNRESTRICTED = {"/login"}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if not app.storage.user.get("authenticated", False):
+            path = request.url.path
+            if not (path in _UNRESTRICTED or path.startswith("/_nicegui")
+                    or path.startswith("/api/")):
+                app.storage.user["referrer"] = path
+                return RedirectResponse("/login")
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
 
 DEFAULT_BETREFF = "Beherbergungssteuer-Anmeldung {monat} {jahr}"
 DEFAULT_TEXT = (
@@ -63,6 +87,90 @@ def _load_apartments():
 async def smoobu_webhook():
     data.clear_cache()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- Login
+@ui.page("/login")
+def login_page():
+    ui.colors(primary="#1f6feb")
+    if app.storage.user.get("authenticated"):
+        ui.navigate.to("/")
+        return
+
+    def finish():
+        app.storage.user["authenticated"] = True
+        ui.navigate.to(app.storage.user.get("referrer") or "/")
+
+    with ui.column().classes("absolute-center items-center gap-3"):
+        ui.label("Beherbergungssteuer Dresden").classes("text-xl font-bold")
+        with ui.card().classes("w-[360px] max-w-full gap-2"):
+            if not auth.is_configured(AUTH):
+                ui.label("Erst-Einrichtung – Passwort festlegen").classes("font-semibold")
+                p1 = ui.input("Neues Passwort", password=True,
+                              password_toggle_button=True).classes("w-full")
+                p2 = ui.input("Passwort wiederholen", password=True).classes("w-full")
+
+                def setup():
+                    if len(p1.value or "") < 6:
+                        ui.notify("Mindestens 6 Zeichen.", type="warning"); return
+                    if p1.value != p2.value:
+                        ui.notify("Passwörter stimmen nicht überein.", type="negative"); return
+                    AUTH["password_hash"] = auth.hash_password(p1.value)
+                    data.save_config()
+                    ui.notify("Passwort gesetzt.", type="positive")
+                    finish()
+                ui.button("Speichern & anmelden", on_click=setup) \
+                    .props("unelevated").classes("w-full")
+            else:
+                ui.label("Anmelden").classes("font-semibold")
+                pw = ui.input("Passwort", password=True,
+                              password_toggle_button=True).classes("w-full")
+                code = ui.input("6-stelliger Code (Authenticator)").classes("w-full") \
+                    if auth.totp_enabled(AUTH) else None
+
+                def do_login():
+                    if not auth.verify_password(pw.value or "", AUTH.get("password_hash", "")):
+                        ui.notify("Falsches Passwort.", type="negative"); return
+                    if auth.totp_enabled(AUTH) and not auth.verify_totp(
+                            AUTH.get("totp_secret", ""), code.value if code else ""):
+                        ui.notify("Falscher oder fehlender Code.", type="negative"); return
+                    finish()
+                pw.on("keydown.enter", lambda: do_login())
+                if code is not None:
+                    code.on("keydown.enter", lambda: do_login())
+                ui.button("Anmelden", on_click=do_login).props("unelevated").classes("w-full")
+
+
+def logout():
+    app.storage.user["authenticated"] = False
+    ui.navigate.to("/login")
+
+
+# ---------------------------------------------------------------- 2FA-Einrichtung
+def open_2fa_setup():
+    secret = auth.generate_totp_secret()
+    account = CFG.get("email", {}).get("absender") or "Beherbergungssteuer"
+    uri = auth.provisioning_uri(secret, account)
+    with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full items-center gap-2"):
+        ui.label("🔐 Google Authenticator einrichten").classes("text-lg font-bold")
+        ui.label("1. QR-Code in der Authenticator-App scannen:").classes("text-sm")
+        ui.image(auth.qr_data_uri(uri)).classes("w-48 h-48")
+        ui.label("oder Secret manuell eintippen:").classes("text-xs text-gray-500")
+        ui.label(secret).classes("text-xs font-mono break-all")
+        ui.label("2. Zur Bestätigung den aktuellen 6-stelligen Code eingeben:").classes("text-sm")
+        code = ui.input("Code").classes("w-full")
+
+        def confirm():
+            if not auth.verify_totp(secret, code.value or ""):
+                ui.notify("Code stimmt nicht – bitte erneut versuchen.", type="negative"); return
+            AUTH["totp_secret"] = secret
+            data.save_config()
+            ui.notify("2FA aktiviert.", type="positive")
+            dlg.close()
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Aktivieren", on_click=confirm).props("unelevated")
+    dlg.open()
 
 
 # ---------------------------------------------------------------- Ordner-Browser
@@ -189,6 +297,21 @@ def open_settings():
             ui.label("sendet eine kurze Test-Mail an den Empfänger (ohne Anhang, "
                      "ohne Ablage)").classes("text-xs text-gray-400")
 
+        ui.label("Sicherheit / Login").classes("text-sm text-gray-500 mt-3")
+        with ui.row().classes("w-full items-end gap-3"):
+            new_pw = ui.input("Passwort ändern (leer = unverändert)", password=True,
+                              placeholder="•••• unverändert").classes("flex-grow")
+            if auth.totp_enabled(AUTH):
+                def disable_2fa():
+                    AUTH["totp_secret"] = ""
+                    data.save_config()
+                    ui.notify("2FA (Authenticator) deaktiviert.", type="warning")
+                    dialog.close()
+                ui.button("2FA deaktivieren", on_click=disable_2fa).props("flat")
+                ui.label("🔐 2FA aktiv").classes("text-xs text-green-700 self-center")
+            else:
+                ui.button("🔐 2FA aktivieren", on_click=open_2fa_setup).props("outline")
+
         def save():
             for key in inputs:
                 betr[key] = inputs[key].value or ""
@@ -212,6 +335,12 @@ def open_settings():
             if (m_pw.value or "").strip():
                 ec["app_password"] = m_pw.value.strip()
             CFG["email"] = ec
+            if (new_pw.value or "").strip():
+                if len((new_pw.value or "").strip()) < 6:
+                    ui.notify("Passwort zu kurz (min. 6 Zeichen) – nicht geändert.", type="warning")
+                else:
+                    AUTH["password_hash"] = auth.hash_password(new_pw.value.strip())
+                    ui.notify("Passwort geändert.", type="positive")
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
             dialog.close()
@@ -446,6 +575,8 @@ def main_page():
         with ui.row().classes("gap-1"):
             ui.button("📚 Archiv", on_click=open_archive).props("flat color=white")
             ui.button("⚙️ Einstellungen", on_click=open_settings).props("flat color=white")
+            ui.button(icon="logout", on_click=logout).props("flat round color=white") \
+                .tooltip("Abmelden")
 
     with ui.column().classes("w-full max-w-5xl mx-auto p-4 gap-4"):
         with ui.card().classes("w-full"):
@@ -492,7 +623,8 @@ def main_page():
 
 def run():
     ui.run(host="127.0.0.1", port=int(CFG.get("port", 3001)),
-           title="Beherbergungssteuer Dresden", reload=False, show=False)
+           title="Beherbergungssteuer Dresden", reload=False, show=False,
+           storage_secret=STORAGE_SECRET)
 
 
 if __name__ in {"__main__", "__mp_main__"}:

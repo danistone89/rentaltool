@@ -37,5 +37,12 @@
     "cc": "",
     "betreff_vorlage": "Beherbergungssteuer-Anmeldung {monat} {jahr}",
     "text_vorlage": "Sehr geehrte Damen und Herren,\n\nanbei übersende ich die Steueranmeldung zur Beherbergungssteuer für {monat} {jahr} (Kassenzeichen {kassenzeichen}).\n\nFestgesetzte Beherbergungssteuer: {steuer} €.\n\nMit freundlichen Grüßen\n{name}"
+  },
+
+  "auth": {
+    "_hinweis": "password_hash + totp_secret werden von der App gesetzt. Passwort vergessen? password_hash leeren -> beim nächsten Start neu festlegen.",
+    "password_hash": "",
+    "totp_secret": "",
+    "storage_secret": ""
   }
 }

@@ -3,3 +3,6 @@ nicegui>=2.0
 
 # PDF-Erzeugung (amtliches Formular).
 pymupdf>=1.24
+
+# QR-Code für 2FA (Google Authenticator) – reines Python.
+segno>=1.6
