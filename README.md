@@ -79,6 +79,19 @@ zeitraum zwischengespeichert. Der **🔄-Button** leert den Cache und lädt fris
 unter den Eingaben steht „Daten zuletzt von Smoobu geladen: …". Der Webhook
 (`/api/smoobu/webhook`) leert den Cache automatisch bei Änderungen in Smoobu.
 
+## E-Mail-Versand (Gmail)
+
+Über **„✉️ Ablegen & per E-Mail senden"** wird das Formular festgeschrieben und
+als PDF-Anhang an einen **fest konfigurierten Empfänger** geschickt (Modul
+`app/mailer.py`, SMTP über Gmail). Vor dem Senden erscheint ein Dialog mit
+Betreff + Text (aus der Vorlage vorbefüllt, für diesen Versand editierbar).
+
+Einrichtung in den Einstellungen (E-Mail): **Absender** (Gmail-Adresse),
+**Gmail App-Passwort** (nicht das normale Passwort – erfordert 2FA), fester
+**Empfänger**, optional Cc sowie **Betreff-/Text-Vorlage** mit Platzhaltern
+`{monat} {jahr} {periode} {steuer} {umsatz} {kassenzeichen} {name}`. Die Vorlage
+wird in `config.json` gespeichert (App-Passwort inklusive – gitignored).
+
 ## Einstellungen
 
 Unter **⚙️ Einstellungen** (`/settings`) lassen sich die PDF-Felder bearbeiten:

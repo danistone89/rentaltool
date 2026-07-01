@@ -26,5 +26,16 @@
     "name": "Landeshauptstadt Dresden",
     "iban": "DE95 8505 0300 3120 0005 81",
     "bic": "OSDDDE81XXX"
+  },
+
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "absender": "",
+    "app_password": "",
+    "empfaenger": "",
+    "cc": "",
+    "betreff_vorlage": "Beherbergungssteuer-Anmeldung {monat} {jahr}",
+    "text_vorlage": "Sehr geehrte Damen und Herren,\n\nanbei übersende ich die Steueranmeldung zur Beherbergungssteuer für {monat} {jahr} (Kassenzeichen {kassenzeichen}).\n\nFestgesetzte Beherbergungssteuer: {steuer} €.\n\nMit freundlichen Grüßen\n{name}"
   }
 }

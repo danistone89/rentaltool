@@ -14,13 +14,35 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nicegui import app, ui  # noqa: E402
 
-from app import data, smoobu, archive  # noqa: E402
+from app import data, smoobu, archive, mailer  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
     pdf_form = None
 
 CFG = data.CONFIG
+
+DEFAULT_BETREFF = "Beherbergungssteuer-Anmeldung {monat} {jahr}"
+DEFAULT_TEXT = (
+    "Sehr geehrte Damen und Herren,\n\n"
+    "anbei übersende ich die Steueranmeldung zur Beherbergungssteuer für "
+    "{monat} {jahr} (Kassenzeichen {kassenzeichen}).\n\n"
+    "Festgesetzte Beherbergungssteuer: {steuer} €.\n\n"
+    "Mit freundlichen Grüßen\n{name}")
+
+
+def _mail_context(r):
+    """Platzhalter-Werte für die E-Mail-Vorlagen."""
+    betr = CFG.get("betreiber", {})
+    return {
+        "periode": f"{r['year']}-{r['month']:02d}",
+        "jahr": r["year"],
+        "monat": data.MONATE[r["month"]],
+        "steuer": data.euro(r["beherbergungssteuer"]),
+        "umsatz": data.euro(r["umsatz_steuerpflichtig"]),
+        "kassenzeichen": betr.get("kassenzeichen", ""),
+        "name": (betr.get("name", "") + " " + betr.get("zusatz", "")).strip(),
+    }
 
 # Apartments einmalig laden (selten geändert)
 _APARTMENTS = {}
@@ -131,6 +153,22 @@ def open_settings():
             channel = ui.input("Airbnb-Kanalname (steuerfrei)",
                                value=CFG.get("airbnb_channel_name", "Airbnb")).classes("w-full")
 
+        ec = CFG.setdefault("email", {})
+        ui.label("E-Mail-Versand (Gmail)").classes("text-sm text-gray-500 mt-3")
+        with ui.grid(columns=2).classes("w-full gap-3"):
+            m_from = ui.input("Absender (Gmail-Adresse)", value=ec.get("absender", "")).classes("w-full")
+            m_pw = ui.input("Gmail App-Passwort (leer = unverändert)", password=True,
+                            placeholder="•••• unverändert").classes("w-full")
+            m_to = ui.input("Empfänger (fest)", value=ec.get("empfaenger", "")).classes("w-full")
+            m_cc = ui.input("Cc (optional)", value=ec.get("cc", "")).classes("w-full")
+        ui.label("Vorlage – Platzhalter: {monat} {jahr} {periode} {steuer} {umsatz} "
+                 "{kassenzeichen} {name}").classes("text-xs text-gray-400")
+        m_subj = ui.input("Betreff-Vorlage",
+                          value=ec.get("betreff_vorlage") or DEFAULT_BETREFF) \
+            .classes("w-full")
+        m_body = ui.textarea("Text-Vorlage", value=ec.get("text_vorlage") or DEFAULT_TEXT) \
+            .classes("w-full").props("autogrow outlined")
+
         def save():
             for key in inputs:
                 betr[key] = inputs[key].value or ""
@@ -143,6 +181,17 @@ def open_settings():
             if (api.value or "").strip():
                 CFG["smoobu_api_key"] = api.value.strip()
                 data.clear_cache()
+            # E-Mail
+            ec.setdefault("smtp_host", "smtp.gmail.com")
+            ec.setdefault("smtp_port", 587)
+            ec["absender"] = (m_from.value or "").strip()
+            ec["empfaenger"] = (m_to.value or "").strip()
+            ec["cc"] = (m_cc.value or "").strip()
+            ec["betreff_vorlage"] = m_subj.value or ""
+            ec["text_vorlage"] = m_body.value or ""
+            if (m_pw.value or "").strip():
+                ec["app_password"] = m_pw.value.strip()
+            CFG["email"] = ec
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
             dialog.close()
@@ -283,33 +332,81 @@ def render_result(container, result):
         period = f"{r['year']}-{r['month']:02d}"
         fname = f"Beherbergungssteuer_{period}.pdf"
 
-        def festschreiben():
-            pdf = build_pdf()
-            if pdf is None:
-                return
+        def _archive_and_mirror(pdf):
+            """PDF ablegen + (falls konfiguriert) spiegeln. Gibt (entry, zusatz_text)."""
             entry = archive.archive_pdf(pdf, period, _values())
-            ui.download.content(pdf, f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
-                                media_type="application/pdf")
-            msg = (f"Revisionssicher abgelegt: Revision {entry['revision']} · "
-                   f"SHA-256 {entry['sha256'][:12]}…")
+            extra = ""
             mirror = CFG.get("archiv_spiegel", "")
             if mirror:
                 try:
                     archive.mirror_entry(entry, mirror)
-                    msg += " · in Nextcloud gesichert"
+                    extra = " · in Nextcloud gesichert"
                 except Exception as ex:  # Spiegel-Fehler darf lokale Ablage nicht kippen
                     ui.notify(f"Lokal abgelegt, aber Spiegelung fehlgeschlagen: {ex}",
                               type="warning", timeout=9000)
-            ui.notify(msg, type="positive", timeout=7000)
+            return entry, extra
+
+        def festschreiben():
+            pdf = build_pdf()
+            if pdf is None:
+                return
+            entry, extra = _archive_and_mirror(pdf)
+            ui.download.content(pdf, f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
+                                media_type="application/pdf")
+            ui.notify(f"Revisionssicher abgelegt: Revision {entry['revision']} · "
+                      f"SHA-256 {entry['sha256'][:12]}…{extra}", type="positive", timeout=7000)
 
         def vorschau():
             pdf = build_pdf()
             if pdf is not None:
                 ui.download.content(pdf, fname, media_type="application/pdf")
 
-        with ui.row().classes("gap-2 items-center"):
-            ui.button("📥 Erzeugen & revisionssicher ablegen",
-                      on_click=festschreiben).props("unelevated")
+        def open_send():
+            ec = CFG.get("email", {})
+            if not (ec.get("empfaenger") and ec.get("absender") and ec.get("app_password")):
+                ui.notify("E-Mail noch nicht eingerichtet – Absender, App-Passwort und "
+                          "Empfänger in den Einstellungen setzen.", type="warning", timeout=9000)
+                return
+            ctx = _mail_context(r)
+            with ui.dialog() as dlg, ui.card().classes("w-[720px] max-w-full"):
+                ui.label("✉️ Anmeldung per E-Mail senden").classes("text-xl font-bold")
+                cc = f" · Cc: {ec['cc']}" if ec.get("cc") else ""
+                ui.label(f"An: {ec['empfaenger']}{cc}   (Absender: {ec['absender']})") \
+                    .classes("text-sm text-gray-600")
+                subj = ui.input("Betreff", value=mailer.render(ec.get("betreff_vorlage") or DEFAULT_BETREFF, ctx)) \
+                    .classes("w-full")
+                body = ui.textarea("Text", value=mailer.render(ec.get("text_vorlage") or DEFAULT_TEXT, ctx)) \
+                    .classes("w-full").props("autogrow outlined")
+                ui.label(f"📎 Anhang: Beherbergungssteuer_{period}_v(neu).pdf") \
+                    .classes("text-xs text-gray-500")
+
+                def do_send():
+                    pdf = build_pdf()
+                    if pdf is None:
+                        return
+                    entry, extra = _archive_and_mirror(pdf)
+                    try:
+                        mailer.send_form(
+                            CFG, pdf,
+                            f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
+                            ctx, subject=subj.value, body=body.value)
+                    except mailer.MailError as ex:
+                        ui.notify(f"Abgelegt (Rev. {entry['revision']}), aber Versand "
+                                  f"fehlgeschlagen: {ex}", type="negative", timeout=11000)
+                        dlg.close()
+                        return
+                    ui.notify(f"✅ Gesendet an {ec['empfaenger']} · abgelegt als "
+                              f"Revision {entry['revision']}{extra}", type="positive", timeout=8000)
+                    dlg.close()
+
+                with ui.row().classes("w-full justify-end"):
+                    ui.button("Abbrechen", on_click=dlg.close).props("flat")
+                    ui.button("Senden", on_click=do_send).props("unelevated")
+            dlg.open()
+
+        with ui.row().classes("gap-2 items-center flex-wrap"):
+            ui.button("📥 Erzeugen & ablegen", on_click=festschreiben).props("unelevated")
+            ui.button("✉️ Ablegen & per E-Mail senden", on_click=open_send).props("unelevated")
             ui.button("👁 Nur Vorschau", on_click=vorschau).props("flat")
             existing = sum(1 for e in archive.list_entries() if e["period"] == period)
             if existing:

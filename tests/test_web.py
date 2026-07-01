@@ -38,7 +38,8 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     user.find("Berechnen").click()
     await user.should_see("341,90")          # Steuer-KPI
     await user.should_see("Buchungen")        # Tabellen-Überschrift
-    await user.should_see("revisionssicher ablegen")  # Festschreiben-Button
+    await user.should_see("Erzeugen & ablegen")   # Festschreiben-Button
+    await user.should_see("per E-Mail senden")    # E-Mail-Button
 
 
 async def test_einstellungen_dialog(user: User, mock_backend):
