@@ -7,6 +7,7 @@ Start:  python3 app/web.py   (Port aus config.json, Default 3001)
 Reines Python-Frontend (NiceGUI). Fachlogik unverändert in
 smoobu.py / steuer.py / pdf_form.py; Glue in data.py.
 """
+import base64
 import os
 import sys
 from datetime import date
@@ -55,6 +56,31 @@ DEFAULT_TEXT = (
     "Mit freundlichen Grüßen\n{name}")
 
 
+PURPLE, GOLD = "#5E2A84", "#C8A96E"
+
+# LIVARO-Suites-Wortbildmarke als komplettes SVG (Gold-Turm-Icon + Schriftzug).
+_LOGO_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70">'
+    '<g fill="none" stroke="' + GOLD + '" stroke-width="2.6" '
+    'stroke-linejoin="round" stroke-linecap="round">'
+    '<path d="M8 60 L8 23 L26 12 L26 60"/>'
+    '<path d="M22 60 L22 33 L38 24 L38 60"/>'
+    '<path d="M34 60 L34 44 L50 35 L50 60"/>'
+    '</g>'
+    '<text x="70" y="40" font-family="Georgia,\'Times New Roman\',serif" font-size="30" '
+    'letter-spacing="7" font-weight="600" fill="' + PURPLE + '">LIVARO</text>'
+    '<text x="72" y="58" font-family="Georgia,serif" font-size="13" '
+    'letter-spacing="10" fill="' + GOLD + '">SUITES</text>'
+    '</svg>')
+_LOGO_URI = "data:image/svg+xml;base64," + base64.b64encode(_LOGO_SVG.encode()).decode()
+
+
+def logo(height=44):
+    """Logo als ui.image (SVG data-URI), Breite proportional (Ratio 300:70)."""
+    return ui.image(_LOGO_URI).props("no-spinner fit=contain") \
+        .style(f"height:{height}px;width:{round(height * 300 / 70)}px")
+
+
 def _mail_context(r):
     """Platzhalter-Werte für die E-Mail-Vorlagen."""
     betr = CFG.get("betreiber", {})
@@ -92,9 +118,9 @@ async def smoobu_webhook():
 # ---------------------------------------------------------------- Login
 @ui.page("/login")
 def login_page():
-    ui.colors(primary="#7c3aed", secondary="#0ea5e9", accent="#f59e0b",
+    ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
               positive="#16a34a", negative="#dc2626")
-    ui.query("body").classes("bg-slate-100")
+    ui.query("body").classes("bg-[#F5F2EB]")
     if app.storage.user.get("authenticated"):
         ui.navigate.to("/")
         return
@@ -103,10 +129,8 @@ def login_page():
         app.storage.user["authenticated"] = True
         ui.navigate.to(app.storage.user.get("referrer") or "/")
 
-    with ui.column().classes("absolute-center items-center gap-3"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("apartment").classes("text-3xl text-primary")
-            ui.label("DS Apartments & Suites").classes("text-2xl font-bold text-slate-800")
+    with ui.column().classes("absolute-center items-center gap-4"):
+        logo(60)
         with ui.card().classes("w-[360px] max-w-full gap-2 rounded-xl shadow-md"):
             if not auth.is_configured(AUTH):
                 ui.label("Erst-Einrichtung – Passwort festlegen").classes("font-semibold")
@@ -445,12 +469,13 @@ def open_archive():
 # ---------------------------------------------------------------- Ergebnis
 def _kpi(container, label, value, icon="analytics", accent=False):
     with container:
-        with ui.card().classes("p-4 rounded-xl shadow-sm border border-slate-100"):
+        cls = "p-4 rounded-xl shadow-sm border " + \
+            ("border-[#C8A96E]/40 bg-[#faf7f0]" if accent else "border-slate-100")
+        with ui.card().classes(cls):
             with ui.row().classes("items-center gap-2 no-wrap"):
-                ui.icon(icon).classes("text-xl " + ("text-green-600" if accent else "text-primary"))
+                ui.icon(icon).classes("text-xl " + ("text-[#C8A96E]" if accent else "text-primary"))
                 ui.label(label).classes("text-xs text-gray-500")
-            ui.label(value).classes("text-2xl font-bold mt-1 "
-                                    + ("text-green-700" if accent else "text-slate-800"))
+            ui.label(value).classes("text-2xl font-bold mt-1 text-primary")
 
 
 def render_result(container, result):
@@ -603,21 +628,20 @@ def render_result(container, result):
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
-    ui.colors(primary="#7c3aed", secondary="#0ea5e9", accent="#f59e0b",
-              positive="#16a34a", negative="#dc2626", dark="#1e293b")
-    ui.query("body").classes("bg-slate-50")
+    ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
+              positive="#16a34a", negative="#dc2626", dark="#2D2D2D")
+    ui.query("body").classes("bg-[#F5F2EB]")
     today = date.today()
     apts = _load_apartments()
 
-    with ui.header(elevated=True).classes("items-center px-4 bg-primary text-white"):
+    with ui.header(elevated=True).classes("items-center px-4 bg-white text-slate-800 border-b border-slate-200"):
         ui.button(icon="menu", on_click=lambda: drawer.toggle()) \
-            .props("flat round color=white dense").classes("lg:hidden")
-        ui.icon("apartment").classes("text-2xl")
-        ui.label("DS Apartments & Suites").classes("text-lg font-bold tracking-tight")
+            .props("flat round color=primary dense").classes("lg:hidden")
+        logo(42)
         ui.space()
         ui.button("Einstellungen", icon="settings", on_click=open_settings) \
-            .props("flat color=white no-caps")
-        ui.button(icon="logout", on_click=logout).props("flat round color=white") \
+            .props("flat color=primary no-caps")
+        ui.button(icon="logout", on_click=logout).props("flat round color=primary") \
             .tooltip("Abmelden")
 
     with ui.left_drawer(bordered=True).props("width=220").classes("bg-white") as drawer:
@@ -684,7 +708,7 @@ def main_page():
 
 def run():
     ui.run(host="127.0.0.1", port=int(CFG.get("port", 3001)),
-           title="DS Apartments & Suites", reload=False, show=False,
+           title="LIVARO Suites", reload=False, show=False,
            storage_secret=STORAGE_SECRET)
 
 
