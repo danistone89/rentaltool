@@ -25,17 +25,39 @@ def test_revisionen_und_kette(tmp_path, monkeypatch):
     assert not (mode & 0o222)
 
 
-def test_spiegelung(tmp_path, monkeypatch):
+def test_spiegelung_lokaler_ordner(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     mirror = tmp_path / "nextcloud"
+    cfg = {"archiv_spiegel": str(mirror)}
     e1 = archive.archive_pdf(b"PDF-A", "2025-12", {"steuer": 341.90})
-    archive.mirror_entry(e1, str(mirror))
+    archive.mirror_entry(e1, cfg)
     assert (mirror / e1["file"]).exists()
     assert (mirror / "ledger.jsonl").exists()
-    # zweite Ablage, dann komplette Spiegelung
     archive.archive_pdf(b"PDF-B", "2026-05", {"steuer": 429.35})
-    n = archive.mirror_all(str(mirror))
-    assert n == 2
+    assert archive.mirror_all(cfg) == 2
+
+
+def test_spiegelung_webdav(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    calls = []
+
+    def fake_req(method, url, w, data=None, headers=None):
+        calls.append((method, url))
+        return 201
+    monkeypatch.setattr(archive, "_dav_request", fake_req)
+
+    cfg = {"archiv_webdav": {"url": "https://nc.example.com", "user": "admin",
+                             "password": "pw", "folder": "Buchhaltung/BHS"}}
+    assert archive.has_mirror(cfg)
+    assert archive.mirror_label(cfg) == "Nextcloud (WebDAV)"
+
+    e = archive.archive_pdf(b"PDF-A", "2025-12", {"steuer": 341.90})
+    res = archive.mirror_entry(e, cfg)
+    assert res.startswith("nextcloud:")
+    puts = [u for (m, u) in calls if m == "PUT"]
+    assert any(u.endswith(".pdf") for u in puts)
+    assert any(u.endswith("ledger.jsonl") for u in puts)
+    assert all("/remote.php/dav/files/admin/Buchhaltung/BHS/" in u for u in puts)
 
 
 def test_manipulation_wird_erkannt(tmp_path, monkeypatch):

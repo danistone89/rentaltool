@@ -61,7 +61,7 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
 async def test_einstellungen_dialog(user: User, mock_backend):
     await _login(user)
     user.find("Einstellungen").click()
-    await user.should_see("Spiegel-Ordner")   # Nextcloud-Feld
+    await user.should_see("Nextcloud (WebDAV)")   # Spiegel-Feld
     await user.should_see("Betreiberdaten")
     await user.should_see("2FA aktivieren")    # Sicherheits-Sektion
 

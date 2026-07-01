@@ -11,6 +11,14 @@
   "unterschrift_x": 210,
   "archiv_spiegel": "",
 
+  "archiv_webdav": {
+    "_hinweis": "Nextcloud-Upload (für Server ohne lokalen Sync). App-Passwort in Nextcloud unter Einstellungen → Sicherheit erzeugen.",
+    "url": "",
+    "user": "",
+    "password": "",
+    "folder": ""
+  },
+
   "betreiber": {
     "name": "Nachname",
     "zusatz": "Vorname",

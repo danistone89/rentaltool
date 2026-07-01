@@ -230,29 +230,42 @@ def open_settings():
             steuer_pct = ui.number("Steuersatz (%)",
                                    value=CFG.get("steuersatz", 0.06) * 100, step=0.1, format="%.1f")
         ui.label("Revisionssicheres Archiv – externer Speicherort").classes("text-sm text-gray-500 mt-3")
+
+        # --- Nextcloud (WebDAV): empfohlen für den Server ---
+        wd = CFG.setdefault("archiv_webdav", {})
+        ui.label("Nextcloud (WebDAV) – lädt direkt hoch, funktioniert auch auf dem Server") \
+            .classes("text-xs text-gray-400")
+        with ui.grid(columns=2).classes("w-full gap-3"):
+            wd_url = ui.input("Nextcloud-URL (z. B. https://cloud.dstcloud.de)",
+                              value=wd.get("url", "")).classes("w-full")
+            wd_user = ui.input("Benutzer", value=wd.get("user", "")).classes("w-full")
+            wd_pw = ui.input("App-Passwort (leer = unverändert)", password=True,
+                             placeholder="•••• unverändert").classes("w-full")
+            wd_folder = ui.input("Ziel-Ordner (z. B. Buchhaltung/Beherbergungssteuer)",
+                                 value=wd.get("folder", "")).classes("w-full")
+
+        def test_webdav():
+            w = {"url": (wd_url.value or "").strip(), "user": (wd_user.value or "").strip(),
+                 "password": (wd_pw.value or "").strip() or wd.get("password", ""),
+                 "folder": (wd_folder.value or "").strip()}
+            ok, msg = archive.webdav_test(w)
+            ui.notify(("✓ " if ok else "✗ ") + msg,
+                      type=("positive" if ok else "negative"), timeout=9000)
+        ui.button("🔌 Nextcloud-Verbindung testen", on_click=test_webdav).props("outline")
+
+        # --- lokaler Ordner: nur für lokalen Betrieb (mit Nextcloud-Sync) ---
         cur = CFG.get("archiv_spiegel", "")
         with ui.row().classes("w-full items-end gap-2"):
-            spiegel = ui.input("Spiegel-Ordner (z. B. Nextcloud)", value=cur) \
+            spiegel = ui.input("oder lokaler Ordner (nur lokaler Betrieb)", value=cur) \
                 .classes("flex-grow") \
-                .tooltip("Vollständigen Pfad eintippen oder per Durchsuchen wählen. "
-                         "Jede Festschreibung wird dorthin kopiert (Nextcloud-Sync lädt hoch).")
+                .tooltip("Nur wenn die App lokal läuft und ein Nextcloud-Sync-Ordner existiert. "
+                         "Wird ignoriert, sobald oben Nextcloud/WebDAV gesetzt ist.")
 
             def browse():
                 detected = data.detect_cloud_folders()
                 start = spiegel.value or (detected[0] if detected else "")
                 open_folder_picker(start, lambda p: spiegel.set_value(p))
             ui.button("📁 Durchsuchen", on_click=browse).props("outline")
-
-        def check_folder():
-            p = spiegel.value
-            if not p:
-                ui.notify("Kein Ordner gewählt.", type="warning"); return
-            if not os.path.isdir(p):
-                ui.notify(f"Ordner existiert nicht: {p}", type="negative"); return
-            if not os.access(p, os.W_OK):
-                ui.notify("Ordner ist nicht beschreibbar.", type="negative"); return
-            ui.notify("Ordner OK und beschreibbar ✓", type="positive")
-        ui.button("Ordner prüfen", on_click=check_folder).props("flat dense")
 
         ui.label("Smoobu").classes("text-sm text-gray-500 mt-3")
         with ui.grid(columns=2).classes("w-full gap-3"):
@@ -319,6 +332,12 @@ def open_settings():
             CFG["unterschrift_x"] = int(v) if v == int(v) else v
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
             CFG["archiv_spiegel"] = spiegel.value or ""
+            wd["url"] = (wd_url.value or "").strip()
+            wd["user"] = (wd_user.value or "").strip()
+            wd["folder"] = (wd_folder.value or "").strip()
+            if (wd_pw.value or "").strip():
+                wd["password"] = wd_pw.value.strip()
+            CFG["archiv_webdav"] = wd
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()
             if (api.value or "").strip():
@@ -387,19 +406,19 @@ def open_archive():
                 if not res["ok"]:
                     ui.label("⚠️ " + "; ".join(res["issues"])).classes("text-xs text-red-700")
         with ui.row().classes("w-full justify-between items-center"):
-            mirror = CFG.get("archiv_spiegel", "")
-
-            def mirror_all():
-                if not mirror:
-                    ui.notify("Kein Spiegel-Ordner gesetzt (Einstellungen).", type="warning")
+            def do_mirror_all():
+                if not archive.has_mirror(CFG):
+                    ui.notify("Kein Spiegel gesetzt (Einstellungen).", type="warning")
                     return
                 try:
-                    n = archive.mirror_all(mirror)
-                    ui.notify(f"{n} Dokument(e) nach Nextcloud gespiegelt.", type="positive")
+                    n = archive.mirror_all(CFG)
+                    ui.notify(f"{n} Dokument(e) nach {archive.mirror_label(CFG)} gespiegelt.",
+                              type="positive")
                 except Exception as ex:
                     ui.notify(f"Spiegelung fehlgeschlagen: {ex}", type="negative", timeout=9000)
-            if mirror:
-                ui.button("🔁 Alles nach Nextcloud spiegeln", on_click=mirror_all).props("flat")
+            if archive.has_mirror(CFG):
+                ui.button(f"🔁 Alles nach {archive.mirror_label(CFG)} spiegeln",
+                          on_click=do_mirror_all).props("flat")
             else:
                 ui.label("Kein externer Spiegel gesetzt (→ Einstellungen)").classes("text-xs text-gray-400")
             ui.button("Schließen", on_click=dialog.close).props("flat")
@@ -485,11 +504,10 @@ def render_result(container, result):
             """PDF ablegen + (falls konfiguriert) spiegeln. Gibt (entry, zusatz_text)."""
             entry = archive.archive_pdf(pdf, period, _values())
             extra = ""
-            mirror = CFG.get("archiv_spiegel", "")
-            if mirror:
+            if archive.has_mirror(CFG):
                 try:
-                    archive.mirror_entry(entry, mirror)
-                    extra = " · in Nextcloud gesichert"
+                    archive.mirror_entry(entry, CFG)
+                    extra = f" · in {archive.mirror_label(CFG)} gesichert"
                 except Exception as ex:  # Spiegel-Fehler darf lokale Ablage nicht kippen
                     ui.notify(f"Lokal abgelegt, aber Spiegelung fehlgeschlagen: {ex}",
                               type="warning", timeout=9000)

@@ -64,12 +64,15 @@ Archiv festgeschrieben (Modul `app/archive.py`):
   listet alle Ablagen und prüft die Integrität – jede nachträgliche Änderung an
   Datei oder Eintrag wird erkannt.
 
-**Externer Spiegel (Nextcloud):** In den Einstellungen lässt sich ein
-**Spiegel-Ordner** wählen (erkannte Cloud-Ordner unter `~/Library/CloudStorage`
-oder freier Pfad). Jede Festschreibung kopiert die PDF + den Ledger dorthin; der
-Nextcloud-Sync lädt sie hoch → Ablage „außer Haus". Über das Archiv (📚) lässt
-sich mit **„🔁 Alles nach Nextcloud spiegeln"** der Bestand nachträglich sichern.
-Schlägt die Spiegelung fehl, bleibt die lokale Ablage trotzdem gültig.
+**Externer Spiegel (Nextcloud):** Zwei Wege, je nach Betrieb:
+- **Nextcloud (WebDAV)** – empfohlen, funktioniert auch auf dem Server: URL,
+  Benutzer, **Nextcloud-App-Passwort** und Ziel-Ordner in den Einstellungen; jede
+  Festschreibung wird per WebDAV hochgeladen („🔌 Verbindung testen" prüft es).
+- **Lokaler Ordner** – nur im lokalen Betrieb mit laufendem Nextcloud-Sync-Client.
+
+WebDAV hat Vorrang, wenn gesetzt. Über das Archiv (📚) sichert
+**„🔁 Alles nach … spiegeln"** den Bestand nachträglich. Schlägt die Spiegelung
+fehl, bleibt die lokale Ablage trotzdem gültig.
 
 > Pragmatische Revisionssicherheit (Integrität, Unveränderbarkeit, Nachweis +
 > externe Kopie). `archive/` ist gitignored.

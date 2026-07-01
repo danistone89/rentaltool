@@ -17,11 +17,15 @@ Hinweis: Das ist pragmatische Revisionssicherheit (Integrität, Unveränderbarke
 lückenloser Nachweis). Für volle GoBD-Konformität gehört das Archiv zusätzlich auf
 ein WORM-/Backup-Medium außerhalb dieses Rechners.
 """
+import base64
 import hashlib
 import json
 import os
 import shutil
+import urllib.error
+import urllib.request
 from datetime import datetime
+from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVE_DIR = os.path.join(HERE, "archive")
@@ -123,12 +127,33 @@ def read_pdf(rel_file):
         return f.read()
 
 
-# ----------------------------------------------------- Spiegel (z. B. Nextcloud)
+# ============================================ Spiegel (Nextcloud / lokaler Ordner)
+# Zwei Ziele möglich:
+#   * WebDAV/Nextcloud (cfg["archiv_webdav"]) – für Server-Betrieb (kein Sync-Client)
+#   * lokaler Ordner (cfg["archiv_spiegel"]) – für lokalen Betrieb (Nextcloud-Sync)
+# WebDAV hat Vorrang, wenn konfiguriert.
+
+def _webdav_cfg(cfg):
+    w = (cfg or {}).get("archiv_webdav") or {}
+    if w.get("url") and w.get("user") and w.get("password"):
+        return w
+    return None
+
+
+def has_mirror(cfg):
+    return bool(_webdav_cfg(cfg) or (cfg or {}).get("archiv_spiegel"))
+
+
+def mirror_label(cfg):
+    return "Nextcloud (WebDAV)" if _webdav_cfg(cfg) else "Spiegel-Ordner"
+
+
+# ---- lokaler Ordner ----
 def _copy_ro(src, dst):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     if os.path.exists(dst):
         try:
-            os.chmod(dst, 0o644)  # falls vorherige Kopie schreibgeschützt
+            os.chmod(dst, 0o644)
         except OSError:
             pass
     shutil.copy2(src, dst)
@@ -138,39 +163,120 @@ def _copy_ro(src, dst):
         pass
 
 
-def mirror_entry(entry, mirror_base):
-    """Eine abgelegte PDF + den aktuellen Ledger in den Spiegel-Ordner kopieren.
+# ---- WebDAV (Nextcloud) ----
+def _dav_base(w):
+    url = w["url"].strip().rstrip("/")
+    if "/remote.php/dav/files/" not in url:
+        url = f"{url}/remote.php/dav/files/{w['user']}"
+    return url.rstrip("/")
 
-    mirror_base z. B. ein synchronisierter Nextcloud-Ordner. Struktur bleibt
-    erhalten: <mirror_base>/<jahr>/<datei>.pdf und <mirror_base>/ledger.jsonl.
-    """
-    if not mirror_base:
+
+def _dav_encode(rel):
+    return "/".join(quote(p) for p in rel.split("/") if p)
+
+
+def _dav_request(method, url, w, data=None, headers=None):
+    req = urllib.request.Request(url, data=data, method=method)
+    tok = base64.b64encode(f"{w['user']}:{w['password']}".encode()).decode()
+    req.add_header("Authorization", "Basic " + tok)
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        resp = urllib.request.urlopen(req, timeout=30)
+        return resp.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Nextcloud nicht erreichbar: {e}")
+
+
+def _dav_mkcol_path(w, rel_dir):
+    base = _dav_base(w)
+    cur = base
+    for seg in [s for s in rel_dir.split("/") if s]:
+        cur = cur + "/" + quote(seg)
+        code = _dav_request("MKCOL", cur, w)
+        if code not in (201, 405, 301):  # 405 = existiert schon
+            raise RuntimeError(f"Nextcloud MKCOL {code} für {cur}")
+
+
+def _dav_put(w, rel_path, data):
+    url = _dav_base(w) + "/" + _dav_encode(rel_path)
+    code = _dav_request("PUT", url, w, data=data)
+    if code not in (200, 201, 204):
+        raise RuntimeError(f"Nextcloud PUT {code} für {rel_path}")
+
+
+def webdav_test(w):
+    """Verbindung/Anmeldung prüfen (PROPFIND). Gibt (ok, meldung)."""
+    if not (w.get("url") and w.get("user") and w.get("password")):
+        return False, "URL, Benutzer und App-Passwort nötig."
+    try:
+        code = _dav_request("PROPFIND", _dav_base(w), w, headers={"Depth": "0"})
+    except RuntimeError as ex:
+        return False, str(ex)
+    if code in (207, 200):
+        # Zielordner anlegen (idempotent), damit später sicher vorhanden
+        try:
+            if w.get("folder"):
+                _dav_mkcol_path(w, w["folder"])
+        except RuntimeError as ex:
+            return False, f"Verbunden, aber Ordner-Anlage scheiterte: {ex}"
+        return True, "Verbindung OK, Ordner bereit."
+    if code in (401, 403):
+        return False, "Anmeldung fehlgeschlagen – Benutzer/App-Passwort prüfen."
+    return False, f"Unerwartete Antwort: HTTP {code}"
+
+
+def _webdav_upload_one(entry, w):
+    folder = (w.get("folder") or "").strip("/")
+    rel_file = (folder + "/" + entry["file"]).strip("/")
+    _dav_mkcol_path(w, os.path.dirname(rel_file))
+    with open(os.path.join(ARCHIVE_DIR, entry["file"]), "rb") as f:
+        _dav_put(w, rel_file, f.read())
+    if os.path.exists(LEDGER_PATH):
+        with open(LEDGER_PATH, "rb") as f:
+            _dav_put(w, (folder + "/ledger.jsonl").strip("/"), f.read())
+    return "nextcloud:" + rel_file
+
+
+# ---- öffentliche API ----
+def mirror_entry(entry, cfg):
+    """Eine abgelegte PDF + Ledger in den konfigurierten Spiegel bringen."""
+    w = _webdav_cfg(cfg)
+    if w:
+        return _webdav_upload_one(entry, w)
+    base = (cfg or {}).get("archiv_spiegel")
+    if not base:
         return None
     _copy_ro(os.path.join(ARCHIVE_DIR, entry["file"]),
-             os.path.join(mirror_base, entry["file"]))
-    # Ledger als prüfbaren Nachweis mitspiegeln (bleibt beschreibbar)
-    led_dst = os.path.join(mirror_base, "ledger.jsonl")
-    os.makedirs(mirror_base, exist_ok=True)
+             os.path.join(base, entry["file"]))
+    os.makedirs(base, exist_ok=True)
     if os.path.exists(LEDGER_PATH):
-        shutil.copy2(LEDGER_PATH, led_dst)
-    return os.path.join(mirror_base, entry["file"])
+        shutil.copy2(LEDGER_PATH, os.path.join(base, "ledger.jsonl"))
+    return os.path.join(base, entry["file"])
 
 
-def mirror_all(mirror_base):
-    """Alle bisher abgelegten Dokumente + Ledger in den Spiegel kopieren.
-
-    Für Erst-Einrichtung oder nachträglich gesetzten Spiegel-Ordner.
-    Gibt die Anzahl kopierter Dateien zurück.
-    """
-    if not mirror_base:
-        return 0
+def mirror_all(cfg):
+    """Alle bisher abgelegten Dokumente + Ledger spiegeln. Anzahl zurück."""
+    w = _webdav_cfg(cfg)
+    entries = list_entries()
     n = 0
-    for e in list_entries():
+    if w:
+        for e in entries:
+            if os.path.exists(os.path.join(ARCHIVE_DIR, e["file"])):
+                _webdav_upload_one(e, w)
+                n += 1
+        return n
+    base = (cfg or {}).get("archiv_spiegel")
+    if not base:
+        return 0
+    for e in entries:
         src = os.path.join(ARCHIVE_DIR, e["file"])
         if os.path.exists(src):
-            _copy_ro(src, os.path.join(mirror_base, e["file"]))
+            _copy_ro(src, os.path.join(base, e["file"]))
             n += 1
     if os.path.exists(LEDGER_PATH):
-        os.makedirs(mirror_base, exist_ok=True)
-        shutil.copy2(LEDGER_PATH, os.path.join(mirror_base, "ledger.jsonl"))
+        os.makedirs(base, exist_ok=True)
+        shutil.copy2(LEDGER_PATH, os.path.join(base, "ledger.jsonl"))
     return n
