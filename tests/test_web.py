@@ -45,7 +45,8 @@ async def test_login_schuetzt_startseite(user: User, mock_backend):
 
 async def test_seite_laedt(user: User, mock_backend):
     await _login(user)
-    await user.should_see("Beherbergungssteuer Dresden")
+    await user.should_see("DS Apartments & Suites")   # App-Name (Header)
+    await user.should_see("Beherbergungssteuer")       # Feature-Titel
     await user.should_see("Berechnen")
 
 

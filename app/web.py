@@ -92,7 +92,9 @@ async def smoobu_webhook():
 # ---------------------------------------------------------------- Login
 @ui.page("/login")
 def login_page():
-    ui.colors(primary="#1f6feb")
+    ui.colors(primary="#4f46e5", secondary="#0ea5e9", accent="#f59e0b",
+              positive="#16a34a", negative="#dc2626")
+    ui.query("body").classes("bg-slate-100")
     if app.storage.user.get("authenticated"):
         ui.navigate.to("/")
         return
@@ -102,8 +104,10 @@ def login_page():
         ui.navigate.to(app.storage.user.get("referrer") or "/")
 
     with ui.column().classes("absolute-center items-center gap-3"):
-        ui.label("Beherbergungssteuer Dresden").classes("text-xl font-bold")
-        with ui.card().classes("w-[360px] max-w-full gap-2"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("apartment").classes("text-3xl text-primary")
+            ui.label("DS Apartments & Suites").classes("text-2xl font-bold text-slate-800")
+        with ui.card().classes("w-[360px] max-w-full gap-2 rounded-xl shadow-md"):
             if not auth.is_configured(AUTH):
                 ui.label("Erst-Einrichtung – Passwort festlegen").classes("font-semibold")
                 p1 = ui.input("Neues Passwort", password=True,
@@ -426,24 +430,26 @@ def open_archive():
 
 
 # ---------------------------------------------------------------- Ergebnis
-def _kpi(container, label, value, accent=False):
+def _kpi(container, label, value, icon="analytics", accent=False):
     with container:
-        with ui.card().classes("p-4 " + ("bg-green-50" if accent else "bg-blue-50")):
-            ui.label(label).classes("text-xs text-gray-500")
-            cls = "text-2xl font-bold " + ("text-green-700" if accent else "")
-            ui.label(value).classes(cls)
+        with ui.card().classes("p-4 rounded-xl shadow-sm border border-slate-100"):
+            with ui.row().classes("items-center gap-2 no-wrap"):
+                ui.icon(icon).classes("text-xl " + ("text-green-600" if accent else "text-primary"))
+                ui.label(label).classes("text-xs text-gray-500")
+            ui.label(value).classes("text-2xl font-bold mt-1 "
+                                    + ("text-green-700" if accent else "text-slate-800"))
 
 
 def render_result(container, result):
     container.clear()
     r = result
     with container:
-        with ui.row().classes("w-full gap-4"):
-            grid = ui.grid(columns=4).classes("w-full gap-4")
-        _kpi(grid, "ÜN insgesamt", str(r["uebernachtungen_insgesamt"]))
-        _kpi(grid, "verbleibende ÜN", str(r["uebernachtungen_verbleibend"]))
-        _kpi(grid, "steuerpfl. Umsatz", data.euro(r["umsatz_steuerpflichtig"]) + " €")
-        _kpi(grid, "Beherbergungssteuer", data.euro(r["beherbergungssteuer"]) + " €", accent=True)
+        grid = ui.grid(columns=4).classes("w-full gap-4 max-md:grid-cols-2")
+        _kpi(grid, "ÜN insgesamt", str(r["uebernachtungen_insgesamt"]), icon="hotel")
+        _kpi(grid, "verbleibende ÜN", str(r["uebernachtungen_verbleibend"]), icon="nights_stay")
+        _kpi(grid, "steuerpfl. Umsatz", data.euro(r["umsatz_steuerpflichtig"]) + " €", icon="payments")
+        _kpi(grid, "Beherbergungssteuer", data.euro(r["beherbergungssteuer"]) + " €",
+             icon="account_balance", accent=True)
 
         ui.label(f"Airbnb-ÜN (berechnet): {r['uebernachtungen_airbnb']} – fließen nicht in die "
                  f"Steuer ein (Airbnb meldet selbst). Basis = Preis ohne durchlaufende "
@@ -584,31 +590,56 @@ def render_result(container, result):
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
-    ui.colors(primary="#1f6feb")
+    ui.colors(primary="#4f46e5", secondary="#0ea5e9", accent="#f59e0b",
+              positive="#16a34a", negative="#dc2626", dark="#1e293b")
+    ui.query("body").classes("bg-slate-50")
     today = date.today()
     apts = _load_apartments()
 
-    with ui.header().classes("items-center justify-between"):
-        ui.label("Beherbergungssteuer Dresden").classes("text-lg font-bold")
-        with ui.row().classes("gap-1"):
-            ui.button("📚 Archiv", on_click=open_archive).props("flat color=white")
-            ui.button("⚙️ Einstellungen", on_click=open_settings).props("flat color=white")
-            ui.button(icon="logout", on_click=logout).props("flat round color=white") \
-                .tooltip("Abmelden")
+    with ui.header(elevated=True).classes("items-center px-4 bg-primary text-white"):
+        ui.button(icon="menu", on_click=lambda: drawer.toggle()) \
+            .props("flat round color=white dense").classes("lg:hidden")
+        ui.icon("apartment").classes("text-2xl")
+        ui.label("DS Apartments & Suites").classes("text-lg font-bold tracking-tight")
+        ui.space()
+        ui.button("Einstellungen", icon="settings", on_click=open_settings) \
+            .props("flat color=white no-caps")
+        ui.button(icon="logout", on_click=logout).props("flat round color=white") \
+            .tooltip("Abmelden")
 
-    with ui.column().classes("w-full max-w-5xl mx-auto p-4 gap-4"):
-        with ui.card().classes("w-full"):
+    with ui.left_drawer(bordered=True).props("width=230").classes("bg-white") as drawer:
+        ui.label("Bereiche").classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-2")
+        with ui.list().props("padding").classes("w-full"):
+            with ui.item().props("active").classes("rounded-lg text-primary bg-indigo-50 mx-1"):
+                with ui.item_section().props("avatar"):
+                    ui.icon("receipt_long")
+                ui.item_section("Beherbergungssteuer")
+        ui.space()
+        ui.label("Weitere Features folgen …").classes("text-xs text-gray-400 px-3 pb-3")
+
+    with ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-5"):
+        with ui.row().classes("w-full items-center gap-3"):
+            ui.icon("receipt_long").classes("text-3xl text-primary")
+            with ui.column().classes("gap-0"):
+                ui.label("Beherbergungssteuer").classes("text-2xl font-bold text-slate-800 leading-tight")
+                ui.label("Dresden · monatliche Steueranmeldung").classes("text-sm text-gray-500")
+            ui.space()
+            ui.button("Archiv", icon="inventory_2", on_click=open_archive).props("outline no-caps")
+
+        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
             with ui.row().classes("items-end gap-4 flex-wrap"):
                 year = ui.select(list(range(2023, today.year + 2)), label="Jahr",
-                                 value=today.year)
+                                 value=today.year).props("outlined dense")
                 month = ui.select({m: data.MONATE[m] for m in range(1, 13)}, label="Monat",
-                                  value=today.month)
+                                  value=today.month).props("outlined dense")
                 apt = ui.select(apts or {}, label="Apartments", multiple=True,
-                                value=list(apts.keys())).classes("min-w-[220px]").props("use-chips")
+                                value=list(apts.keys())).classes("min-w-[220px]") \
+                    .props("outlined dense use-chips")
                 airbnb = ui.number("Airbnb-ÜN (Override)", value=None, format="%d") \
-                    .props('placeholder="leer = berechnet" clearable')
-                befreit = ui.number("Steuerbefr. Umsatz €", value=0, step=0.01)
-                ui.button("Berechnen", on_click=lambda: do_compute()).props("unelevated")
+                    .props('outlined dense placeholder="leer = berechnet" clearable')
+                befreit = ui.number("Steuerbefr. Umsatz €", value=0, step=0.01).props("outlined dense")
+                ui.button("Berechnen", icon="calculate",
+                          on_click=lambda: do_compute()).props("unelevated no-caps")
                 ui.button(icon="refresh", on_click=lambda: do_compute(force=True)) \
                     .props("flat round").tooltip("Frisch von Smoobu laden (Cache leeren)")
             with ui.row().classes("items-center gap-2"):
@@ -641,7 +672,7 @@ def main_page():
 
 def run():
     ui.run(host="127.0.0.1", port=int(CFG.get("port", 3001)),
-           title="Beherbergungssteuer Dresden", reload=False, show=False,
+           title="DS Apartments & Suites", reload=False, show=False,
            storage_secret=STORAGE_SECRET)
 
 
