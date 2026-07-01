@@ -53,7 +53,9 @@ def send(email_cfg, msg):
     host = email_cfg.get("smtp_host") or "smtp.gmail.com"
     port = int(email_cfg.get("smtp_port") or 587)
     user = (email_cfg.get("absender") or "").strip()
-    pw = email_cfg.get("app_password") or ""
+    # Gmail zeigt App-Passwörter mit Leerzeichen ("abcd efgh ..."); beim Login
+    # müssen die weg.
+    pw = (email_cfg.get("app_password") or "").replace(" ", "")
     if not (user and pw):
         raise MailError("Gmail-Adresse oder App-Passwort fehlt (Einstellungen → E-Mail).")
     try:
@@ -74,3 +76,28 @@ def send_form(cfg, pdf_bytes, filename, context, *, subject=None, body=None):
     msg = build_message(email_cfg, pdf_bytes, filename, context, subject=subject, body=body)
     send(email_cfg, msg)
     return msg["To"]
+
+
+def build_test_message(email_cfg):
+    """Einfache Test-Nachricht ohne Anhang."""
+    to = (email_cfg.get("empfaenger") or "").strip()
+    absender = (email_cfg.get("absender") or "").strip()
+    if not to:
+        raise MailError("Kein Empfänger konfiguriert (Einstellungen → E-Mail).")
+    if not absender:
+        raise MailError("Kein Absender (Gmail-Adresse) konfiguriert.")
+    msg = EmailMessage()
+    msg["From"] = absender
+    msg["To"] = to
+    if (email_cfg.get("cc") or "").strip():
+        msg["Cc"] = email_cfg["cc"].strip()
+    msg["Subject"] = "Test – Beherbergungssteuer-App"
+    msg.set_content("Dies ist eine Test-E-Mail der Beherbergungssteuer-App.\n"
+                    "Wenn Sie diese Nachricht erhalten, funktioniert der Gmail-Versand.")
+    return msg
+
+
+def send_test(email_cfg):
+    """Test-E-Mail an den konfigurierten Empfänger senden."""
+    send(email_cfg, build_test_message(email_cfg))
+    return (email_cfg.get("empfaenger") or "").strip()

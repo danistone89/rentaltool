@@ -169,6 +169,26 @@ def open_settings():
         m_body = ui.textarea("Text-Vorlage", value=ec.get("text_vorlage") or DEFAULT_TEXT) \
             .classes("w-full").props("autogrow outlined")
 
+        def test_email():
+            test_cfg = {
+                "smtp_host": ec.get("smtp_host", "smtp.gmail.com"),
+                "smtp_port": ec.get("smtp_port", 587),
+                "absender": (m_from.value or "").strip(),
+                "empfaenger": (m_to.value or "").strip(),
+                "cc": (m_cc.value or "").strip(),
+                # neu eingetipptes Passwort bevorzugen, sonst gespeichertes
+                "app_password": (m_pw.value or "").strip() or ec.get("app_password", ""),
+            }
+            try:
+                to = mailer.send_test(test_cfg)
+                ui.notify(f"Test-E-Mail an {to} gesendet ✓", type="positive", timeout=8000)
+            except mailer.MailError as ex:
+                ui.notify(f"Test fehlgeschlagen: {ex}", type="negative", timeout=12000)
+        with ui.row().classes("items-center gap-2"):
+            ui.button("📧 Test-E-Mail senden", on_click=test_email).props("outline")
+            ui.label("sendet eine kurze Test-Mail an den Empfänger (ohne Anhang, "
+                     "ohne Ablage)").classes("text-xs text-gray-400")
+
         def save():
             for key in inputs:
                 betr[key] = inputs[key].value or ""
