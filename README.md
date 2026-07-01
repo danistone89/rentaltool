@@ -64,15 +64,16 @@ Archiv festgeschrieben (Modul `app/archive.py`):
   listet alle Ablagen und prüft die Integrität – jede nachträgliche Änderung an
   Datei oder Eintrag wird erkannt.
 
-**Externer Spiegel (Nextcloud):** Zwei Wege, je nach Betrieb:
-- **Nextcloud (WebDAV)** – empfohlen, funktioniert auch auf dem Server: URL,
-  Benutzer, **Nextcloud-App-Passwort** und Ziel-Ordner in den Einstellungen; jede
-  Festschreibung wird per WebDAV hochgeladen („🔌 Verbindung testen" prüft es).
-- **Lokaler Ordner** – nur im lokalen Betrieb mit laufendem Nextcloud-Sync-Client.
+**Ablage-Ordner (Computer):** In den Einstellungen (Tab „Archiv") einen Ordner
+auf dem Computer wählen (Browser „Durchsuchen"); jede Festschreibung wird dorthin
+kopiert – z. B. ein Nextcloud-Sync-Ordner oder ein Buchhaltungs-Ordner. Über das
+Archiv (📚) sichert **„🔁 Alles … spiegeln"** den Bestand nachträglich. Schlägt
+das Kopieren fehl, bleibt die interne Ablage (`archive/`) trotzdem gültig.
 
-WebDAV hat Vorrang, wenn gesetzt. Über das Archiv (📚) sichert
-**„🔁 Alles nach … spiegeln"** den Bestand nachträglich. Schlägt die Spiegelung
-fehl, bleibt die lokale Ablage trotzdem gültig.
+Hinweis: Der Ordner liegt dort, wo die App läuft. Lokal = dein Mac; auf dem
+Server = der Server (dann ggf. den Ordner via Mount mit der Cloud verbinden).
+Die WebDAV-Funktion im Code (`archive.mirror_entry` via `archiv_webdav`) bleibt
+verfügbar, ist in der UI aber nicht mehr eingebunden.
 
 > Pragmatische Revisionssicherheit (Integrität, Unveränderbarkeit, Nachweis +
 > externe Kopie). `archive/` ist gitignored.

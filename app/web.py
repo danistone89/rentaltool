@@ -245,7 +245,6 @@ def open_folder_picker(start, on_pick):
 def open_settings():
     betr = CFG.setdefault("betreiber", {})
     ec = CFG.setdefault("email", {})
-    wd = CFG.setdefault("archiv_webdav", {})
     with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full"):
         with ui.row().classes("w-full items-center"):
             ui.icon("settings").classes("text-xl text-primary")
@@ -276,39 +275,31 @@ def open_settings():
                                            format="%.1f").props("outlined dense")
 
             with ui.tab_panel(t_arch):
-                ui.label("Nextcloud (WebDAV) – lädt direkt hoch, funktioniert auch auf dem Server") \
-                    .classes("text-xs text-gray-400")
-                with ui.grid(columns=2).classes("w-full gap-3"):
-                    wd_url = ui.input("Nextcloud-URL (z. B. https://cloud.dstcloud.de)",
-                                      value=wd.get("url", "")).props("outlined dense").classes("w-full")
-                    wd_user = ui.input("Benutzer", value=wd.get("user", "")).props("outlined dense").classes("w-full")
-                    wd_pw = ui.input("App-Passwort (leer = unverändert)", password=True,
-                                     placeholder="•••• unverändert").props("outlined dense").classes("w-full")
-                    wd_folder = ui.input("Ziel-Ordner (z. B. Buchhaltung/Beherbergungssteuer)",
-                                         value=wd.get("folder", "")).props("outlined dense").classes("w-full")
-
-                def test_webdav():
-                    w = {"url": (wd_url.value or "").strip(), "user": (wd_user.value or "").strip(),
-                         "password": (wd_pw.value or "").strip() or wd.get("password", ""),
-                         "folder": (wd_folder.value or "").strip()}
-                    ok, msg = archive.webdav_test(w)
-                    ui.notify(("✓ " if ok else "✗ ") + msg,
-                              type=("positive" if ok else "negative"), timeout=9000)
-                ui.button("Nextcloud-Verbindung testen", icon="wifi_tethering",
-                          on_click=test_webdav).props("outline no-caps")
-
+                ui.label("Jede Festschreibung wird revisionssicher abgelegt und zusätzlich "
+                         "in diesen Ordner auf dem Computer kopiert.").classes("text-sm text-gray-500")
                 cur = CFG.get("archiv_spiegel", "")
-                with ui.row().classes("w-full items-end gap-2 mt-2"):
-                    spiegel = ui.input("oder lokaler Ordner (nur lokaler Betrieb)", value=cur) \
+                with ui.row().classes("w-full items-end gap-2 mt-1"):
+                    spiegel = ui.input("Ablage-Ordner", value=cur) \
                         .props("outlined dense").classes("flex-grow") \
-                        .tooltip("Nur wenn die App lokal läuft und ein Nextcloud-Sync-Ordner existiert. "
-                                 "Wird ignoriert, sobald oben Nextcloud/WebDAV gesetzt ist.")
+                        .tooltip("Ordner auf dem Computer, in den die PDFs kopiert werden "
+                                 "(z. B. dein Nextcloud-Sync-Ordner oder ein Buchhaltungs-Ordner).")
 
                     def browse():
                         detected = data.detect_cloud_folders()
                         start = spiegel.value or (detected[0] if detected else "")
                         open_folder_picker(start, lambda p: spiegel.set_value(p))
                     ui.button("Durchsuchen", icon="folder_open", on_click=browse).props("outline no-caps")
+
+                    def check_folder():
+                        p = spiegel.value
+                        if not p:
+                            ui.notify("Kein Ordner gewählt.", type="warning"); return
+                        if not os.path.isdir(p):
+                            ui.notify(f"Ordner existiert nicht: {p}", type="negative"); return
+                        if not os.access(p, os.W_OK):
+                            ui.notify("Ordner ist nicht beschreibbar.", type="negative"); return
+                        ui.notify("Ordner OK und beschreibbar ✓", type="positive")
+                    ui.button("Prüfen", on_click=check_folder).props("flat no-caps dense")
 
             with ui.tab_panel(t_smoobu):
                 with ui.grid(columns=2).classes("w-full gap-3"):
@@ -373,12 +364,7 @@ def open_settings():
             CFG["unterschrift_x"] = int(v) if v == int(v) else v
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
             CFG["archiv_spiegel"] = spiegel.value or ""
-            wd["url"] = (wd_url.value or "").strip()
-            wd["user"] = (wd_user.value or "").strip()
-            wd["folder"] = (wd_folder.value or "").strip()
-            if (wd_pw.value or "").strip():
-                wd["password"] = wd_pw.value.strip()
-            CFG["archiv_webdav"] = wd
+            CFG["archiv_webdav"] = {}   # Ablage über Ordner, nicht Nextcloud/WebDAV
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()
             if (api.value or "").strip():
