@@ -92,7 +92,7 @@ async def smoobu_webhook():
 # ---------------------------------------------------------------- Login
 @ui.page("/login")
 def login_page():
-    ui.colors(primary="#4f46e5", secondary="#0ea5e9", accent="#f59e0b",
+    ui.colors(primary="#7c3aed", secondary="#0ea5e9", accent="#f59e0b",
               positive="#16a34a", negative="#dc2626")
     ui.query("body").classes("bg-slate-100")
     if app.storage.user.get("authenticated"):
@@ -220,114 +220,127 @@ def open_folder_picker(start, on_pick):
 # ---------------------------------------------------------------- Einstellungen
 def open_settings():
     betr = CFG.setdefault("betreiber", {})
-    with ui.dialog() as dialog, ui.card().classes("w-[680px] max-w-full"):
-        ui.label("⚙️ Einstellungen").classes("text-xl font-bold")
-        ui.label("Betreiberdaten (erscheinen im PDF)").classes("text-sm text-gray-500 mt-2")
-        inputs = {}
-        with ui.grid(columns=2).classes("w-full gap-3"):
-            for key, lbl in data.BETREIBER_FIELDS:
-                inputs[key] = ui.input(lbl, value=betr.get(key, "")).classes("w-full")
-        ui.label("PDF & Steuer").classes("text-sm text-gray-500 mt-3")
-        with ui.grid(columns=2).classes("w-full gap-3"):
-            sig_x = ui.number("Unterschrift X (pt, größer = rechts)",
-                              value=float(CFG.get("unterschrift_x", 210)), step=5)
-            steuer_pct = ui.number("Steuersatz (%)",
-                                   value=CFG.get("steuersatz", 0.06) * 100, step=0.1, format="%.1f")
-        ui.label("Revisionssicheres Archiv – externer Speicherort").classes("text-sm text-gray-500 mt-3")
+    ec = CFG.setdefault("email", {})
+    wd = CFG.setdefault("archiv_webdav", {})
+    with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full"):
+        with ui.row().classes("w-full items-center"):
+            ui.icon("settings").classes("text-xl text-primary")
+            ui.label("Einstellungen").classes("text-xl font-bold")
 
-        # --- Nextcloud (WebDAV): empfohlen für den Server ---
-        wd = CFG.setdefault("archiv_webdav", {})
-        ui.label("Nextcloud (WebDAV) – lädt direkt hoch, funktioniert auch auf dem Server") \
-            .classes("text-xs text-gray-400")
-        with ui.grid(columns=2).classes("w-full gap-3"):
-            wd_url = ui.input("Nextcloud-URL (z. B. https://cloud.dstcloud.de)",
-                              value=wd.get("url", "")).classes("w-full")
-            wd_user = ui.input("Benutzer", value=wd.get("user", "")).classes("w-full")
-            wd_pw = ui.input("App-Passwort (leer = unverändert)", password=True,
-                             placeholder="•••• unverändert").classes("w-full")
-            wd_folder = ui.input("Ziel-Ordner (z. B. Buchhaltung/Beherbergungssteuer)",
-                                 value=wd.get("folder", "")).classes("w-full")
+        with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
+            t_betr = ui.tab("Betreiber", icon="person")
+            t_pdf = ui.tab("PDF & Steuer", icon="description")
+            t_arch = ui.tab("Archiv", icon="cloud_upload")
+            t_smoobu = ui.tab("Smoobu", icon="sync")
+            t_mail = ui.tab("E-Mail", icon="mail")
+            t_sec = ui.tab("Sicherheit", icon="lock")
 
-        def test_webdav():
-            w = {"url": (wd_url.value or "").strip(), "user": (wd_user.value or "").strip(),
-                 "password": (wd_pw.value or "").strip() or wd.get("password", ""),
-                 "folder": (wd_folder.value or "").strip()}
-            ok, msg = archive.webdav_test(w)
-            ui.notify(("✓ " if ok else "✗ ") + msg,
-                      type=("positive" if ok else "negative"), timeout=9000)
-        ui.button("🔌 Nextcloud-Verbindung testen", on_click=test_webdav).props("outline")
+        with ui.tab_panels(tabs, value=t_betr).classes("w-full"):
+            with ui.tab_panel(t_betr):
+                ui.label("Betreiberdaten (erscheinen im PDF)").classes("text-sm text-gray-500")
+                inputs = {}
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    for key, lbl in data.BETREIBER_FIELDS:
+                        inputs[key] = ui.input(lbl, value=betr.get(key, "")).props("outlined dense").classes("w-full")
 
-        # --- lokaler Ordner: nur für lokalen Betrieb (mit Nextcloud-Sync) ---
-        cur = CFG.get("archiv_spiegel", "")
-        with ui.row().classes("w-full items-end gap-2"):
-            spiegel = ui.input("oder lokaler Ordner (nur lokaler Betrieb)", value=cur) \
-                .classes("flex-grow") \
-                .tooltip("Nur wenn die App lokal läuft und ein Nextcloud-Sync-Ordner existiert. "
-                         "Wird ignoriert, sobald oben Nextcloud/WebDAV gesetzt ist.")
+            with ui.tab_panel(t_pdf):
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    sig_x = ui.number("Unterschrift X (pt, größer = rechts)",
+                                      value=float(CFG.get("unterschrift_x", 210)), step=5).props("outlined dense")
+                    steuer_pct = ui.number("Steuersatz (%)",
+                                           value=CFG.get("steuersatz", 0.06) * 100, step=0.1,
+                                           format="%.1f").props("outlined dense")
 
-            def browse():
-                detected = data.detect_cloud_folders()
-                start = spiegel.value or (detected[0] if detected else "")
-                open_folder_picker(start, lambda p: spiegel.set_value(p))
-            ui.button("📁 Durchsuchen", on_click=browse).props("outline")
+            with ui.tab_panel(t_arch):
+                ui.label("Nextcloud (WebDAV) – lädt direkt hoch, funktioniert auch auf dem Server") \
+                    .classes("text-xs text-gray-400")
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    wd_url = ui.input("Nextcloud-URL (z. B. https://cloud.dstcloud.de)",
+                                      value=wd.get("url", "")).props("outlined dense").classes("w-full")
+                    wd_user = ui.input("Benutzer", value=wd.get("user", "")).props("outlined dense").classes("w-full")
+                    wd_pw = ui.input("App-Passwort (leer = unverändert)", password=True,
+                                     placeholder="•••• unverändert").props("outlined dense").classes("w-full")
+                    wd_folder = ui.input("Ziel-Ordner (z. B. Buchhaltung/Beherbergungssteuer)",
+                                         value=wd.get("folder", "")).props("outlined dense").classes("w-full")
 
-        ui.label("Smoobu").classes("text-sm text-gray-500 mt-3")
-        with ui.grid(columns=2).classes("w-full gap-3"):
-            api = ui.input("API-Key (leer = unverändert)",
-                           password=True, placeholder="•••• unverändert").classes("w-full")
-            channel = ui.input("Airbnb-Kanalname (steuerfrei)",
-                               value=CFG.get("airbnb_channel_name", "Airbnb")).classes("w-full")
+                def test_webdav():
+                    w = {"url": (wd_url.value or "").strip(), "user": (wd_user.value or "").strip(),
+                         "password": (wd_pw.value or "").strip() or wd.get("password", ""),
+                         "folder": (wd_folder.value or "").strip()}
+                    ok, msg = archive.webdav_test(w)
+                    ui.notify(("✓ " if ok else "✗ ") + msg,
+                              type=("positive" if ok else "negative"), timeout=9000)
+                ui.button("Nextcloud-Verbindung testen", icon="wifi_tethering",
+                          on_click=test_webdav).props("outline no-caps")
 
-        ec = CFG.setdefault("email", {})
-        ui.label("E-Mail-Versand (Gmail)").classes("text-sm text-gray-500 mt-3")
-        with ui.grid(columns=2).classes("w-full gap-3"):
-            m_from = ui.input("Absender (Gmail-Adresse)", value=ec.get("absender", "")).classes("w-full")
-            m_pw = ui.input("Gmail App-Passwort (leer = unverändert)", password=True,
-                            placeholder="•••• unverändert").classes("w-full")
-            m_to = ui.input("Empfänger (fest)", value=ec.get("empfaenger", "")).classes("w-full")
-            m_cc = ui.input("Cc (optional)", value=ec.get("cc", "")).classes("w-full")
-        ui.label("Vorlage – Platzhalter: {monat} {jahr} {periode} {steuer} {umsatz} "
-                 "{kassenzeichen} {name}").classes("text-xs text-gray-400")
-        m_subj = ui.input("Betreff-Vorlage",
-                          value=ec.get("betreff_vorlage") or DEFAULT_BETREFF) \
-            .classes("w-full")
-        m_body = ui.textarea("Text-Vorlage", value=ec.get("text_vorlage") or DEFAULT_TEXT) \
-            .classes("w-full").props("autogrow outlined")
+                cur = CFG.get("archiv_spiegel", "")
+                with ui.row().classes("w-full items-end gap-2 mt-2"):
+                    spiegel = ui.input("oder lokaler Ordner (nur lokaler Betrieb)", value=cur) \
+                        .props("outlined dense").classes("flex-grow") \
+                        .tooltip("Nur wenn die App lokal läuft und ein Nextcloud-Sync-Ordner existiert. "
+                                 "Wird ignoriert, sobald oben Nextcloud/WebDAV gesetzt ist.")
 
-        def test_email():
-            test_cfg = {
-                "smtp_host": ec.get("smtp_host", "smtp.gmail.com"),
-                "smtp_port": ec.get("smtp_port", 587),
-                "absender": (m_from.value or "").strip(),
-                "empfaenger": (m_to.value or "").strip(),
-                "cc": (m_cc.value or "").strip(),
-                # neu eingetipptes Passwort bevorzugen, sonst gespeichertes
-                "app_password": (m_pw.value or "").strip() or ec.get("app_password", ""),
-            }
-            try:
-                to = mailer.send_test(test_cfg)
-                ui.notify(f"Test-E-Mail an {to} gesendet ✓", type="positive", timeout=8000)
-            except mailer.MailError as ex:
-                ui.notify(f"Test fehlgeschlagen: {ex}", type="negative", timeout=12000)
-        with ui.row().classes("items-center gap-2"):
-            ui.button("📧 Test-E-Mail senden", on_click=test_email).props("outline")
-            ui.label("sendet eine kurze Test-Mail an den Empfänger (ohne Anhang, "
-                     "ohne Ablage)").classes("text-xs text-gray-400")
+                    def browse():
+                        detected = data.detect_cloud_folders()
+                        start = spiegel.value or (detected[0] if detected else "")
+                        open_folder_picker(start, lambda p: spiegel.set_value(p))
+                    ui.button("Durchsuchen", icon="folder_open", on_click=browse).props("outline no-caps")
 
-        ui.label("Sicherheit / Login").classes("text-sm text-gray-500 mt-3")
-        with ui.row().classes("w-full items-end gap-3"):
-            new_pw = ui.input("Passwort ändern (leer = unverändert)", password=True,
-                              placeholder="•••• unverändert").classes("flex-grow")
-            if auth.totp_enabled(AUTH):
-                def disable_2fa():
-                    AUTH["totp_secret"] = ""
-                    data.save_config()
-                    ui.notify("2FA (Authenticator) deaktiviert.", type="warning")
-                    dialog.close()
-                ui.button("2FA deaktivieren", on_click=disable_2fa).props("flat")
-                ui.label("🔐 2FA aktiv").classes("text-xs text-green-700 self-center")
-            else:
-                ui.button("🔐 2FA aktivieren", on_click=open_2fa_setup).props("outline")
+            with ui.tab_panel(t_smoobu):
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    api = ui.input("API-Key (leer = unverändert)", password=True,
+                                   placeholder="•••• unverändert").props("outlined dense").classes("w-full")
+                    channel = ui.input("Airbnb-Kanalname (steuerfrei)",
+                                       value=CFG.get("airbnb_channel_name", "Airbnb")).props("outlined dense").classes("w-full")
+
+            with ui.tab_panel(t_mail):
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    m_from = ui.input("Absender (Gmail-Adresse)", value=ec.get("absender", "")).props("outlined dense").classes("w-full")
+                    m_pw = ui.input("Gmail App-Passwort (leer = unverändert)", password=True,
+                                    placeholder="•••• unverändert").props("outlined dense").classes("w-full")
+                    m_to = ui.input("Empfänger (fest)", value=ec.get("empfaenger", "")).props("outlined dense").classes("w-full")
+                    m_cc = ui.input("Cc (optional)", value=ec.get("cc", "")).props("outlined dense").classes("w-full")
+                ui.label("Vorlage – Platzhalter: {monat} {jahr} {periode} {steuer} {umsatz} "
+                         "{kassenzeichen} {name}").classes("text-xs text-gray-400 mt-2")
+                m_subj = ui.input("Betreff-Vorlage",
+                                  value=ec.get("betreff_vorlage") or DEFAULT_BETREFF).props("outlined dense").classes("w-full")
+                m_body = ui.textarea("Text-Vorlage", value=ec.get("text_vorlage") or DEFAULT_TEXT) \
+                    .classes("w-full").props("autogrow outlined")
+
+                def test_email():
+                    test_cfg = {
+                        "smtp_host": ec.get("smtp_host", "smtp.gmail.com"),
+                        "smtp_port": ec.get("smtp_port", 587),
+                        "absender": (m_from.value or "").strip(),
+                        "empfaenger": (m_to.value or "").strip(),
+                        "cc": (m_cc.value or "").strip(),
+                        "app_password": (m_pw.value or "").strip() or ec.get("app_password", ""),
+                    }
+                    try:
+                        to = mailer.send_test(test_cfg)
+                        ui.notify(f"Test-E-Mail an {to} gesendet ✓", type="positive", timeout=8000)
+                    except mailer.MailError as ex:
+                        ui.notify(f"Test fehlgeschlagen: {ex}", type="negative", timeout=12000)
+                with ui.row().classes("items-center gap-2 mt-1"):
+                    ui.button("Test-E-Mail senden", icon="send", on_click=test_email).props("outline no-caps")
+                    ui.label("kurze Test-Mail an den Empfänger (ohne Anhang, ohne Ablage)") \
+                        .classes("text-xs text-gray-400")
+
+            with ui.tab_panel(t_sec):
+                new_pw = ui.input("Passwort ändern (leer = unverändert)", password=True,
+                                  placeholder="•••• unverändert").props("outlined dense").classes("w-full")
+                with ui.row().classes("items-center gap-2 mt-2"):
+                    if auth.totp_enabled(AUTH):
+                        def disable_2fa():
+                            AUTH["totp_secret"] = ""
+                            data.save_config()
+                            ui.notify("2FA (Authenticator) deaktiviert.", type="warning")
+                            dialog.close()
+                        ui.label("🔐 2FA aktiv").classes("text-sm text-green-700")
+                        ui.button("2FA deaktivieren", on_click=disable_2fa).props("flat no-caps")
+                    else:
+                        ui.button("2FA aktivieren (Google Authenticator)", icon="qr_code_2",
+                                  on_click=open_2fa_setup).props("outline no-caps")
 
         def save():
             for key in inputs:
@@ -590,7 +603,7 @@ def render_result(container, result):
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
-    ui.colors(primary="#4f46e5", secondary="#0ea5e9", accent="#f59e0b",
+    ui.colors(primary="#7c3aed", secondary="#0ea5e9", accent="#f59e0b",
               positive="#16a34a", negative="#dc2626", dark="#1e293b")
     ui.query("body").classes("bg-slate-50")
     today = date.today()
@@ -607,13 +620,12 @@ def main_page():
         ui.button(icon="logout", on_click=logout).props("flat round color=white") \
             .tooltip("Abmelden")
 
-    with ui.left_drawer(bordered=True).props("width=230").classes("bg-white") as drawer:
-        ui.label("Bereiche").classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-2")
-        with ui.list().props("padding").classes("w-full"):
-            with ui.item().props("active").classes("rounded-lg text-primary bg-indigo-50 mx-1"):
-                with ui.item_section().props("avatar"):
-                    ui.icon("receipt_long")
-                ui.item_section("Beherbergungssteuer")
+    with ui.left_drawer(bordered=True).props("width=220").classes("bg-white") as drawer:
+        ui.label("Bereiche").classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-3 pb-1")
+        with ui.row().classes("items-center gap-2 mx-2 px-2 py-2 rounded-lg "
+                              "bg-violet-50 text-primary cursor-pointer no-wrap"):
+            ui.icon("receipt_long").classes("text-xl")
+            ui.label("Beherbergungssteuer").classes("font-medium")
         ui.space()
         ui.label("Weitere Features folgen …").classes("text-xs text-gray-400 px-3 pb-3")
 
