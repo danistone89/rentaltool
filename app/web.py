@@ -17,11 +17,14 @@ from nicegui import app, ui  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer, auth, timetrack  # noqa: E402
+from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
     pdf_form = None
+
+os.makedirs(housekeeping.MEDIA_DIR, exist_ok=True)
+app.add_static_files("/media", housekeeping.MEDIA_DIR)
 
 CFG = data.CONFIG
 AUTH = CFG.setdefault("auth", {})
@@ -45,11 +48,12 @@ ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
 # die feinen Rechte definieren wir später, hier nur das Grundgerüst.
 AREAS = [
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
+    {"key": "reinigung", "label": "Reinigung", "icon": "cleaning_services"},
     {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
 ]
 ROLE_AREAS = {
-    "admin": {a["key"] for a in AREAS},   # Admin sieht alles
-    "putzkraft": {"zeiterfassung"},       # Putzkräfte: Arbeitszeit erfassen
+    "admin": {a["key"] for a in AREAS},          # Admin sieht alles
+    "putzkraft": {"reinigung", "zeiterfassung"},  # Putzkräfte: Reinigung + Zeit
 }
 
 
@@ -533,6 +537,23 @@ def open_settings():
                         ui.notify("Ordner OK und beschreibbar ✓", type="positive")
                     ui.button("Prüfen", on_click=check_folder).props("flat no-caps dense")
 
+                ui.separator().classes("my-2")
+                ui.label("Reinigungs-Fotos (Soll/Ist) und Belege werden zusätzlich in diesen "
+                         "Ordner gespiegelt.").classes("text-sm text-gray-500")
+                with ui.row().classes("w-full items-end gap-2 mt-1"):
+                    reinigung_ordner = ui.input("Foto-Ordner (Reinigung)",
+                                                value=CFG.get("reinigung_ordner", "")) \
+                        .props("outlined dense").classes("flex-grow") \
+                        .tooltip("Ordner auf dem Computer/Server (z. B. Nextcloud-Mount), in den "
+                                 "Reinigungsfotos kopiert werden. Leer = nur lokal in media/.")
+
+                    def browse_reinigung():
+                        detected = data.detect_cloud_folders()
+                        start = reinigung_ordner.value or (detected[0] if detected else "")
+                        open_folder_picker(start, lambda p: reinigung_ordner.set_value(p))
+                    ui.button("Durchsuchen", icon="folder_open",
+                              on_click=browse_reinigung).props("outline no-caps")
+
             with ui.tab_panel(t_smoobu):
                 with ui.grid(columns=2).classes("w-full gap-3"):
                     api = ui.input("API-Key (leer = unverändert)", password=True,
@@ -580,6 +601,7 @@ def open_settings():
             CFG["unterschrift_x"] = int(v) if v == int(v) else v
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
             CFG["archiv_spiegel"] = spiegel.value or ""
+            CFG["reinigung_ordner"] = reinigung_ordner.value or ""
             CFG["archiv_webdav"] = {}   # Ablage über Ordner, nicht Nextcloud/WebDAV
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()
@@ -821,6 +843,366 @@ def render_result(container, result):
                          "eine neue Revision an.").classes("text-xs text-amber-700")
 
 
+# ---------------------------------------------------------------- Reinigung
+def _apts():
+    return dict(_load_apartments())
+
+
+def _photo_mirror():
+    return CFG.get("reinigung_ordner") or None
+
+
+def _due_today():
+    from datetime import date, timedelta
+    today = date.today().isoformat()
+    d_from = (date.today() - timedelta(days=92)).isoformat()
+    try:
+        bookings = data._reservations(d_from, today)
+    except Exception:
+        return []
+    out = {}
+    for b in bookings:
+        if b.get("is-blocked-booking") or b.get("type") == "cancellation":
+            continue
+        if b.get("departure") == today:
+            ap = b.get("apartment") or {}
+            if ap.get("id"):
+                out[ap["id"]] = ap.get("name")
+    return list(out.items())
+
+
+def _save_upload(e, kind):
+    content = e.content.read()
+    name = e.name or "foto.jpg"
+    ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
+    return housekeeping.save_photo(kind, content, ext=ext, mirror_dir=_photo_mirror())
+
+
+def _run_ist(run_id, task_id):
+    for r in housekeeping._read(housekeeping.CLEANINGS, []):
+        if r["id"] == run_id:
+            return r["tasks"].get(task_id, {}).get("ist_photo")
+    return None
+
+
+def _notify_damage(d):
+    ec = CFG.get("email", {})
+    if not (ec.get("absender") and ec.get("app_password")):
+        return
+    to = CFG.get("benachrichtigung_email") or ec.get("absender")
+    body = (f"Neue Schadensmeldung\n\nApartment: {d['apartment_name']}\n"
+            f"Raum: {d['room']}\nDringlichkeit: {d['urgency']}\n"
+            f"Gemeldet von: {d['reporter']}\nZeit: {d['ts']}\n\n"
+            f"Beschreibung:\n{d['desc']}\n")
+    try:
+        mailer.send_plain(CFG, to,
+                          f"[LIVARO] Schaden {d['apartment_name']} ({d['urgency']})", body)
+    except mailer.MailError:
+        pass
+
+
+def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None):
+    photo = {"rel": None}
+    with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-2"):
+        ui.label(f"Schaden melden – {apt_name}").classes("text-lg font-bold")
+        room = ui.input("Raum/Bereich").props("dense outlined").classes("w-full")
+        desc = ui.textarea("Was ist beschädigt?").props("outlined").classes("w-full")
+        urg = ui.select(["niedrig", "mittel", "hoch"], value="mittel",
+                        label="Dringlichkeit").props("dense outlined").classes("w-full")
+        thumb = ui.row()
+
+        def on_up(e):
+            photo["rel"] = _save_upload(e, "damage")
+            thumb.clear()
+            with thumb:
+                ui.image(f"/media/{photo['rel']}").classes("w-24 h-24 object-cover rounded")
+        ui.upload(auto_upload=True, on_upload=on_up, label="Foto (optional)") \
+            .props('accept="image/*"').classes("w-full")
+
+        def save():
+            if not (desc.value or "").strip():
+                ui.notify("Bitte Beschreibung angeben.", type="warning"); return
+            d = housekeeping.add_damage(apt_id, apt_name, (room.value or "").strip(),
+                                        desc.value.strip(), urg.value, photo["rel"], reporter)
+            _notify_damage(d)
+            ui.notify("Schaden gemeldet – Danke!", type="positive")
+            dlg.close()
+            if on_saved:
+                on_saved()
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Melden", on_click=save).props("unelevated")
+    dlg.open()
+
+
+def _hk_header(title, subtitle):
+    with ui.row().classes("w-full items-center gap-3"):
+        ui.icon("cleaning_services").classes("text-3xl text-primary")
+        with ui.column().classes("gap-0"):
+            ui.label(title).classes("text-2xl font-bold text-slate-800 leading-tight")
+            ui.label(subtitle).classes("text-sm text-gray-500")
+
+
+def render_reinigung():
+    if _is_admin():
+        reinigung_admin()
+    else:
+        reinigung_putzkraft()
+
+
+def reinigung_putzkraft():
+    user = _cur_user()
+    _hk_header("Reinigung", "Checkliste, Fotonachweis, Schäden & Bestand")
+    apts = _apts()
+    state = {"apt": None}
+    body = ui.column().classes("w-full gap-4")
+
+    def open_apt(aid, anm):
+        state["apt"] = (aid, anm); render()
+
+    def _task_row(run, t):
+        st = run["tasks"].get(t["id"], {})
+        with ui.row().classes("w-full items-center gap-3 no-wrap"):
+            cb = ui.checkbox(t["text"], value=st.get("done", False))
+            cb.on_value_change(lambda e, tid=t["id"]: housekeeping.update_task(run["id"], tid, done=e.value))
+            ui.space()
+            if t.get("ref_photo"):
+                with ui.column().classes("items-center gap-0"):
+                    ui.image(f"/media/{t['ref_photo']}").classes("w-16 h-16 object-cover rounded")
+                    ui.label("Soll").classes("text-xs text-gray-400")
+            istc = ui.column().classes("items-center gap-0")
+
+            def refresh_ist(col=istc, tid=t["id"], run_id=run["id"]):
+                col.clear()
+                with col:
+                    p = _run_ist(run_id, tid)
+                    if p:
+                        ui.image(f"/media/{p}").classes("w-16 h-16 object-cover rounded")
+                        ui.label("Ist ✓").classes("text-xs text-green-600")
+                    else:
+                        ui.upload(auto_upload=True,
+                                  on_upload=lambda e: (_save_ist(e, run_id, tid), refresh_ist())) \
+                            .props('accept="image/*" flat dense').classes("max-w-[110px]")
+                        ui.label("Ist-Foto").classes("text-xs text-gray-400")
+            refresh_ist()
+
+    def _save_ist(e, run_id, tid):
+        rel = _save_upload(e, "ist")
+        housekeeping.update_task(run_id, tid, ist_photo=rel)
+
+    def _restock_card(aid, anm):
+        with ui.card().classes("w-full"):
+            with ui.expansion("Verbrauch / Wäsche nachbestellen", icon="inventory_2").classes("w-full"):
+                for it in housekeeping.get_inventory(aid):
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.label(it["name"]).classes("flex-grow")
+                        qty = ui.input("Menge", value="1").props("dense outlined").classes("w-24")
+
+                        def melden(name=it["name"], kat=it["kategorie"], q=qty):
+                            housekeeping.add_restock(aid, anm, name, (q.value or "1").strip(), kat, user)
+                            ui.notify(f"{name} zum Nachkauf gemeldet.", type="positive")
+                        ui.button("melden", icon="add_shopping_cart",
+                                  on_click=melden).props("flat dense no-caps")
+
+    def render():
+        body.clear()
+        with body:
+            if state["apt"] is None:
+                with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2"):
+                    due = _due_today()
+                    if due:
+                        ui.label("Heute fällig (nach Abreise):").classes("font-medium")
+                        with ui.row().classes("gap-2 flex-wrap"):
+                            for aid, anm in due:
+                                ui.button(anm, icon="event_available",
+                                          on_click=lambda a=aid, n=anm: open_apt(a, n)) \
+                                    .props("unelevated no-caps")
+                    ui.label("Apartment wählen:").classes("text-sm text-gray-500 mt-1")
+                    with ui.row().classes("items-end gap-2"):
+                        s = ui.select(apts, label="Apartment").props("outlined dense").classes("min-w-[240px]")
+                        ui.button("Reinigung starten", icon="play_arrow",
+                                  on_click=lambda: (open_apt(s.value, apts.get(s.value)) if s.value
+                                                    else ui.notify("Bitte Apartment wählen.", type="warning"))) \
+                            .props("unelevated no-caps")
+                return
+            aid, anm = state["apt"]
+            run = housekeeping.start_run(aid, anm, user)
+            cl = housekeeping.get_checklist(aid)
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.button(icon="arrow_back", on_click=lambda: (state.update(apt=None), render())).props("flat round")
+                ui.label(anm).classes("text-xl font-bold")
+                ui.space()
+                ui.button("Schaden melden", icon="report_problem",
+                          on_click=lambda: open_damage_dialog(aid, anm, user)) \
+                    .props("outline no-caps color=negative")
+            for room in cl["rooms"]:
+                with ui.card().classes("w-full"):
+                    ui.label(room["name"]).classes("font-medium")
+                    for t in room["tasks"]:
+                        _task_row(run, t)
+            _restock_card(aid, anm)
+            ui.button("Durchgang abschließen", icon="check_circle",
+                      on_click=lambda: (housekeeping.finish_run(run["id"]),
+                                        ui.notify("Durchgang abgeschlossen ✓", type="positive"),
+                                        state.update(apt=None), render())) \
+                .props("unelevated no-caps")
+    render()
+
+
+def reinigung_admin():
+    _hk_header("Reinigung", "Durchgänge, Schäden, Einkaufsliste & Konfiguration")
+    apts = _apts()
+    with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
+        t_runs = ui.tab("Durchgänge", icon="fact_check")
+        t_dmg = ui.tab("Schäden", icon="report_problem")
+        t_shop = ui.tab("Einkaufsliste", icon="shopping_cart")
+        t_cfg = ui.tab("Konfiguration", icon="tune")
+    with ui.tab_panels(tabs, value=t_runs).classes("w-full"):
+        with ui.tab_panel(t_runs):
+            _admin_runs()
+        with ui.tab_panel(t_dmg):
+            _admin_damages()
+        with ui.tab_panel(t_shop):
+            _admin_shopping()
+        with ui.tab_panel(t_cfg):
+            _admin_config(apts)
+
+
+def _admin_runs():
+    runs = housekeeping.list_runs()
+    if not runs:
+        ui.label("Noch keine Durchgänge.").classes("text-gray-500"); return
+    for r in runs:
+        cl = housekeeping.get_checklist(r["apartment_id"])
+        total = sum(len(room["tasks"]) for room in cl["rooms"])
+        done = sum(1 for v in r["tasks"].values() if v.get("done"))
+        status = "abgeschlossen" if r.get("finished") else "läuft"
+        head = f"{r['apartment_name']} · {r['user']} · {_d(r['started'])} · {done}/{total} Aufgaben · {status}"
+        with ui.expansion(head, icon="cleaning_services").classes("w-full"):
+            for room in cl["rooms"]:
+                ui.label(room["name"]).classes("font-medium text-sm mt-1")
+                for t in room["tasks"]:
+                    st = r["tasks"].get(t["id"], {})
+                    with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                        ui.icon("check_circle" if st.get("done") else "radio_button_unchecked") \
+                            .classes("text-green-600" if st.get("done") else "text-gray-300")
+                        ui.label(t["text"]).classes("flex-grow text-sm")
+                        if t.get("ref_photo"):
+                            ui.image(f"/media/{t['ref_photo']}").classes("w-14 h-14 object-cover rounded")
+                        if st.get("ist_photo"):
+                            ui.image(f"/media/{st['ist_photo']}").classes("w-14 h-14 object-cover rounded")
+
+
+def _admin_damages():
+    dmg = housekeeping.list_damages()
+    if not dmg:
+        ui.label("Keine Schadensmeldungen.").classes("text-gray-500"); return
+    for d in dmg:
+        color = {"hoch": "text-red-700", "mittel": "text-amber-700"}.get(d["urgency"], "text-gray-600")
+        with ui.card().classes("w-full"):
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.icon("report_problem").classes(color)
+                ui.label(f"{d['apartment_name']} · {d['room']}").classes("font-semibold")
+                ui.label(d["urgency"]).classes(f"text-xs {color}")
+                ui.label(f"{_d(d['ts'])} · {d['reporter']}").classes("text-xs text-gray-500")
+                ui.space()
+                if d["status"] == "offen":
+                    ui.button("erledigt", icon="check",
+                              on_click=lambda i=d["id"]: (housekeeping.set_damage_status(i, "erledigt"),
+                                                          render_reinigung_refresh())) \
+                        .props("flat dense no-caps")
+                else:
+                    ui.label("erledigt").classes("text-xs text-green-700")
+            ui.label(d["desc"]).classes("text-sm")
+            if d.get("photo"):
+                ui.image(f"/media/{d['photo']}").classes("w-40 h-40 object-cover rounded")
+
+
+def _admin_shopping():
+    items = housekeeping.list_restock(only_open=True)
+    if not items:
+        ui.label("Einkaufsliste ist leer.").classes("text-gray-500"); return
+    for r in items:
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("shopping_cart").classes("text-primary")
+            ui.label(f"{r['menge']}× {r['item']}").classes("font-medium")
+            ui.label(f"({r['apartment_name']}, {r['kategorie']})").classes("text-xs text-gray-500")
+            ui.label(f"{_d(r['ts'])} · {r['reporter']}").classes("text-xs text-gray-400")
+            ui.space()
+            ui.button("gekauft", icon="check",
+                      on_click=lambda i=r["id"]: (housekeeping.set_restock_status(i, "erledigt"),
+                                                  render_reinigung_refresh())) \
+                .props("flat dense no-caps")
+
+
+def render_reinigung_refresh():
+    ui.navigate.to("/")   # einfacher Refresh nach Statusänderung
+
+
+def _admin_config(apts):
+    ui.label("Checkliste & Bestand je Apartment. Soll-Foto pro Aufgabe hochladen.") \
+        .classes("text-sm text-gray-500")
+    sel = ui.select(apts, label="Apartment",
+                    value=(next(iter(apts), None))).props("outlined dense").classes("min-w-[240px]")
+    box = ui.column().classes("w-full gap-2")
+
+    def render_cfg():
+        box.clear()
+        aid = sel.value
+        if not aid:
+            return
+        cl = housekeeping.get_checklist(aid)
+        with box:
+            for ri, room in enumerate(cl["rooms"]):
+                with ui.card().classes("w-full gap-1"):
+                    with ui.row().classes("w-full items-center gap-2"):
+                        rn = ui.input("Raum", value=room["name"]).props("dense outlined").classes("w-56")
+                        rn.on("blur", lambda e, i=ri, f=rn: (_set_room_name(cl, i, f.value), housekeeping.save_checklist(aid, cl)))
+                        ui.space()
+                        ui.button(icon="delete", on_click=lambda i=ri: (cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                            .props("flat dense round color=negative")
+                    for ti, t in enumerate(room["tasks"]):
+                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
+                            tt.on("blur", lambda e, tk=t, f=tt: (tk.update(text=f.value), housekeeping.save_checklist(aid, cl)))
+                            if t.get("ref_photo"):
+                                ui.image(f"/media/{t['ref_photo']}").classes("w-12 h-12 object-cover rounded")
+                            ui.upload(auto_upload=True,
+                                      on_upload=lambda e, tid=t["id"]: (housekeeping.set_task_ref_photo(aid, tid, _save_upload(e, "ref")), render_cfg())) \
+                                .props('accept="image/*" flat dense').classes("max-w-[120px]").tooltip("Soll-Foto")
+                            ui.button(icon="delete", on_click=lambda i=ti, rm=room: (rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                                .props("flat dense round color=negative")
+                    ui.button("Aufgabe hinzufügen", icon="add",
+                              on_click=lambda rm=room: (rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                        .props("flat dense no-caps")
+            ui.button("Raum hinzufügen", icon="add_home",
+                      on_click=lambda: (cl["rooms"].append({"name": "Neuer Raum", "tasks": []}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                .props("outline no-caps")
+
+            ui.separator()
+            ui.label("Bestandsliste (Verbrauch/Wäsche)").classes("font-medium")
+            inv = housekeeping.get_inventory(aid)
+            for ii, it in enumerate(inv):
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    nm = ui.input("Artikel", value=it["name"]).props("dense outlined").classes("flex-grow")
+                    nm.on("blur", lambda e, itm=it, f=nm: (itm.update(name=f.value), housekeeping.save_inventory(aid, inv)))
+                    ka = ui.select({"verbrauch": "Verbrauch", "waesche": "Wäsche"},
+                                   value=it.get("kategorie", "verbrauch")).props("dense outlined").classes("w-40")
+                    ka.on_value_change(lambda e, itm=it: (itm.update(kategorie=e.value), housekeeping.save_inventory(aid, inv)))
+                    ui.button(icon="delete", on_click=lambda i=ii: (inv.pop(i), housekeeping.save_inventory(aid, inv), render_cfg())) \
+                        .props("flat dense round color=negative")
+            ui.button("Artikel hinzufügen", icon="add",
+                      on_click=lambda: (inv.append({"id": housekeeping._uid(), "name": "Neuer Artikel", "kategorie": "verbrauch"}), housekeeping.save_inventory(aid, inv), render_cfg())) \
+                .props("flat dense no-caps")
+
+    sel.on_value_change(lambda e: render_cfg())
+    render_cfg()
+
+
+def _set_room_name(cl, idx, name):
+    cl["rooms"][idx]["name"] = name
+
+
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
@@ -916,7 +1298,7 @@ def main_page():
 
     def build_zeiterfassung():
         user = _cur_user()
-        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out mit Standort-Nachweis")
+        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out der Arbeitszeit")
         with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
             status_box = ui.column().classes("items-start gap-2")
         own_box = ui.column().classes("w-full")
@@ -954,21 +1336,28 @@ def main_page():
                 _zeit_table(admin_box, timetrack.entries(), True, "Alle Mitarbeiter", export=True)
         refresh()
 
+    def build_reinigung():
+        render_reinigung()
+
     builders = {"beherbergungssteuer": build_beherbergungssteuer,
+                "reinigung": build_reinigung,
                 "zeiterfassung": build_zeiterfassung}
 
+    _BASE_NAV = "items-center gap-2 mx-2 px-2 py-2 rounded-lg no-wrap cursor-pointer "
+    nav_rows = {}
+    with nav:
+        for a in visible:
+            row = ui.row().classes(_BASE_NAV).mark(f"nav-{a['key']}")
+            with row:
+                ui.icon(a["icon"]).classes("text-xl")
+                ui.label(a["label"]).classes("font-medium")
+            row.on("click", lambda e, k=a["key"]: activate(k))
+            nav_rows[a["key"]] = row
+
     def activate(key):
-        nav.clear()
-        with nav:
-            for a in visible:
-                on = a["key"] == key
-                cls = ("items-center gap-2 mx-2 px-2 py-2 rounded-lg no-wrap cursor-pointer " +
-                       ("bg-violet-50 text-primary" if on else "text-slate-600 hover:bg-slate-100"))
-                row = ui.row().classes(cls)
-                with row:
-                    ui.icon(a["icon"]).classes("text-xl")
-                    ui.label(a["label"]).classes("font-medium")
-                row.on("click", lambda e, k=a["key"]: activate(k))
+        for k, row in nav_rows.items():
+            row.classes(replace=_BASE_NAV + (
+                "bg-violet-50 text-primary" if k == key else "text-slate-600 hover:bg-slate-100"))
         content.clear()
         with content:
             builders.get(key, lambda: None)()

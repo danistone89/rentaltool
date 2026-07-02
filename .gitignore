@@ -28,3 +28,11 @@ archive/
 
 # Arbeitszeiten (personenbezogen: Zeiten + Standorte)
 worklog.json
+
+# Reinigung & Qualität (betrieblich/personenbezogen)
+checklists.json
+inventory.json
+cleanings.json
+damages.json
+restock.json
+media/

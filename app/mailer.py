@@ -101,3 +101,18 @@ def send_test(email_cfg):
     """Test-E-Mail an den konfigurierten Empfänger senden."""
     send(email_cfg, build_test_message(email_cfg))
     return (email_cfg.get("empfaenger") or "").strip()
+
+
+def send_plain(cfg, to, subject, body):
+    """Einfache Benachrichtigungs-Mail (z. B. Schadensmeldung)."""
+    ec = cfg.get("email", {})
+    to = (to or ec.get("absender") or "").strip()
+    if not to:
+        raise MailError("Kein Empfänger für Benachrichtigung.")
+    msg = EmailMessage()
+    msg["From"] = (ec.get("absender") or "").strip()
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(body)
+    send(ec, msg)
+    return to

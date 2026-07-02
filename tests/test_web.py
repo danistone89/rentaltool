@@ -67,6 +67,19 @@ async def test_einstellungen_dialog(user: User, mock_backend):
     await user.should_see("Betreiberdaten")
 
 
+async def test_reinigung_admin(user: User, mock_backend, tmp_path, monkeypatch):
+    from app import housekeeping as hk
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    await _login(user)
+    user.find(marker="nav-reinigung").click()
+    await user.should_see("Durchgänge")       # Admin-Tabs
+    await user.should_see("Schäden")
+    await user.should_see("Einkaufsliste")
+    await user.should_see("Konfiguration")
+
+
 async def test_benutzerverwaltung_admin(user: User, mock_backend):
     await _login(user)
     user.find("Benutzer").click()
@@ -81,9 +94,13 @@ async def test_mein_konto(user: User, mock_backend):
     await user.should_see("2FA aktivieren")
 
 
-async def test_putzkraft_sieht_nur_zeiterfassung(user: User, mock_backend,
-                                                  tmp_path, monkeypatch):
+async def test_putzkraft_sieht_nur_reinigung_und_zeit(user: User, mock_backend,
+                                                      tmp_path, monkeypatch):
+    from app import housekeeping as hk
     monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setitem(web.USERS, "putzi", {
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
@@ -92,8 +109,8 @@ async def test_putzkraft_sieht_nur_zeiterfassung(user: User, mock_backend,
     user.find("Passwort").type("putzi")
     user.find("Anmelden").click()
     await user.open("/")
-    await user.should_see("Zeiterfassung")
-    await user.should_see("Check-in")
+    await user.should_see("Reinigung")       # Standard-Bereich der Putzkraft
+    await user.should_see("Zeiterfassung")   # zweiter erlaubter Bereich (Menü)
     await user.should_not_see("Berechnen")   # kein Zugriff auf Beherbergungssteuer
 
 
