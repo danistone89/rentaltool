@@ -25,3 +25,6 @@ archive/
 
 # NiceGUI Session-Storage (enthält Login-Sessions)
 .nicegui/
+
+# Arbeitszeiten (personenbezogen: Zeiten + Standorte)
+worklog.json

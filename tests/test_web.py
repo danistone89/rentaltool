@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 from nicegui.testing import User
 
-from app import data, steuer, web, archive, auth  # noqa: F401
+from app import data, steuer, web, archive, auth, timetrack  # noqa: F401
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixture_2025-12.json")
 STICHTAG = date(2026, 6, 29)
@@ -79,6 +79,22 @@ async def test_mein_konto(user: User, mock_backend):
     user.find("Mein Konto").click()
     await user.should_see("Angemeldet als test")
     await user.should_see("2FA aktivieren")
+
+
+async def test_putzkraft_sieht_nur_zeiterfassung(user: User, mock_backend,
+                                                  tmp_path, monkeypatch):
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.USERS, "putzi", {
+        "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
+        "totp_secret": "", "name": "putzi"})
+    await user.open("/login")
+    user.find("Benutzername").type("putzi")
+    user.find("Passwort").type("putzi")
+    user.find("Anmelden").click()
+    await user.open("/")
+    await user.should_see("Zeiterfassung")
+    await user.should_see("Check-in")
+    await user.should_not_see("Berechnen")   # kein Zugriff auf Beherbergungssteuer
 
 
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):

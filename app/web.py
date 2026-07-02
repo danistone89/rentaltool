@@ -17,7 +17,7 @@ from nicegui import app, ui  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer, auth  # noqa: E402
+from app import data, smoobu, archive, mailer, auth, timetrack  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -45,10 +45,11 @@ ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
 # die feinen Rechte definieren wir später, hier nur das Grundgerüst.
 AREAS = [
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
+    {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
 ]
 ROLE_AREAS = {
     "admin": {a["key"] for a in AREAS},   # Admin sieht alles
-    "putzkraft": set(),                   # später freischalten
+    "putzkraft": {"zeiterfassung"},       # Putzkräfte: Arbeitszeit erfassen
 }
 
 
@@ -66,6 +67,88 @@ def _is_admin():
 
 def _role_areas(role):
     return ROLE_AREAS.get(role, set())
+
+
+# ---- Zeiterfassung: Standort + Anzeige-Helfer ------------------------------
+_GEO_JS = (
+    "return await new Promise((res)=>{"
+    "if(!navigator.geolocation){res({error:'nicht unterstützt'});return;}"
+    "navigator.geolocation.getCurrentPosition("
+    "p=>res({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy}),"
+    "e=>res({error:e.message||'verweigert'}),"
+    "{enableHighAccuracy:true,timeout:10000,maximumAge:0});});"
+)
+
+
+async def get_location():
+    try:
+        r = await ui.run_javascript(_GEO_JS, timeout=15.0)
+    except Exception as ex:
+        r = {"error": str(ex)}
+    return r if isinstance(r, dict) else {"error": "unbekannt"}
+
+
+def _loc_text(loc):
+    if not loc or loc.get("error"):
+        return "⚠️ " + (loc.get("error", "kein Standort") if loc else "kein Standort")
+    return f"{loc['lat']:.4f}, {loc['lon']:.4f} (±{round(loc.get('acc', 0))} m)"
+
+
+def _t(iso):
+    return iso[11:16] if iso and len(iso) >= 16 else ""
+
+
+def _d(iso):
+    return iso[:10] if iso else ""
+
+
+def _export_csv(rows, show_user):
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+    w.writerow((["Mitarbeiter"] if show_user else []) +
+               ["Datum", "Check-in", "Standort ein", "Check-out", "Standort aus", "Dauer"])
+    for e in rows:
+        w.writerow((([e["user"]] if show_user else []) + [
+            _d(e["checkin"]), _t(e["checkin"]), _loc_text(e.get("checkin_loc")),
+            _t(e["checkout"]) if e.get("checkout") else "",
+            _loc_text(e.get("checkout_loc")) if e.get("checkout") else "",
+            timetrack.fmt_dur(timetrack.duration_minutes(e))]))
+    ui.download.content(buf.getvalue().encode("utf-8-sig"), "arbeitszeiten.csv",
+                        media_type="text/csv")
+
+
+def _zeit_table(container, rows, show_user, title, export=False):
+    container.clear()
+    cols = ([{"name": "user", "label": "Mitarbeiter", "field": "user", "align": "left"}]
+            if show_user else []) + [
+        {"name": "date", "label": "Datum", "field": "date", "align": "left"},
+        {"name": "cin", "label": "Check-in", "field": "cin", "align": "left"},
+        {"name": "lin", "label": "Standort ein", "field": "lin", "align": "left"},
+        {"name": "cout", "label": "Check-out", "field": "cout", "align": "left"},
+        {"name": "lout", "label": "Standort aus", "field": "lout", "align": "left"},
+        {"name": "dur", "label": "Dauer", "field": "dur", "align": "right"},
+    ]
+    trows = [{
+        "id": e["id"], "user": e["user"], "date": _d(e["checkin"]), "cin": _t(e["checkin"]),
+        "lin": _loc_text(e.get("checkin_loc")),
+        "cout": _t(e["checkout"]) if e.get("checkout") else "—",
+        "lout": _loc_text(e.get("checkout_loc")) if e.get("checkout") else "—",
+        "dur": timetrack.fmt_dur(timetrack.duration_minutes(e)),
+    } for e in rows]
+    with container:
+        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
+            with ui.row().classes("w-full items-center"):
+                ui.label(title).classes("font-medium")
+                ui.space()
+                if export and rows:
+                    ui.button("CSV", icon="download",
+                              on_click=lambda: _export_csv(rows, show_user)).props("flat dense no-caps")
+            if trows:
+                ui.table(columns=cols, rows=trows, row_key="id").props("dense flat").classes("w-full")
+            else:
+                ui.label("Noch keine Einträge.").classes("text-sm text-gray-400")
 
 # Pfade ohne Login-Zwang: Login-Seite, Smoobu-Webhook, NiceGUI-Interna.
 _UNRESTRICTED = {"/login"}
@@ -794,41 +877,30 @@ def main_page():
 
     with ui.left_drawer(bordered=True).props("width=230").classes("bg-white") as drawer:
         ui.label("Bereiche").classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-3 pb-1")
-        visible = [a for a in AREAS if a["key"] in areas]
-        if visible:
-            for a in visible:
-                with ui.row().classes("items-center gap-2 mx-2 px-2 py-2 rounded-lg "
-                                      "bg-violet-50 text-primary no-wrap"):
-                    ui.icon(a["icon"]).classes("text-xl")
-                    ui.label(a["label"]).classes("font-medium")
-        else:
-            ui.label("Noch keine Bereiche freigeschaltet.") \
-                .classes("text-xs text-gray-400 px-3 py-2")
+        nav = ui.column().classes("w-full gap-1")
         ui.space()
         with ui.column().classes("px-3 pb-3 gap-0"):
             ui.label(_cur_user()).classes("text-sm font-medium text-slate-700")
             ui.label(ROLES.get(role, role)).classes("text-xs text-gray-400")
 
-    with ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-5"):
-        if "beherbergungssteuer" not in areas:
-            with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):
-                ui.icon("lock").classes("text-5xl text-gray-300")
-                ui.label(f"Willkommen, {_cur_user()}!").classes("text-lg font-medium text-slate-700")
-                ui.label("Für deinen Zugang sind noch keine Bereiche freigeschaltet.") \
-                    .classes("text-gray-500")
-                ui.label("Der Administrator schaltet dir die passenden Bereiche frei.") \
-                    .classes("text-xs text-gray-400")
-            return
+    content = ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-5")
+    visible = [a for a in AREAS if a["key"] in areas]
 
-        apts = _load_apartments()
+    def _feature_header(icon, title, subtitle, action=None):
         with ui.row().classes("w-full items-center gap-3"):
-            ui.icon("receipt_long").classes("text-3xl text-primary")
+            ui.icon(icon).classes("text-3xl text-primary")
             with ui.column().classes("gap-0"):
-                ui.label("Beherbergungssteuer").classes("text-2xl font-bold text-slate-800 leading-tight")
-                ui.label("Dresden · monatliche Steueranmeldung").classes("text-sm text-gray-500")
+                ui.label(title).classes("text-2xl font-bold text-slate-800 leading-tight")
+                ui.label(subtitle).classes("text-sm text-gray-500")
             ui.space()
-            ui.button("Archiv", icon="inventory_2", on_click=open_archive).props("outline no-caps")
+            if action:
+                action()
 
+    def build_beherbergungssteuer():
+        apts = _load_apartments()
+        _feature_header("receipt_long", "Beherbergungssteuer", "Dresden · monatliche Steueranmeldung",
+                        lambda: ui.button("Archiv", icon="inventory_2",
+                                          on_click=open_archive).props("outline no-caps"))
         with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
             with ui.row().classes("items-end gap-4 flex-wrap"):
                 year = ui.select(list(range(2023, today.year + 2)), label="Jahr",
@@ -851,7 +923,6 @@ def main_page():
                     .classes("text-xs text-gray-500")
                 ui.space()
                 status = ui.label("").classes("text-xs text-gray-400")
-
         results = ui.column().classes("w-full gap-4")
 
         def do_compute(force=False):
@@ -871,6 +942,82 @@ def main_page():
             render_result(results, result)
             if force:
                 ui.notify("Frisch von Smoobu geladen", type="positive")
+
+    def build_zeiterfassung():
+        user = _cur_user()
+        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out mit Standort-Nachweis")
+        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
+            status_box = ui.column().classes("items-start gap-2")
+        own_box = ui.column().classes("w-full")
+        admin_box = ui.column().classes("w-full")
+
+        async def do_checkin():
+            loc = await get_location()
+            if timetrack.check_in(user, loc) is None:
+                ui.notify("Du bist bereits eingecheckt.", type="warning")
+            else:
+                ui.notify("Eingecheckt ✓", type="positive")
+                if loc.get("error"):
+                    ui.notify("Standort nicht verfügbar/verweigert – wird protokolliert.",
+                              type="warning", timeout=9000)
+            refresh()
+
+        async def do_checkout():
+            loc = await get_location()
+            if timetrack.check_out(user, loc) is None:
+                ui.notify("Kein offener Check-in.", type="warning")
+            else:
+                ui.notify("Ausgecheckt ✓", type="positive")
+            refresh()
+
+        def refresh():
+            status_box.clear()
+            with status_box:
+                oe = timetrack.get_open(user)
+                if oe:
+                    ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
+                        .classes("text-lg font-medium text-green-700")
+                    ui.label("Standort: " + _loc_text(oe.get("checkin_loc"))) \
+                        .classes("text-xs text-gray-500")
+                    ui.button("Check-out", icon="logout", on_click=do_checkout) \
+                        .props("unelevated size=lg color=negative")
+                else:
+                    ui.label("Nicht eingecheckt").classes("text-gray-500")
+                    ui.button("Check-in", icon="login", on_click=do_checkin) \
+                        .props("unelevated size=lg")
+            _zeit_table(own_box, timetrack.entries(user), False, "Meine Zeiten")
+            if _is_admin():
+                _zeit_table(admin_box, timetrack.entries(), True, "Alle Mitarbeiter", export=True)
+        refresh()
+
+    builders = {"beherbergungssteuer": build_beherbergungssteuer,
+                "zeiterfassung": build_zeiterfassung}
+
+    def activate(key):
+        nav.clear()
+        with nav:
+            for a in visible:
+                on = a["key"] == key
+                cls = ("items-center gap-2 mx-2 px-2 py-2 rounded-lg no-wrap cursor-pointer " +
+                       ("bg-violet-50 text-primary" if on else "text-slate-600 hover:bg-slate-100"))
+                row = ui.row().classes(cls)
+                with row:
+                    ui.icon(a["icon"]).classes("text-xl")
+                    ui.label(a["label"]).classes("font-medium")
+                row.on("click", lambda e, k=a["key"]: activate(k))
+        content.clear()
+        with content:
+            builders.get(key, lambda: None)()
+
+    if visible:
+        activate(visible[0]["key"])
+    else:
+        with content:
+            with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):
+                ui.icon("lock").classes("text-5xl text-gray-300")
+                ui.label(f"Willkommen, {_cur_user()}!").classes("text-lg font-medium text-slate-700")
+                ui.label("Für deinen Zugang sind noch keine Bereiche freigeschaltet.") \
+                    .classes("text-gray-500")
 
 
 def run():
