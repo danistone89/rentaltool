@@ -72,11 +72,11 @@ def _role_areas(role):
 # ---- Zeiterfassung: Standort + Anzeige-Helfer ------------------------------
 _GEO_JS = (
     "return await new Promise((res)=>{"
-    "if(!navigator.geolocation){res({error:'nicht unterstützt'});return;}"
+    "if(!navigator.geolocation){res({error:'nicht unterstützt',code:0});return;}"
     "navigator.geolocation.getCurrentPosition("
     "p=>res({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy}),"
-    "e=>res({error:e.message||'verweigert'}),"
-    "{enableHighAccuracy:true,timeout:10000,maximumAge:0});});"
+    "e=>res({error:e.message||'verweigert',code:e.code}),"
+    "{enableHighAccuracy:true,timeout:12000,maximumAge:0});});"
 )
 
 
@@ -100,6 +100,35 @@ def _t(iso):
 
 def _d(iso):
     return iso[:10] if iso else ""
+
+
+def open_geo_help(loc, retry_coro, force_cb, action_label):
+    """Anleitung, wenn der Standort fehlt/verweigert wurde (v. a. iPhone Safari)."""
+    with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("location_off").classes("text-2xl text-negative")
+            ui.label("Standort nicht verfügbar").classes("text-lg font-bold")
+        ui.label("Für die Zeiterfassung wird dein Standort benötigt. Bitte einmalig "
+                 "freigeben:").classes("text-sm")
+        with ui.column().classes("gap-0 text-sm"):
+            ui.label("iPhone (Safari):").classes("font-medium mt-1")
+            ui.label("1. Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → einschalten")
+            ui.label("2. In derselben Liste: Safari-Websites → Beim Verwenden der App")
+            ui.label("3. Zurück zur App, Seite neu laden, erneut auf Check-in tippen")
+            ui.label("Android (Chrome):").classes("font-medium mt-2")
+            ui.label("1. Standort in den Schnelleinstellungen einschalten")
+            ui.label("2. Beim Popup auf Zulassen tippen (oder Schloss-Symbol → Standort → Zulassen)")
+        ui.label(f"Technischer Hinweis: {loc.get('error', '')}").classes("text-xs text-gray-400")
+
+        async def _retry():
+            dlg.close()
+            await retry_coro()
+        with ui.row().classes("w-full justify-end gap-2 mt-1"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button(f"Ohne Standort {action_label}",
+                      on_click=lambda: (dlg.close(), force_cb())).props("flat color=grey")
+            ui.button("Erneut versuchen", icon="my_location", on_click=_retry).props("unelevated")
+    dlg.open()
 
 
 def _export_csv(rows, show_user):
@@ -951,24 +980,35 @@ def main_page():
         own_box = ui.column().classes("w-full")
         admin_box = ui.column().classes("w-full")
 
-        async def do_checkin():
-            loc = await get_location()
+        def _apply_in(loc):
             if timetrack.check_in(user, loc) is None:
                 ui.notify("Du bist bereits eingecheckt.", type="warning")
             else:
                 ui.notify("Eingecheckt ✓", type="positive")
-                if loc.get("error"):
-                    ui.notify("Standort nicht verfügbar/verweigert – wird protokolliert.",
-                              type="warning", timeout=9000)
             refresh()
 
-        async def do_checkout():
-            loc = await get_location()
+        def _apply_out(loc):
             if timetrack.check_out(user, loc) is None:
                 ui.notify("Kein offener Check-in.", type="warning")
             else:
                 ui.notify("Ausgecheckt ✓", type="positive")
             refresh()
+
+        async def do_checkin():
+            ui.notify("Standort wird ermittelt …", type="info", timeout=2000)
+            loc = await get_location()
+            if loc.get("error"):
+                open_geo_help(loc, do_checkin, lambda: _apply_in(loc), "einchecken")
+                return
+            _apply_in(loc)
+
+        async def do_checkout():
+            ui.notify("Standort wird ermittelt …", type="info", timeout=2000)
+            loc = await get_location()
+            if loc.get("error"):
+                open_geo_help(loc, do_checkout, lambda: _apply_out(loc), "auschecken")
+                return
+            _apply_out(loc)
 
         def refresh():
             status_box.clear()
