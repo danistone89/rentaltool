@@ -1152,55 +1152,81 @@ def _admin_config(apts):
         if not aid:
             return
         cl = housekeeping.get_checklist(aid)
+        inv = housekeeping.get_inventory(aid)
+        room_inputs = []   # (room_dict, input)
+        task_inputs = []   # (task_dict, input)
+        inv_inputs = []    # (item_dict, name_input, kat_select)
+
+        def collect():
+            """Aktuelle Feldwerte in die Datenstrukturen übernehmen."""
+            for room, f in room_inputs:
+                room["name"] = f.value
+            for t, f in task_inputs:
+                t["text"] = f.value
+            for it, nf, kf in inv_inputs:
+                it["name"] = nf.value
+                it["kategorie"] = kf.value
+
+        def persist(notify=True):
+            collect()
+            housekeeping.save_checklist(aid, cl)
+            housekeeping.save_inventory(aid, inv)
+            if notify:
+                ui.notify("Konfiguration gespeichert ✓", type="positive")
+
         with box:
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.label("Räume & Aufgaben").classes("font-medium")
+                ui.space()
+                ui.button("Speichern", icon="save", on_click=lambda: persist()) \
+                    .props("unelevated no-caps")
             for ri, room in enumerate(cl["rooms"]):
                 with ui.card().classes("w-full gap-1"):
                     with ui.row().classes("w-full items-center gap-2"):
                         rn = ui.input("Raum", value=room["name"]).props("dense outlined").classes("w-56")
-                        rn.on("blur", lambda e, i=ri, f=rn: (_set_room_name(cl, i, f.value), housekeeping.save_checklist(aid, cl)))
+                        room_inputs.append((room, rn))
                         ui.space()
-                        ui.button(icon="delete", on_click=lambda i=ri: (cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                        ui.button(icon="delete", on_click=lambda i=ri: (collect(), cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                             .props("flat dense round color=negative")
                     for ti, t in enumerate(room["tasks"]):
                         with ui.row().classes("w-full items-center gap-2 no-wrap"):
                             tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
-                            tt.on("blur", lambda e, tk=t, f=tt: (tk.update(text=f.value), housekeeping.save_checklist(aid, cl)))
+                            task_inputs.append((t, tt))
                             if t.get("ref_photo"):
                                 ui.image(f"/media/{t['ref_photo']}").classes("w-12 h-12 object-cover rounded")
                             ui.upload(auto_upload=True,
-                                      on_upload=lambda e, tid=t["id"]: (housekeeping.set_task_ref_photo(aid, tid, _save_upload(e, "ref")), render_cfg())) \
+                                      on_upload=lambda e, tid=t["id"]: (collect(), housekeeping.save_checklist(aid, cl), housekeeping.set_task_ref_photo(aid, tid, _save_upload(e, "ref")), render_cfg())) \
                                 .props('accept="image/*" flat dense').classes("max-w-[120px]").tooltip("Soll-Foto")
-                            ui.button(icon="delete", on_click=lambda i=ti, rm=room: (rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                            ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                                 .props("flat dense round color=negative")
                     ui.button("Aufgabe hinzufügen", icon="add",
-                              on_click=lambda rm=room: (rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                              on_click=lambda rm=room: (collect(), rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
                         .props("flat dense no-caps")
             ui.button("Raum hinzufügen", icon="add_home",
-                      on_click=lambda: (cl["rooms"].append({"name": "Neuer Raum", "tasks": []}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                      on_click=lambda: (collect(), cl["rooms"].append({"name": "Neuer Raum", "tasks": []}), housekeeping.save_checklist(aid, cl), render_cfg())) \
                 .props("outline no-caps")
 
             ui.separator()
             ui.label("Bestandsliste (Verbrauch/Wäsche)").classes("font-medium")
-            inv = housekeeping.get_inventory(aid)
             for ii, it in enumerate(inv):
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
                     nm = ui.input("Artikel", value=it["name"]).props("dense outlined").classes("flex-grow")
-                    nm.on("blur", lambda e, itm=it, f=nm: (itm.update(name=f.value), housekeeping.save_inventory(aid, inv)))
                     ka = ui.select({"verbrauch": "Verbrauch", "waesche": "Wäsche"},
                                    value=it.get("kategorie", "verbrauch")).props("dense outlined").classes("w-40")
-                    ka.on_value_change(lambda e, itm=it: (itm.update(kategorie=e.value), housekeeping.save_inventory(aid, inv)))
-                    ui.button(icon="delete", on_click=lambda i=ii: (inv.pop(i), housekeeping.save_inventory(aid, inv), render_cfg())) \
+                    inv_inputs.append((it, nm, ka))
+                    ui.button(icon="delete", on_click=lambda i=ii: (collect(), inv.pop(i), housekeeping.save_inventory(aid, inv), render_cfg())) \
                         .props("flat dense round color=negative")
             ui.button("Artikel hinzufügen", icon="add",
-                      on_click=lambda: (inv.append({"id": housekeeping._uid(), "name": "Neuer Artikel", "kategorie": "verbrauch"}), housekeeping.save_inventory(aid, inv), render_cfg())) \
+                      on_click=lambda: (collect(), inv.append({"id": housekeeping._uid(), "name": "Neuer Artikel", "kategorie": "verbrauch"}), housekeeping.save_inventory(aid, inv), render_cfg())) \
                 .props("flat dense no-caps")
+
+            ui.separator()
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Konfiguration speichern", icon="save", on_click=lambda: persist()) \
+                    .props("unelevated no-caps")
 
     sel.on_value_change(lambda e: render_cfg())
     render_cfg()
-
-
-def _set_room_name(cl, idx, name):
-    cl["rooms"][idx]["name"] = name
 
 
 # ---------------------------------------------------------------- Hauptseite
