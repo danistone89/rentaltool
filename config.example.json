@@ -1,16 +1,12 @@
 {
   "_hinweis": "Kopiere diese Datei zu config.json und trage deine Werte ein. config.json ist in .gitignore und wird NICHT eingecheckt (enthält API-Key + Betreiberdaten).",
-
   "smoobu_api_key": "DEIN_SMOOBU_API_KEY",
   "settings_channel_id": 0,
   "port": 3001,
-
   "steuersatz": 0.06,
   "airbnb_channel_name": "Airbnb",
-
   "unterschrift_x": 210,
   "archiv_spiegel": "",
-
   "archiv_webdav": {
     "_hinweis": "Nextcloud-Upload (für Server ohne lokalen Sync). App-Passwort in Nextcloud unter Einstellungen → Sicherheit erzeugen.",
     "url": "",
@@ -18,11 +14,6 @@
     "password": "",
     "folder": ""
   },
-
-  "arbeitsorte": [
-    {"name": "Beispiel-Objekt", "address": "Musterstraße 1, 01067 Dresden", "lat": null, "lon": null, "radius_m": 150}
-  ],
-
   "betreiber": {
     "name": "Nachname",
     "zusatz": "Vorname",
@@ -33,13 +24,11 @@
     "telefon": "",
     "kassenzeichen": "0000.00.000000"
   },
-
   "empfaenger": {
     "name": "Landeshauptstadt Dresden",
     "iban": "DE95 8505 0300 3120 0005 81",
     "bic": "OSDDDE81XXX"
   },
-
   "email": {
     "smtp_host": "smtp.gmail.com",
     "smtp_port": 587,
@@ -50,7 +39,6 @@
     "betreff_vorlage": "Beherbergungssteuer-Anmeldung {monat} {jahr}",
     "text_vorlage": "Sehr geehrte Damen und Herren,\n\nanbei übersende ich die Steueranmeldung zur Beherbergungssteuer für {monat} {jahr} (Kassenzeichen {kassenzeichen}).\n\nFestgesetzte Beherbergungssteuer: {steuer} €.\n\nMit freundlichen Grüßen\n{name}"
   },
-
   "auth": {
     "_hinweis": "users werden von der App verwaltet (Benutzer-Dialog). Ausgesperrt? auth.users auf {} setzen -> beim nächsten Aufruf Admin neu anlegen. Rollen: admin | putzkraft.",
     "storage_secret": "",

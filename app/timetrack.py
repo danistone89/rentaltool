@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Arbeitszeit-Erfassung: Check-in/Check-out je Benutzer mit Standort.
+"""Arbeitszeit-Erfassung: Check-in/Check-out je Benutzer (ohne Standort, DSGVO).
 
-Speichert Einträge in worklog.json (Liste). Jeder Eintrag:
-  {id, user, checkin(ISO), checkin_loc, checkout(ISO|None), checkout_loc}
-checkin_loc/checkout_loc: {lat, lon, acc} oder {error: "..."} (Standort-Nachweis
-als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
+Speichert Einträge in worklog.json (Liste): {id, user, checkin(ISO),
+checkout(ISO|None)}.
 """
 import json
 import os
@@ -33,36 +31,26 @@ def get_open(user):
     return None
 
 
-def check_in(user, loc, ip=None, ort=None, dist=None, now=None):
-    """Check-in. Gibt None zurück, wenn bereits ein offener Eintrag existiert.
-
-    loc: GPS-Dict. ip: öffentliche IP. ort: erkanntes Objekt (Geofence). dist: m.
-    """
+def check_in(user, now=None):
+    """Check-in. Gibt None zurück, wenn bereits ein offener Eintrag existiert."""
     items = _read()
     if any(e["user"] == user and not e.get("checkout") for e in items):
         return None
     now = now or datetime.now()
     e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
-         "checkin": now.isoformat(timespec="seconds"),
-         "checkin_loc": loc, "checkin_ip": ip, "checkin_ort": ort, "checkin_dist": dist,
-         "checkout": None, "checkout_loc": None, "checkout_ip": None,
-         "checkout_ort": None, "checkout_dist": None}
+         "checkin": now.isoformat(timespec="seconds"), "checkout": None}
     items.append(e)
     _write(items)
     return e
 
 
-def check_out(user, loc, ip=None, ort=None, dist=None, now=None):
+def check_out(user, now=None):
     """Offenen Eintrag des Benutzers schließen. None, wenn keiner offen ist."""
     items = _read()
     now = now or datetime.now()
     for e in reversed(items):
         if e["user"] == user and not e.get("checkout"):
             e["checkout"] = now.isoformat(timespec="seconds")
-            e["checkout_loc"] = loc
-            e["checkout_ip"] = ip
-            e["checkout_ort"] = ort
-            e["checkout_dist"] = dist
             _write(items)
             return e
     return None
