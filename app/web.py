@@ -133,8 +133,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if not app.storage.user.get("authenticated", False):
             path = request.url.path
+            # /media = in der UI eingebettete Fotos (zufällige UUID-Dateinamen);
+            # app.storage.user ist bei Static-Requests nicht verlässlich verfügbar,
+            # daher hier durchlassen statt auf /login umzuleiten.
             if not (path in _UNRESTRICTED or path.startswith("/_nicegui")
-                    or path.startswith("/api/")):
+                    or path.startswith("/api/") or path.startswith("/media/")):
                 app.storage.user["referrer"] = path
                 return RedirectResponse("/login")
         return await call_next(request)
