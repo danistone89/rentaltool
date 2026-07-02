@@ -15,6 +15,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nicegui import app, ui  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import data, smoobu, archive, mailer, auth, timetrack  # noqa: E402
@@ -88,6 +89,38 @@ async def get_location():
     return r if isinstance(r, dict) else {"error": "unbekannt"}
 
 
+async def get_ip():
+    """Öffentliche IP des Clients (Router) über /api/whoami."""
+    try:
+        r = await ui.run_javascript("return await (await fetch('/api/whoami')).json();",
+                                    timeout=8.0)
+        return (r or {}).get("ip", "") if isinstance(r, dict) else ""
+    except Exception:
+        return ""
+
+
+def _match_ort(ip):
+    """IP einem konfigurierten Arbeitsort zuordnen (config.arbeitsorte)."""
+    if not ip:
+        return None
+    for o in CFG.get("arbeitsorte", []):
+        if ip in (o.get("ips") or []):
+            return o.get("name")
+    return None
+
+
+def _presence(ip, ort, loc):
+    """Kurztext für Anwesenheits-Nachweis: Ort > IP > GPS > Warnung."""
+    if ort:
+        return f"✓ {ort}"
+    parts = []
+    if ip:
+        parts.append(ip)
+    if loc and not loc.get("error"):
+        parts.append(f"GPS {loc['lat']:.3f},{loc['lon']:.3f}")
+    return " · ".join(parts) if parts else "⚠️ kein Nachweis"
+
+
 def _loc_text(loc):
     if not loc or loc.get("error"):
         return "⚠️ " + (loc.get("error", "kein Standort") if loc else "kein Standort")
@@ -102,47 +135,20 @@ def _d(iso):
     return iso[:10] if iso else ""
 
 
-def open_geo_help(loc, retry_coro, force_cb, action_label):
-    """Anleitung, wenn der Standort fehlt/verweigert wurde (v. a. iPhone Safari)."""
-    with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("location_off").classes("text-2xl text-negative")
-            ui.label("Standort nicht verfügbar").classes("text-lg font-bold")
-        ui.label("Für die Zeiterfassung wird dein Standort benötigt. Bitte einmalig "
-                 "freigeben:").classes("text-sm")
-        with ui.column().classes("gap-0 text-sm"):
-            ui.label("iPhone (Safari):").classes("font-medium mt-1")
-            ui.label("1. Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → einschalten")
-            ui.label("2. In derselben Liste: Safari-Websites → Beim Verwenden der App")
-            ui.label("3. Zurück zur App, Seite neu laden, erneut auf Check-in tippen")
-            ui.label("Android (Chrome):").classes("font-medium mt-2")
-            ui.label("1. Standort in den Schnelleinstellungen einschalten")
-            ui.label("2. Beim Popup auf Zulassen tippen (oder Schloss-Symbol → Standort → Zulassen)")
-        ui.label(f"Technischer Hinweis: {loc.get('error', '')}").classes("text-xs text-gray-400")
-
-        async def _retry():
-            dlg.close()
-            await retry_coro()
-        with ui.row().classes("w-full justify-end gap-2 mt-1"):
-            ui.button("Abbrechen", on_click=dlg.close).props("flat")
-            ui.button(f"Ohne Standort {action_label}",
-                      on_click=lambda: (dlg.close(), force_cb())).props("flat color=grey")
-            ui.button("Erneut versuchen", icon="my_location", on_click=_retry).props("unelevated")
-    dlg.open()
-
-
 def _export_csv(rows, show_user):
     import csv
     import io
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow((["Mitarbeiter"] if show_user else []) +
-               ["Datum", "Check-in", "Standort ein", "Check-out", "Standort aus", "Dauer"])
+               ["Datum", "Check-in", "Ort/Netz ein", "Check-out", "Ort/Netz aus", "Dauer"])
     for e in rows:
         w.writerow((([e["user"]] if show_user else []) + [
-            _d(e["checkin"]), _t(e["checkin"]), _loc_text(e.get("checkin_loc")),
+            _d(e["checkin"]), _t(e["checkin"]),
+            _presence(e.get("checkin_ip"), e.get("checkin_ort"), e.get("checkin_loc")),
             _t(e["checkout"]) if e.get("checkout") else "",
-            _loc_text(e.get("checkout_loc")) if e.get("checkout") else "",
+            _presence(e.get("checkout_ip"), e.get("checkout_ort"), e.get("checkout_loc"))
+            if e.get("checkout") else "",
             timetrack.fmt_dur(timetrack.duration_minutes(e))]))
     ui.download.content(buf.getvalue().encode("utf-8-sig"), "arbeitszeiten.csv",
                         media_type="text/csv")
@@ -154,16 +160,17 @@ def _zeit_table(container, rows, show_user, title, export=False):
             if show_user else []) + [
         {"name": "date", "label": "Datum", "field": "date", "align": "left"},
         {"name": "cin", "label": "Check-in", "field": "cin", "align": "left"},
-        {"name": "lin", "label": "Standort ein", "field": "lin", "align": "left"},
+        {"name": "lin", "label": "Ort/Netz ein", "field": "lin", "align": "left"},
         {"name": "cout", "label": "Check-out", "field": "cout", "align": "left"},
-        {"name": "lout", "label": "Standort aus", "field": "lout", "align": "left"},
+        {"name": "lout", "label": "Ort/Netz aus", "field": "lout", "align": "left"},
         {"name": "dur", "label": "Dauer", "field": "dur", "align": "right"},
     ]
     trows = [{
         "id": e["id"], "user": e["user"], "date": _d(e["checkin"]), "cin": _t(e["checkin"]),
-        "lin": _loc_text(e.get("checkin_loc")),
+        "lin": _presence(e.get("checkin_ip"), e.get("checkin_ort"), e.get("checkin_loc")),
         "cout": _t(e["checkout"]) if e.get("checkout") else "—",
-        "lout": _loc_text(e.get("checkout_loc")) if e.get("checkout") else "—",
+        "lout": _presence(e.get("checkout_ip"), e.get("checkout_ort"), e.get("checkout_loc"))
+                if e.get("checkout") else "—",
         "dur": timetrack.fmt_dur(timetrack.duration_minutes(e)),
     } for e in rows]
     with container:
@@ -257,11 +264,19 @@ def _load_apartments():
     return _APARTMENTS
 
 
-# ---------------------------------------------------------------- Webhook
+# ---------------------------------------------------------------- Webhook / API
 @app.post("/api/smoobu/webhook")
 async def smoobu_webhook():
     data.clear_cache()
     return {"ok": True}
+
+
+@app.get("/api/whoami")
+def whoami(request: Request):
+    """Öffentliche IP des Aufrufers (hinter nginx via X-Forwarded-For)."""
+    xff = request.headers.get("x-forwarded-for", "")
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "")
+    return {"ip": ip}
 
 
 # ---------------------------------------------------------------- Login
@@ -545,6 +560,7 @@ def open_settings():
             t_betr = ui.tab("Betreiber", icon="person")
             t_pdf = ui.tab("PDF & Steuer", icon="description")
             t_arch = ui.tab("Archiv", icon="cloud_upload")
+            t_orte = ui.tab("Standorte", icon="wifi")
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
 
@@ -590,6 +606,51 @@ def open_settings():
                             ui.notify("Ordner ist nicht beschreibbar.", type="negative"); return
                         ui.notify("Ordner OK und beschreibbar ✓", type="positive")
                     ui.button("Prüfen", on_click=check_folder).props("flat no-caps dense")
+
+            with ui.tab_panel(t_orte):
+                ui.label("Arbeitsorte für die Standort-Prüfung der Zeiterfassung. "
+                         "Trage je Objekt die öffentliche IP(s) des WLANs ein – die "
+                         "Putzkraft muss dann im WLAN des Objekts sein.") \
+                    .classes("text-sm text-gray-500")
+                orte = CFG.setdefault("arbeitsorte", [])
+                orte_box = ui.column().classes("w-full gap-2")
+
+                def render_orte():
+                    orte_box.clear()
+                    with orte_box:
+                        for i, o in enumerate(orte):
+                            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                                nm = ui.input("Name", value=o.get("name", "")) \
+                                    .props("dense outlined").classes("w-48")
+                                ipf = ui.input("IP-Adressen (mit Komma trennen)",
+                                               value=", ".join(o.get("ips", []))) \
+                                    .props("dense outlined").classes("flex-grow")
+
+                                def _upd(idx=i, nmf=nm, ipe=ipf):
+                                    orte[idx] = {"name": (nmf.value or "").strip(),
+                                                 "ips": [x.strip() for x in (ipe.value or "").split(",") if x.strip()]}
+                                    data.save_config()
+                                nm.on("blur", lambda e, f=_upd: f())
+                                ipf.on("blur", lambda e, f=_upd: f())
+
+                                def _del(idx=i):
+                                    orte.pop(idx); data.save_config(); render_orte()
+                                ui.button(icon="delete", on_click=_del) \
+                                    .props("flat dense round color=negative")
+                render_orte()
+
+                cur_ip = ui.label("").classes("text-xs text-gray-600 font-mono")
+
+                async def show_ip():
+                    ip = await get_ip()
+                    cur_ip.text = f"Aktuelle öffentliche IP dieses Geräts: {ip or 'unbekannt'}"
+                with ui.row().classes("items-center gap-2 mt-1"):
+                    ui.button("Ort hinzufügen", icon="add_location",
+                              on_click=lambda: (orte.append({"name": "Neuer Ort", "ips": []}),
+                                                data.save_config(), render_orte())) \
+                        .props("outline no-caps")
+                    ui.button("Aktuelle IP anzeigen", icon="wifi", on_click=show_ip) \
+                        .props("flat no-caps")
 
             with ui.tab_panel(t_smoobu):
                 with ui.grid(columns=2).classes("w-full gap-3"):
@@ -980,35 +1041,35 @@ def main_page():
         own_box = ui.column().classes("w-full")
         admin_box = ui.column().classes("w-full")
 
-        def _apply_in(loc):
-            if timetrack.check_in(user, loc) is None:
-                ui.notify("Du bist bereits eingecheckt.", type="warning")
-            else:
-                ui.notify("Eingecheckt ✓", type="positive")
-            refresh()
-
-        def _apply_out(loc):
-            if timetrack.check_out(user, loc) is None:
-                ui.notify("Kein offener Check-in.", type="warning")
-            else:
-                ui.notify("Ausgecheckt ✓", type="positive")
-            refresh()
+        async def _presence_now():
+            ui.notify("Standort/Netzwerk wird geprüft …", type="info", timeout=2000)
+            ip = await get_ip()
+            ort = _match_ort(ip)
+            loc = await get_location()          # GPS optional, blockiert nicht
+            gps = None if loc.get("error") else loc
+            return ip, ort, gps
 
         async def do_checkin():
-            ui.notify("Standort wird ermittelt …", type="info", timeout=2000)
-            loc = await get_location()
-            if loc.get("error"):
-                open_geo_help(loc, do_checkin, lambda: _apply_in(loc), "einchecken")
-                return
-            _apply_in(loc)
+            ip, ort, gps = await _presence_now()
+            if timetrack.check_in(user, gps, ip, ort) is None:
+                ui.notify("Du bist bereits eingecheckt.", type="warning")
+            elif ort:
+                ui.notify(f"Eingecheckt ✓ · {ort}", type="positive")
+            elif ip:
+                ui.notify(f"Eingecheckt ✓ · Netzwerk {ip} (kein bekannter Arbeitsort)",
+                          type="warning", timeout=9000)
+            else:
+                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort-Nachweis",
+                          type="warning", timeout=9000)
+            refresh()
 
         async def do_checkout():
-            ui.notify("Standort wird ermittelt …", type="info", timeout=2000)
-            loc = await get_location()
-            if loc.get("error"):
-                open_geo_help(loc, do_checkout, lambda: _apply_out(loc), "auschecken")
-                return
-            _apply_out(loc)
+            ip, ort, gps = await _presence_now()
+            if timetrack.check_out(user, gps, ip, ort) is None:
+                ui.notify("Kein offener Check-in.", type="warning")
+            else:
+                ui.notify(f"Ausgecheckt ✓ · {ort}" if ort else "Ausgecheckt ✓", type="positive")
+            refresh()
 
         def refresh():
             status_box.clear()
@@ -1017,7 +1078,8 @@ def main_page():
                 if oe:
                     ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
                         .classes("text-lg font-medium text-green-700")
-                    ui.label("Standort: " + _loc_text(oe.get("checkin_loc"))) \
+                    ui.label("Nachweis: " + _presence(oe.get("checkin_ip"),
+                             oe.get("checkin_ort"), oe.get("checkin_loc"))) \
                         .classes("text-xs text-gray-500")
                     ui.button("Check-out", icon="logout", on_click=do_checkout) \
                         .props("unelevated size=lg color=negative")

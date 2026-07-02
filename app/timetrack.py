@@ -33,21 +33,25 @@ def get_open(user):
     return None
 
 
-def check_in(user, loc, now=None):
-    """Check-in. Gibt None zurück, wenn bereits ein offener Eintrag existiert."""
+def check_in(user, loc, ip=None, ort=None, now=None):
+    """Check-in. Gibt None zurück, wenn bereits ein offener Eintrag existiert.
+
+    loc: GPS-Dict (optional). ip: öffentliche IP. ort: erkannter Standort (o. None).
+    """
     items = _read()
     if any(e["user"] == user and not e.get("checkout") for e in items):
         return None
     now = now or datetime.now()
     e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
-         "checkin": now.isoformat(timespec="seconds"), "checkin_loc": loc,
-         "checkout": None, "checkout_loc": None}
+         "checkin": now.isoformat(timespec="seconds"),
+         "checkin_loc": loc, "checkin_ip": ip, "checkin_ort": ort,
+         "checkout": None, "checkout_loc": None, "checkout_ip": None, "checkout_ort": None}
     items.append(e)
     _write(items)
     return e
 
 
-def check_out(user, loc, now=None):
+def check_out(user, loc, ip=None, ort=None, now=None):
     """Offenen Eintrag des Benutzers schließen. None, wenn keiner offen ist."""
     items = _read()
     now = now or datetime.now()
@@ -55,6 +59,8 @@ def check_out(user, loc, now=None):
         if e["user"] == user and not e.get("checkout"):
             e["checkout"] = now.isoformat(timespec="seconds")
             e["checkout_loc"] = loc
+            e["checkout_ip"] = ip
+            e["checkout_ort"] = ort
             _write(items)
             return e
     return None

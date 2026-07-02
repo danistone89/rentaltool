@@ -30,6 +30,16 @@ def test_getrennte_benutzer(tmp_path, monkeypatch):
     assert len(timetrack.entries()) == 2
 
 
+def test_ip_und_ort_gespeichert(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    timetrack.check_in("a", None, ip="1.2.3.4", ort="Cottaer Straße",
+                       now=datetime(2026, 7, 2, 8))
+    e = timetrack.check_out("a", None, ip="1.2.3.4", ort="Cottaer Straße",
+                            now=datetime(2026, 7, 2, 9))
+    assert e["checkin_ip"] == "1.2.3.4" and e["checkin_ort"] == "Cottaer Straße"
+    assert e["checkout_ort"] == "Cottaer Straße"
+
+
 def test_offene_dauer(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     e = timetrack.check_in("a", {}, now=datetime(2026, 7, 2, 8))

@@ -19,6 +19,10 @@
     "folder": ""
   },
 
+  "arbeitsorte": [
+    {"name": "Beispiel-Objekt", "ips": ["1.2.3.4"]}
+  ],
+
   "betreiber": {
     "name": "Nachname",
     "zusatz": "Vorname",
