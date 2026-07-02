@@ -81,6 +81,16 @@ async def test_mein_konto(user: User, mock_backend):
     await user.should_see("2FA aktivieren")
 
 
+def test_geofence(monkeypatch):
+    monkeypatch.setitem(web.CFG, "arbeitsorte",
+                        [{"name": "Objekt A", "lat": 51.05, "lon": 13.74, "radius_m": 150}])
+    ort, dist = web._match_geofence({"lat": 51.0503, "lon": 13.7403})
+    assert ort == "Objekt A" and dist < 150
+    ort2, dist2 = web._match_geofence({"lat": 51.20, "lon": 13.90})   # weit weg
+    assert ort2 is None and dist2 and dist2 > 1000
+    assert web._match_geofence({"error": "denied"}) == (None, None)
+
+
 async def test_putzkraft_sieht_nur_zeiterfassung(user: User, mock_backend,
                                                   tmp_path, monkeypatch):
     monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))

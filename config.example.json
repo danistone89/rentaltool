@@ -20,7 +20,7 @@
   },
 
   "arbeitsorte": [
-    {"name": "Beispiel-Objekt", "ips": ["1.2.3.4"]}
+    {"name": "Beispiel-Objekt", "address": "Musterstraße 1, 01067 Dresden", "lat": null, "lon": null, "radius_m": 150}
   ],
 
   "betreiber": {

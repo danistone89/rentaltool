@@ -99,26 +99,62 @@ async def get_ip():
         return ""
 
 
-def _match_ort(ip):
-    """IP einem konfigurierten Arbeitsort zuordnen (config.arbeitsorte)."""
-    if not ip:
-        return None
+def _haversine_m(lat1, lon1, lat2, lon2):
+    import math
+    r = 6371000
+    dlat, dlon = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1))
+         * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return int(2 * r * math.asin(math.sqrt(a)))
+
+
+def _match_geofence(loc):
+    """(ort_name, dist_m) wenn innerhalb Radius; sonst (None, nächste_distanz)."""
+    if not loc or loc.get("error"):
+        return None, None
+    best_name, best_dist = None, None
+    inside_name, inside_dist = None, None
     for o in CFG.get("arbeitsorte", []):
-        if ip in (o.get("ips") or []):
-            return o.get("name")
+        if o.get("lat") in (None, "") or o.get("lon") in (None, ""):
+            continue
+        d = _haversine_m(loc["lat"], loc["lon"], float(o["lat"]), float(o["lon"]))
+        if best_dist is None or d < best_dist:
+            best_dist, best_name = d, o.get("name")
+        radius = int(o.get("radius_m", 150) or 150)
+        if d <= radius and (inside_dist is None or d < inside_dist):
+            inside_dist, inside_name = d, o.get("name")
+    if inside_name is not None:
+        return inside_name, inside_dist
+    return None, best_dist
+
+
+def geocode(address):
+    """Adresse -> (lat, lon) via OpenStreetMap Nominatim. None bei Fehler."""
+    import json
+    import urllib.parse
+    import urllib.request
+    url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+        {"q": address, "format": "json", "limit": 1})
+    req = urllib.request.Request(url, headers={"User-Agent": "LIVARO-Suites/1.0 (zeiterfassung)"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = json.load(r)
+        if res:
+            return float(res[0]["lat"]), float(res[0]["lon"])
+    except Exception:
+        pass
     return None
 
 
-def _presence(ip, ort, loc):
-    """Kurztext für Anwesenheits-Nachweis: Ort > IP > GPS > Warnung."""
+def _presence(ort, dist, loc, ip):
+    """Kurztext für den Anwesenheits-Nachweis."""
     if ort:
-        return f"✓ {ort}"
-    parts = []
-    if ip:
-        parts.append(ip)
+        return f"✓ {ort}" + (f" ({dist} m)" if dist is not None else "")
     if loc and not loc.get("error"):
-        parts.append(f"GPS {loc['lat']:.3f},{loc['lon']:.3f}")
-    return " · ".join(parts) if parts else "⚠️ kein Nachweis"
+        return "⚠️ nicht am Objekt" + (f" (nächstes {dist} m)" if dist else "")
+    if ip:
+        return f"⚠️ kein GPS · IP {ip}"
+    return "⚠️ kein Standort"
 
 
 def _loc_text(loc):
@@ -145,9 +181,9 @@ def _export_csv(rows, show_user):
     for e in rows:
         w.writerow((([e["user"]] if show_user else []) + [
             _d(e["checkin"]), _t(e["checkin"]),
-            _presence(e.get("checkin_ip"), e.get("checkin_ort"), e.get("checkin_loc")),
+            _presence(e.get("checkin_ort"), e.get("checkin_dist"), e.get("checkin_loc"), e.get("checkin_ip")),
             _t(e["checkout"]) if e.get("checkout") else "",
-            _presence(e.get("checkout_ip"), e.get("checkout_ort"), e.get("checkout_loc"))
+            _presence(e.get("checkout_ort"), e.get("checkout_dist"), e.get("checkout_loc"), e.get("checkout_ip"))
             if e.get("checkout") else "",
             timetrack.fmt_dur(timetrack.duration_minutes(e))]))
     ui.download.content(buf.getvalue().encode("utf-8-sig"), "arbeitszeiten.csv",
@@ -167,9 +203,9 @@ def _zeit_table(container, rows, show_user, title, export=False):
     ]
     trows = [{
         "id": e["id"], "user": e["user"], "date": _d(e["checkin"]), "cin": _t(e["checkin"]),
-        "lin": _presence(e.get("checkin_ip"), e.get("checkin_ort"), e.get("checkin_loc")),
+        "lin": _presence(e.get("checkin_ort"), e.get("checkin_dist"), e.get("checkin_loc"), e.get("checkin_ip")),
         "cout": _t(e["checkout"]) if e.get("checkout") else "—",
-        "lout": _presence(e.get("checkout_ip"), e.get("checkout_ort"), e.get("checkout_loc"))
+        "lout": _presence(e.get("checkout_ort"), e.get("checkout_dist"), e.get("checkout_loc"), e.get("checkout_ip"))
                 if e.get("checkout") else "—",
         "dur": timetrack.fmt_dur(timetrack.duration_minutes(e)),
     } for e in rows]
@@ -608,9 +644,9 @@ def open_settings():
                     ui.button("Prüfen", on_click=check_folder).props("flat no-caps dense")
 
             with ui.tab_panel(t_orte):
-                ui.label("Arbeitsorte für die Standort-Prüfung der Zeiterfassung. "
-                         "Trage je Objekt die öffentliche IP(s) des WLANs ein – die "
-                         "Putzkraft muss dann im WLAN des Objekts sein.") \
+                ui.label("Objekte für die GPS-Standortprüfung der Zeiterfassung. Adresse "
+                         "eintragen und Lupe antippen (Koordinaten), Radius in Metern "
+                         "(z. B. 150). Check-in außerhalb wird markiert.") \
                     .classes("text-sm text-gray-500")
                 orte = CFG.setdefault("arbeitsorte", [])
                 orte_box = ui.column().classes("w-full gap-2")
@@ -619,38 +655,50 @@ def open_settings():
                     orte_box.clear()
                     with orte_box:
                         for i, o in enumerate(orte):
-                            with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                                nm = ui.input("Name", value=o.get("name", "")) \
-                                    .props("dense outlined").classes("w-48")
-                                ipf = ui.input("IP-Adressen (mit Komma trennen)",
-                                               value=", ".join(o.get("ips", []))) \
-                                    .props("dense outlined").classes("flex-grow")
+                            with ui.card().classes("w-full p-2 gap-2"):
+                                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                                    nm = ui.input("Name", value=o.get("name", "")) \
+                                        .props("dense outlined").classes("w-40")
+                                    addr = ui.input("Adresse", value=o.get("address", "")) \
+                                        .props("dense outlined").classes("flex-grow")
+                                    lat = ui.number("Breite", value=o.get("lat"), format="%.6f") \
+                                        .props("dense outlined").classes("w-32")
+                                    lon = ui.number("Länge", value=o.get("lon"), format="%.6f") \
+                                        .props("dense outlined").classes("w-32")
+                                    rad = ui.number("Radius m", value=o.get("radius_m", 150),
+                                                    step=10).props("dense outlined").classes("w-24")
 
-                                def _upd(idx=i, nmf=nm, ipe=ipf):
-                                    orte[idx] = {"name": (nmf.value or "").strip(),
-                                                 "ips": [x.strip() for x in (ipe.value or "").split(",") if x.strip()]}
-                                    data.save_config()
-                                nm.on("blur", lambda e, f=_upd: f())
-                                ipf.on("blur", lambda e, f=_upd: f())
+                                    def _upd(idx=i, nmf=nm, af=addr, laf=lat, lof=lon, raf=rad):
+                                        orte[idx].update({
+                                            "name": (nmf.value or "").strip(), "address": af.value or "",
+                                            "lat": laf.value, "lon": lof.value,
+                                            "radius_m": int(raf.value or 150)})
+                                        data.save_config()
+                                    for f in (nm, addr, lat, lon, rad):
+                                        f.on("blur", lambda e, fn=_upd: fn())
 
-                                def _del(idx=i):
-                                    orte.pop(idx); data.save_config(); render_orte()
-                                ui.button(icon="delete", on_click=_del) \
-                                    .props("flat dense round color=negative")
+                                    def _geo(idx=i, af=addr, laf=lat, lof=lon):
+                                        r = geocode(af.value or "")
+                                        if not r:
+                                            ui.notify("Adresse nicht gefunden.", type="negative"); return
+                                        laf.value, lof.value = r
+                                        orte[idx]["lat"], orte[idx]["lon"] = r
+                                        orte[idx]["address"] = af.value or ""
+                                        data.save_config()
+                                        ui.notify(f"Koordinaten: {r[0]:.5f}, {r[1]:.5f}", type="positive")
+                                    ui.button(icon="search", on_click=_geo) \
+                                        .props("flat dense round").tooltip("Koordinaten suchen")
+
+                                    def _del(idx=i):
+                                        orte.pop(idx); data.save_config(); render_orte()
+                                    ui.button(icon="delete", on_click=_del) \
+                                        .props("flat dense round color=negative")
                 render_orte()
-
-                cur_ip = ui.label("").classes("text-xs text-gray-600 font-mono")
-
-                async def show_ip():
-                    ip = await get_ip()
-                    cur_ip.text = f"Aktuelle öffentliche IP dieses Geräts: {ip or 'unbekannt'}"
-                with ui.row().classes("items-center gap-2 mt-1"):
-                    ui.button("Ort hinzufügen", icon="add_location",
-                              on_click=lambda: (orte.append({"name": "Neuer Ort", "ips": []}),
-                                                data.save_config(), render_orte())) \
-                        .props("outline no-caps")
-                    ui.button("Aktuelle IP anzeigen", icon="wifi", on_click=show_ip) \
-                        .props("flat no-caps")
+                ui.button("Objekt hinzufügen", icon="add_location",
+                          on_click=lambda: (orte.append({"name": "Neues Objekt", "address": "",
+                                                         "lat": None, "lon": None, "radius_m": 150}),
+                                            data.save_config(), render_orte())) \
+                    .props("outline no-caps mt-1")
 
             with ui.tab_panel(t_smoobu):
                 with ui.grid(columns=2).classes("w-full gap-3"):
@@ -1042,33 +1090,34 @@ def main_page():
         admin_box = ui.column().classes("w-full")
 
         async def _presence_now():
-            ui.notify("Standort/Netzwerk wird geprüft …", type="info", timeout=2000)
-            ip = await get_ip()
-            ort = _match_ort(ip)
-            loc = await get_location()          # GPS optional, blockiert nicht
+            ui.notify("Standort wird geprüft …", type="info", timeout=2000)
+            loc = await get_location()
+            ip = await get_ip()                 # zusätzlich protokolliert
             gps = None if loc.get("error") else loc
-            return ip, ort, gps
+            ort, dist = _match_geofence(gps)
+            return gps, ip, ort, dist
 
         async def do_checkin():
-            ip, ort, gps = await _presence_now()
-            if timetrack.check_in(user, gps, ip, ort) is None:
+            gps, ip, ort, dist = await _presence_now()
+            if timetrack.check_in(user, gps, ip, ort, dist) is None:
                 ui.notify("Du bist bereits eingecheckt.", type="warning")
             elif ort:
-                ui.notify(f"Eingecheckt ✓ · {ort}", type="positive")
-            elif ip:
-                ui.notify(f"Eingecheckt ✓ · Netzwerk {ip} (kein bekannter Arbeitsort)",
+                ui.notify(f"Eingecheckt ✓ · {ort} ({dist} m)", type="positive")
+            elif gps:
+                ui.notify(f"Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)",
                           type="warning", timeout=9000)
             else:
-                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort-Nachweis",
-                          type="warning", timeout=9000)
+                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung am Handy aktivieren.",
+                          type="warning", timeout=10000)
             refresh()
 
         async def do_checkout():
-            ip, ort, gps = await _presence_now()
-            if timetrack.check_out(user, gps, ip, ort) is None:
+            gps, ip, ort, dist = await _presence_now()
+            if timetrack.check_out(user, gps, ip, ort, dist) is None:
                 ui.notify("Kein offener Check-in.", type="warning")
             else:
-                ui.notify(f"Ausgecheckt ✓ · {ort}" if ort else "Ausgecheckt ✓", type="positive")
+                ui.notify(f"Ausgecheckt ✓ · {ort} ({dist} m)" if ort else "Ausgecheckt ✓",
+                          type="positive")
             refresh()
 
         def refresh():
@@ -1078,8 +1127,8 @@ def main_page():
                 if oe:
                     ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
                         .classes("text-lg font-medium text-green-700")
-                    ui.label("Nachweis: " + _presence(oe.get("checkin_ip"),
-                             oe.get("checkin_ort"), oe.get("checkin_loc"))) \
+                    ui.label("Nachweis: " + _presence(oe.get("checkin_ort"),
+                             oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
                         .classes("text-xs text-gray-500")
                     ui.button("Check-out", icon="logout", on_click=do_checkout) \
                         .props("unelevated size=lg color=negative")
