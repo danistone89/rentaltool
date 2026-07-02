@@ -85,19 +85,26 @@ zeitraum zwischengespeichert. Der **🔄-Button** leert den Cache und lädt fris
 unter den Eingaben steht „Daten zuletzt von Smoobu geladen: …". Der Webhook
 (`/api/smoobu/webhook`) leert den Cache automatisch bei Änderungen in Smoobu.
 
-## Login & 2FA
+## Login, Benutzer & Rollen
 
-Die App ist durch einen **Login** geschützt (Single-User, `app/auth.py`). Beim
-ersten Aufruf legst du unter `/login` ein Passwort fest (PBKDF2-gehasht in
-`config.auth`). Ausgenommen vom Login-Zwang: die Login-Seite, der Smoobu-Webhook
-(`/api/…`) und NiceGUI-Interna.
+Die App ist durch einen **Login** geschützt (`app/auth.py`, PBKDF2-Hashes in
+`config.auth.users`). Beim allerersten Aufruf legst du unter `/login` den
+**ersten Administrator** an (Benutzername + Passwort). Ausgenommen vom
+Login-Zwang: Login-Seite, Smoobu-Webhook (`/api/…`), NiceGUI-Interna.
 
-Optional **2FA mit Google Authenticator** (TOTP): in den Einstellungen unter
-„Sicherheit / Login" aktivieren → QR-Code scannen → ab dann Passwort **+**
-6-stelliger Code beim Login. Passwort ändern ebenfalls dort.
+**Mehrbenutzer & Rollen:** Über **„Benutzer"** (nur Admin) lassen sich weitere
+Konten anlegen, Passwörter zurücksetzen, Rollen ändern oder löschen. Rollen:
+`admin` (sieht alles, verwaltet Nutzer/Einstellungen) und `putzkraft`. **Welche
+Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/web.py`** (aktuell:
+Admin = alles, Putzkraft = noch nichts – wird später definiert). Nutzer ohne
+freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 
-> Passwort vergessen? In `config.json` unter `auth.password_hash` leeren – beim
-> nächsten Aufruf kannst du ein neues festlegen. `config.json` ist gitignored.
+**Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
+Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
+6-stelligem Code.
+
+> Ausgesperrt? In `config.json` `auth.users` auf `{}` setzen – beim nächsten
+> Aufruf legst du den Admin neu an. `config.json` ist gitignored.
 
 ## E-Mail-Versand (Gmail)
 

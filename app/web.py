@@ -27,8 +27,45 @@ CFG = data.CONFIG
 AUTH = CFG.setdefault("auth", {})
 _new_secret = not AUTH.get("storage_secret")
 STORAGE_SECRET = auth.ensure_storage_secret(AUTH)
-if _new_secret:
-    data.save_config()  # neu erzeugtes storage_secret persistieren
+
+# ---- Mehrbenutzer + Rollen -------------------------------------------------
+USERS = AUTH.setdefault("users", {})
+_migrated = False
+if not USERS and AUTH.get("password_hash"):   # Migration Single-User -> users
+    USERS["admin"] = {"password_hash": AUTH.pop("password_hash"), "role": "admin",
+                      "totp_secret": AUTH.pop("totp_secret", ""), "name": "Administrator"}
+    _migrated = True
+
+if _new_secret or _migrated:
+    data.save_config()
+
+ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
+
+# Bereiche (Features). Welche Rolle was sieht, wird über ROLE_AREAS gesteuert –
+# die feinen Rechte definieren wir später, hier nur das Grundgerüst.
+AREAS = [
+    {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
+]
+ROLE_AREAS = {
+    "admin": {a["key"] for a in AREAS},   # Admin sieht alles
+    "putzkraft": set(),                   # später freischalten
+}
+
+
+def _cur_user():
+    return app.storage.user.get("user", "")
+
+
+def _cur_role():
+    return app.storage.user.get("role", "")
+
+
+def _is_admin():
+    return _cur_role() == "admin"
+
+
+def _role_areas(role):
+    return ROLE_AREAS.get(role, set())
 
 # Pfade ohne Login-Zwang: Login-Seite, Smoobu-Webhook, NiceGUI-Interna.
 _UNRESTRICTED = {"/login"}
@@ -125,47 +162,52 @@ def login_page():
         ui.navigate.to("/")
         return
 
-    def finish():
+    def finish2(username, role):
         app.storage.user["authenticated"] = True
+        app.storage.user["user"] = username
+        app.storage.user["role"] = role
         ui.navigate.to(app.storage.user.get("referrer") or "/")
 
     with ui.column().classes("absolute-center items-center gap-4"):
         logo(60)
         with ui.card().classes("w-[360px] max-w-full gap-2 rounded-xl shadow-md"):
-            if not auth.is_configured(AUTH):
-                ui.label("Erst-Einrichtung – Passwort festlegen").classes("font-semibold")
-                p1 = ui.input("Neues Passwort", password=True,
+            if not USERS:
+                ui.label("Erst-Einrichtung – Administrator anlegen").classes("font-semibold")
+                un = ui.input("Benutzername", value="admin").classes("w-full")
+                p1 = ui.input("Passwort", password=True,
                               password_toggle_button=True).classes("w-full")
                 p2 = ui.input("Passwort wiederholen", password=True).classes("w-full")
 
                 def setup():
+                    name = (un.value or "").strip()
+                    if not name:
+                        ui.notify("Benutzername fehlt.", type="warning"); return
                     if len(p1.value or "") < 6:
-                        ui.notify("Mindestens 6 Zeichen.", type="warning"); return
+                        ui.notify("Passwort mindestens 6 Zeichen.", type="warning"); return
                     if p1.value != p2.value:
                         ui.notify("Passwörter stimmen nicht überein.", type="negative"); return
-                    AUTH["password_hash"] = auth.hash_password(p1.value)
+                    USERS[name] = {"password_hash": auth.hash_password(p1.value),
+                                   "role": "admin", "totp_secret": "", "name": name}
                     data.save_config()
-                    ui.notify("Passwort gesetzt.", type="positive")
-                    finish()
-                ui.button("Speichern & anmelden", on_click=setup) \
+                    finish2(name, "admin")
+                ui.button("Anlegen & anmelden", on_click=setup) \
                     .props("unelevated").classes("w-full")
             else:
                 ui.label("Anmelden").classes("font-semibold")
+                un = ui.input("Benutzername").classes("w-full")
                 pw = ui.input("Passwort", password=True,
                               password_toggle_button=True).classes("w-full")
-                code = ui.input("6-stelliger Code (Authenticator)").classes("w-full") \
-                    if auth.totp_enabled(AUTH) else None
+                code = ui.input("6-stelliger Code (falls 2FA aktiv)").classes("w-full")
 
                 def do_login():
-                    if not auth.verify_password(pw.value or "", AUTH.get("password_hash", "")):
-                        ui.notify("Falsches Passwort.", type="negative"); return
-                    if auth.totp_enabled(AUTH) and not auth.verify_totp(
-                            AUTH.get("totp_secret", ""), code.value if code else ""):
-                        ui.notify("Falscher oder fehlender Code.", type="negative"); return
-                    finish()
-                pw.on("keydown.enter", lambda: do_login())
-                if code is not None:
-                    code.on("keydown.enter", lambda: do_login())
+                    u = USERS.get((un.value or "").strip())
+                    if not u or not auth.verify_password(pw.value or "", u.get("password_hash", "")):
+                        ui.notify("Benutzername oder Passwort falsch.", type="negative"); return
+                    if u.get("totp_secret") and not auth.verify_totp(u["totp_secret"], code.value or ""):
+                        ui.notify("Code fehlt oder ist falsch.", type="negative"); return
+                    finish2((un.value or "").strip(), u.get("role", "putzkraft"))
+                for f in (un, pw, code):
+                    f.on("keydown.enter", lambda: do_login())
                 ui.button("Anmelden", on_click=do_login).props("unelevated").classes("w-full")
 
 
@@ -175,10 +217,13 @@ def logout():
 
 
 # ---------------------------------------------------------------- 2FA-Einrichtung
-def open_2fa_setup():
+def open_2fa_setup(on_done=None):
+    username = _cur_user()
+    u = USERS.get(username)
+    if not u:
+        ui.notify("Kein angemeldeter Benutzer.", type="negative"); return
     secret = auth.generate_totp_secret()
-    account = CFG.get("email", {}).get("absender") or "Beherbergungssteuer"
-    uri = auth.provisioning_uri(secret, account)
+    uri = auth.provisioning_uri(secret, username or "LIVARO", issuer="LIVARO Suites")
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full items-center gap-2"):
         ui.label("🔐 Google Authenticator einrichten").classes("text-lg font-bold")
         ui.label("1. QR-Code in der Authenticator-App scannen:").classes("text-sm")
@@ -191,13 +236,145 @@ def open_2fa_setup():
         def confirm():
             if not auth.verify_totp(secret, code.value or ""):
                 ui.notify("Code stimmt nicht – bitte erneut versuchen.", type="negative"); return
-            AUTH["totp_secret"] = secret
+            u["totp_secret"] = secret
             data.save_config()
             ui.notify("2FA aktiviert.", type="positive")
             dlg.close()
+            if on_done:
+                on_done()
         with ui.row().classes("w-full justify-end"):
             ui.button("Abbrechen", on_click=dlg.close).props("flat")
             ui.button("Aktivieren", on_click=confirm).props("unelevated")
+    dlg.open()
+
+
+# ---------------------------------------------------------------- Mein Konto
+def open_account():
+    username = _cur_user()
+    u = USERS.get(username, {})
+    with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
+        ui.label("Mein Konto").classes("text-xl font-bold")
+        ui.label(f"Angemeldet als {username} · {ROLES.get(u.get('role'), u.get('role', ''))}") \
+            .classes("text-sm text-gray-500")
+        new_pw = ui.input("Neues Passwort (leer = unverändert)", password=True,
+                          password_toggle_button=True).classes("w-full")
+        with ui.row().classes("items-center gap-2 mt-1"):
+            if u.get("totp_secret"):
+                def disable_2fa():
+                    u["totp_secret"] = ""
+                    data.save_config()
+                    ui.notify("2FA deaktiviert.", type="warning"); dlg.close()
+                ui.label("🔐 2FA aktiv").classes("text-sm text-green-700")
+                ui.button("2FA deaktivieren", on_click=disable_2fa).props("flat no-caps")
+            else:
+                ui.button("2FA aktivieren", icon="qr_code_2",
+                          on_click=lambda: (dlg.close(), open_2fa_setup())).props("outline no-caps")
+
+        def save():
+            if (new_pw.value or "").strip():
+                if len(new_pw.value.strip()) < 6:
+                    ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
+                u["password_hash"] = auth.hash_password(new_pw.value.strip())
+                data.save_config()
+                ui.notify("Passwort geändert.", type="positive")
+            dlg.close()
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Schließen", on_click=dlg.close).props("flat")
+            ui.button("Speichern", on_click=save).props("unelevated")
+    dlg.open()
+
+
+def open_reset_pw(username):
+    with ui.dialog() as dlg, ui.card().classes("w-[360px] gap-2"):
+        ui.label(f"Passwort für {username} setzen").classes("font-bold")
+        p = ui.input("Neues Passwort", password=True,
+                     password_toggle_button=True).classes("w-full")
+
+        def save():
+            if len(p.value or "") < 6:
+                ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
+            USERS[username]["password_hash"] = auth.hash_password(p.value)
+            data.save_config()
+            ui.notify(f"Passwort für {username} gesetzt.", type="positive"); dlg.close()
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Setzen", on_click=save).props("unelevated")
+    dlg.open()
+
+
+# ---------------------------------------------------------------- Benutzer (Admin)
+def open_users():
+    if not _is_admin():
+        ui.notify("Nur für Administratoren.", type="negative"); return
+    with ui.dialog() as dlg, ui.card().classes("w-[640px] max-w-full gap-2"):
+        ui.label("Benutzer verwalten").classes("text-xl font-bold")
+        listing = ui.column().classes("w-full gap-2")
+
+        def render():
+            listing.clear()
+            with listing:
+                for uname in sorted(USERS):
+                    u = USERS[uname]
+                    with ui.card().classes("w-full p-2"):
+                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            ui.icon("shield_person" if u.get("role") == "admin" else "person") \
+                                .classes("text-primary")
+                            ui.label(uname).classes("font-semibold")
+                            if u.get("totp_secret"):
+                                ui.label("2FA").classes("text-xs text-green-700")
+                            ui.space()
+                            sel = ui.select(ROLES, value=u.get("role", "putzkraft")) \
+                                .props("dense outlined").classes("w-40")
+
+                            def _role_handler(un):
+                                def h(e):
+                                    if un == _cur_user() and e.value != "admin":
+                                        ui.notify("Eigene Admin-Rolle nicht entfernbar.",
+                                                  type="warning")
+                                        USERS[un]["role"] = "admin"; render(); return
+                                    USERS[un]["role"] = e.value
+                                    data.save_config()
+                                    ui.notify(f"Rolle von {un}: {ROLES.get(e.value)}",
+                                              type="positive")
+                                return h
+                            sel.on_value_change(_role_handler(uname))
+
+                            ui.button("Passwort", icon="key",
+                                      on_click=lambda un=uname: open_reset_pw(un)) \
+                                .props("flat dense no-caps")
+                            if uname != _cur_user():
+                                def _del(un=uname):
+                                    USERS.pop(un, None); data.save_config()
+                                    ui.notify(f"{un} gelöscht.", type="warning"); render()
+                                ui.button(icon="delete", on_click=_del) \
+                                    .props("flat dense round color=negative").tooltip("Löschen")
+        render()
+
+        ui.separator()
+        ui.label("Neuen Benutzer anlegen").classes("font-medium")
+        with ui.row().classes("w-full items-end gap-2"):
+            nu = ui.input("Benutzername").props("dense outlined")
+            npw = ui.input("Passwort", password=True).props("dense outlined")
+            nrole = ui.select(ROLES, value="putzkraft", label="Rolle") \
+                .props("dense outlined").classes("w-40")
+
+            def add():
+                name = (nu.value or "").strip()
+                if not name:
+                    ui.notify("Benutzername fehlt.", type="warning"); return
+                if name in USERS:
+                    ui.notify("Benutzername existiert bereits.", type="negative"); return
+                if len(npw.value or "") < 6:
+                    ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
+                USERS[name] = {"password_hash": auth.hash_password(npw.value),
+                               "role": nrole.value, "totp_secret": "", "name": name}
+                data.save_config()
+                ui.notify(f"Benutzer {name} angelegt.", type="positive")
+                nu.value = ""; npw.value = ""; render()
+            ui.button("Anlegen", icon="person_add", on_click=add).props("unelevated no-caps")
+
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Schließen", on_click=dlg.close).props("flat")
     dlg.open()
 
 
@@ -243,6 +420,8 @@ def open_folder_picker(start, on_pick):
 
 # ---------------------------------------------------------------- Einstellungen
 def open_settings():
+    if not _is_admin():
+        ui.notify("Nur für Administratoren.", type="negative"); return
     betr = CFG.setdefault("betreiber", {})
     ec = CFG.setdefault("email", {})
     with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full"):
@@ -256,7 +435,6 @@ def open_settings():
             t_arch = ui.tab("Archiv", icon="cloud_upload")
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
-            t_sec = ui.tab("Sicherheit", icon="lock")
 
         with ui.tab_panels(tabs, value=t_betr).classes("w-full"):
             with ui.tab_panel(t_betr):
@@ -341,22 +519,6 @@ def open_settings():
                     ui.label("kurze Test-Mail an den Empfänger (ohne Anhang, ohne Ablage)") \
                         .classes("text-xs text-gray-400")
 
-            with ui.tab_panel(t_sec):
-                new_pw = ui.input("Passwort ändern (leer = unverändert)", password=True,
-                                  placeholder="•••• unverändert").props("outlined dense").classes("w-full")
-                with ui.row().classes("items-center gap-2 mt-2"):
-                    if auth.totp_enabled(AUTH):
-                        def disable_2fa():
-                            AUTH["totp_secret"] = ""
-                            data.save_config()
-                            ui.notify("2FA (Authenticator) deaktiviert.", type="warning")
-                            dialog.close()
-                        ui.label("🔐 2FA aktiv").classes("text-sm text-green-700")
-                        ui.button("2FA deaktivieren", on_click=disable_2fa).props("flat no-caps")
-                    else:
-                        ui.button("2FA aktivieren (Google Authenticator)", icon="qr_code_2",
-                                  on_click=open_2fa_setup).props("outline no-caps")
-
         def save():
             for key in inputs:
                 betr[key] = inputs[key].value or ""
@@ -381,12 +543,6 @@ def open_settings():
             if (m_pw.value or "").strip():
                 ec["app_password"] = m_pw.value.strip()
             CFG["email"] = ec
-            if (new_pw.value or "").strip():
-                if len((new_pw.value or "").strip()) < 6:
-                    ui.notify("Passwort zu kurz (min. 6 Zeichen) – nicht geändert.", type="warning")
-                else:
-                    AUTH["password_hash"] = auth.hash_password(new_pw.value.strip())
-                    ui.notify("Passwort geändert.", type="positive")
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
             dialog.close()
@@ -618,28 +774,53 @@ def main_page():
               positive="#16a34a", negative="#dc2626", dark="#2D2D2D")
     ui.query("body").classes("bg-[#F5F2EB]")
     today = date.today()
-    apts = _load_apartments()
+    role = _cur_role()
+    areas = _role_areas(role)
 
     with ui.header(elevated=True).classes("items-center px-4 bg-white text-slate-800 border-b border-slate-200"):
         ui.button(icon="menu", on_click=lambda: drawer.toggle()) \
             .props("flat round color=primary dense").classes("lg:hidden")
         logo(42)
         ui.space()
-        ui.button("Einstellungen", icon="settings", on_click=open_settings) \
+        if _is_admin():
+            ui.button("Benutzer", icon="group", on_click=open_users) \
+                .props("flat color=primary no-caps")
+            ui.button("Einstellungen", icon="settings", on_click=open_settings) \
+                .props("flat color=primary no-caps")
+        ui.button("Mein Konto", icon="account_circle", on_click=open_account) \
             .props("flat color=primary no-caps")
         ui.button(icon="logout", on_click=logout).props("flat round color=primary") \
             .tooltip("Abmelden")
 
-    with ui.left_drawer(bordered=True).props("width=220").classes("bg-white") as drawer:
+    with ui.left_drawer(bordered=True).props("width=230").classes("bg-white") as drawer:
         ui.label("Bereiche").classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-3 pb-1")
-        with ui.row().classes("items-center gap-2 mx-2 px-2 py-2 rounded-lg "
-                              "bg-violet-50 text-primary cursor-pointer no-wrap"):
-            ui.icon("receipt_long").classes("text-xl")
-            ui.label("Beherbergungssteuer").classes("font-medium")
+        visible = [a for a in AREAS if a["key"] in areas]
+        if visible:
+            for a in visible:
+                with ui.row().classes("items-center gap-2 mx-2 px-2 py-2 rounded-lg "
+                                      "bg-violet-50 text-primary no-wrap"):
+                    ui.icon(a["icon"]).classes("text-xl")
+                    ui.label(a["label"]).classes("font-medium")
+        else:
+            ui.label("Noch keine Bereiche freigeschaltet.") \
+                .classes("text-xs text-gray-400 px-3 py-2")
         ui.space()
-        ui.label("Weitere Features folgen …").classes("text-xs text-gray-400 px-3 pb-3")
+        with ui.column().classes("px-3 pb-3 gap-0"):
+            ui.label(_cur_user()).classes("text-sm font-medium text-slate-700")
+            ui.label(ROLES.get(role, role)).classes("text-xs text-gray-400")
 
     with ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-5"):
+        if "beherbergungssteuer" not in areas:
+            with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):
+                ui.icon("lock").classes("text-5xl text-gray-300")
+                ui.label(f"Willkommen, {_cur_user()}!").classes("text-lg font-medium text-slate-700")
+                ui.label("Für deinen Zugang sind noch keine Bereiche freigeschaltet.") \
+                    .classes("text-gray-500")
+                ui.label("Der Administrator schaltet dir die passenden Bereiche frei.") \
+                    .classes("text-xs text-gray-400")
+            return
+
+        apts = _load_apartments()
         with ui.row().classes("w-full items-center gap-3"):
             ui.icon("receipt_long").classes("text-3xl text-primary")
             with ui.column().classes("gap-0"):

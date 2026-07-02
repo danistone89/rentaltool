@@ -26,13 +26,15 @@ def mock_backend(monkeypatch):
     ])
     monkeypatch.setattr(data, "compute", lambda *a, **k: result)
     web._APARTMENTS.clear()
-    # Login: bekanntes Passwort, kein TOTP
-    monkeypatch.setitem(web.AUTH, "password_hash", auth.hash_password("test"))
-    monkeypatch.setitem(web.AUTH, "totp_secret", "")
+    # Login: Test-Admin (Benutzer "test"), kein TOTP
+    monkeypatch.setitem(web.USERS, "test", {
+        "password_hash": auth.hash_password("test"), "role": "admin",
+        "totp_secret": "", "name": "test"})
 
 
 async def _login(user):
     await user.open("/login")
+    user.find("Benutzername").type("test")
     user.find("Passwort").type("test")
     user.find("Anmelden").click()
     await user.open("/")
@@ -63,7 +65,20 @@ async def test_einstellungen_dialog(user: User, mock_backend):
     user.find("Einstellungen").click()
     await user.should_see("Ablage-Ordner")   # Ordner-Ablage
     await user.should_see("Betreiberdaten")
-    await user.should_see("2FA aktivieren")    # Sicherheits-Sektion
+
+
+async def test_benutzerverwaltung_admin(user: User, mock_backend):
+    await _login(user)
+    user.find("Benutzer").click()
+    await user.should_see("Benutzer verwalten")
+    await user.should_see("Neuen Benutzer anlegen")
+
+
+async def test_mein_konto(user: User, mock_backend):
+    await _login(user)
+    user.find("Mein Konto").click()
+    await user.should_see("Angemeldet als test")
+    await user.should_see("2FA aktivieren")
 
 
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):

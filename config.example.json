@@ -48,9 +48,8 @@
   },
 
   "auth": {
-    "_hinweis": "password_hash + totp_secret werden von der App gesetzt. Passwort vergessen? password_hash leeren -> beim nächsten Start neu festlegen.",
-    "password_hash": "",
-    "totp_secret": "",
-    "storage_secret": ""
+    "_hinweis": "users werden von der App verwaltet (Benutzer-Dialog). Ausgesperrt? auth.users auf {} setzen -> beim nächsten Aufruf Admin neu anlegen. Rollen: admin | putzkraft.",
+    "storage_secret": "",
+    "users": {}
   }
 }
