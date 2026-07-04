@@ -910,6 +910,22 @@ def _photo_button(label, kind, on_saved, icon="photo_camera"):
         .props('accept="image/*"').classes("hk-upload w-[135px]")
 
 
+def _open_photo(src):
+    """Foto im Vollbild-Dialog anzeigen (Klick/Tap schließt)."""
+    with ui.dialog() as dlg, ui.card().classes("p-1 bg-white max-w-[95vw]"):
+        ui.image(src).classes("max-w-[92vw] max-h-[85vh] object-contain cursor-zoom-out") \
+            .on("click", dlg.close)
+    dlg.open()
+
+
+def _photo_thumb(src, size="w-16 h-16"):
+    """Anklickbares Vorschaubild (öffnet Vollbild)."""
+    ui.image(src).classes(
+        f"{size} object-cover rounded-lg cursor-pointer ring-1 ring-slate-200 "
+        "hover:ring-primary transition") \
+        .on("click", lambda s=src: _open_photo(s))
+
+
 def _run_ist(run_id, task_id):
     for r in housekeeping._read(housekeeping.CLEANINGS, []):
         if r["id"] == run_id:
@@ -947,7 +963,7 @@ def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None):
             photo["rel"] = rel
             thumb.clear()
             with thumb:
-                ui.image(f"/media/{rel}").classes("w-24 h-24 object-cover rounded")
+                _photo_thumb(f"/media/{rel}", "w-24 h-24")
         with ui.row().classes("items-center gap-2"):
             _photo_button("Foto (optional)", "damage", saved)
 
@@ -994,33 +1010,34 @@ def reinigung_putzkraft():
 
     def _task_row(run, t):
         st = run["tasks"].get(t["id"], {})
-        with ui.row().classes("w-full items-center gap-3 no-wrap"):
-            cb = ui.checkbox(t["text"], value=st.get("done", False))
+        with ui.column().classes("w-full gap-2 py-2 border-b border-slate-100"):
+            cb = ui.checkbox(t["text"], value=st.get("done", False)).classes("text-base")
             cb.on_value_change(lambda e, tid=t["id"]: housekeeping.update_task(run["id"], tid, done=e.value))
-            ui.space()
-            if t.get("ref_photo"):
-                with ui.column().classes("items-center gap-0"):
-                    ui.image(f"/media/{t['ref_photo']}").classes("w-16 h-16 object-cover rounded")
-                    ui.label("Soll").classes("text-xs text-gray-400")
-            istc = ui.column().classes("items-center gap-1")
+            with ui.row().classes("w-full items-end gap-4 pl-9 flex-wrap"):
+                if t.get("ref_photo"):
+                    with ui.column().classes("items-center gap-0"):
+                        _photo_thumb(f"/media/{t['ref_photo']}", "w-20 h-20")
+                        ui.label("Soll").classes("text-xs text-gray-400")
+                istc = ui.column().classes("items-center gap-1")
 
-            def refresh_ist(col=istc, tid=t["id"], run_id=run["id"]):
-                col.clear()
-                with col:
-                    p = _run_ist(run_id, tid)
-                    if p:
-                        ui.image(f"/media/{p}").classes("w-16 h-16 object-cover rounded")
-                        with ui.row().classes("items-center gap-1"):
-                            ui.icon("check_circle").classes("text-green-600 text-sm")
-                            ui.button("ändern", on_click=lambda c=col, td=tid, r=run_id:
-                                      (housekeeping.update_task(r, td, ist_photo=""),
-                                       refresh_ist(c, td, r))).props("flat dense no-caps size=sm")
-                    else:
-                        def saved(rel, c=col, td=tid, r=run_id):
-                            housekeeping.update_task(r, td, ist_photo=rel)
-                            refresh_ist(c, td, r)
-                        _photo_button("Ist-Foto", "ist", saved)
-            refresh_ist()
+                def refresh_ist(col=istc, tid=t["id"], run_id=run["id"]):
+                    col.clear()
+                    with col:
+                        p = _run_ist(run_id, tid)
+                        if p:
+                            _photo_thumb(f"/media/{p}", "w-20 h-20")
+                            with ui.row().classes("items-center gap-1"):
+                                ui.icon("check_circle").classes("text-green-600 text-sm")
+                                ui.button("ändern", on_click=lambda c=col, td=tid, r=run_id:
+                                          (housekeeping.update_task(r, td, ist_photo=""),
+                                           refresh_ist(c, td, r))).props("flat dense no-caps size=sm")
+                        else:
+                            def saved(rel, c=col, td=tid, r=run_id):
+                                housekeeping.update_task(r, td, ist_photo=rel)
+                                refresh_ist(c, td, r)
+                            _photo_button("Ist-Foto", "ist", saved)
+                            ui.label("Ist").classes("text-xs text-gray-400")
+                refresh_ist()
 
     def _restock_card(aid, anm):
         with ui.card().classes("w-full"):
@@ -1120,9 +1137,9 @@ def _admin_runs():
                             .classes("text-green-600" if st.get("done") else "text-gray-300")
                         ui.label(t["text"]).classes("flex-grow text-sm")
                         if t.get("ref_photo"):
-                            ui.image(f"/media/{t['ref_photo']}").classes("w-14 h-14 object-cover rounded")
+                            _photo_thumb(f"/media/{t['ref_photo']}", "w-14 h-14")
                         if st.get("ist_photo"):
-                            ui.image(f"/media/{st['ist_photo']}").classes("w-14 h-14 object-cover rounded")
+                            _photo_thumb(f"/media/{st['ist_photo']}", "w-14 h-14")
 
 
 def _admin_damages():
@@ -1147,7 +1164,7 @@ def _admin_damages():
                     ui.label("erledigt").classes("text-xs text-green-700")
             ui.label(d["desc"]).classes("text-sm")
             if d.get("photo"):
-                ui.image(f"/media/{d['photo']}").classes("w-40 h-40 object-cover rounded")
+                _photo_thumb(f"/media/{d['photo']}", "w-40 h-40")
 
 
 def _admin_shopping():
@@ -1225,7 +1242,7 @@ def _admin_config(apts):
                             tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
                             task_inputs.append((t, tt))
                             if t.get("ref_photo"):
-                                ui.image(f"/media/{t['ref_photo']}").classes("w-12 h-12 object-cover rounded")
+                                _photo_thumb(f"/media/{t['ref_photo']}", "w-12 h-12")
 
                             def ref_saved(rel, tid=t["id"]):
                                 collect()
@@ -1310,7 +1327,7 @@ def main_page():
             ui.label(_cur_user()).classes("text-sm font-medium text-slate-700")
             ui.label(ROLES.get(role, role)).classes("text-xs text-gray-400")
 
-    content = ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-5")
+    content = ui.column().classes("w-full max-w-6xl mx-auto p-3 sm:p-6 gap-4 sm:gap-5")
     visible = [a for a in AREAS if a["key"] in areas]
 
     def _feature_header(icon, title, subtitle, action=None):
