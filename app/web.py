@@ -1985,6 +1985,36 @@ def _render_cleaning(user, admin, staff, activate):
                     _cleaning_card(j, user, admin, staff, activate)
 
 
+def _add_time_dialog(job, user, activate):
+    """Arbeitszeit für diese Buchung manuell nachtragen."""
+    from datetime import datetime
+    with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
+        ui.label(f"Arbeitszeit nachtragen – {job['apartment_name']}").classes("text-lg font-bold")
+        d = ui.input("Datum", value=job["departure"]).props("type=date outlined dense").classes("w-full")
+        with ui.row().classes("w-full gap-2"):
+            t1 = ui.input("Von", value=(job.get("checkout_time") or "10:00")) \
+                .props("type=time outlined dense").classes("flex-grow")
+            t2 = ui.input("Bis", value="12:00").props("type=time outlined dense").classes("flex-grow")
+
+        def save():
+            try:
+                ci = datetime.fromisoformat(f"{d.value}T{t1.value}")
+                co = datetime.fromisoformat(f"{d.value}T{t2.value}")
+            except Exception:
+                ui.notify("Bitte Datum und Uhrzeiten prüfen.", type="warning"); return
+            if co <= ci:
+                ui.notify("Ende muss nach Beginn liegen.", type="warning"); return
+            timetrack.add_manual(user, ci, co, booking_id=job["id"], apartment=job["apartment_name"])
+            ui.notify(f"Arbeitszeit nachgetragen: {timetrack.fmt_dur(int((co - ci).total_seconds() // 60))}",
+                      type="positive")
+            dlg.close()
+            activate("buchungen")
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Speichern", icon="save", on_click=save).props("unelevated")
+    dlg.open()
+
+
 def _cleaning_actions(job, user, admin, staff, activate):
     """Aktionen nach Wichtigkeit gestaffelt; Checkliste wird dominant, sobald die
     Arbeitszeit für diese Buchung läuft."""
@@ -2014,11 +2044,15 @@ def _cleaning_actions(job, user, admin, staff, activate):
 
             # Weitere Aktionen (sekundär/tertiär)
             ui.label("Weitere Aktionen").classes("text-xs font-semibold text-gray-400 mt-1")
+            nachtragen = _booking_status(job) == "nachtragen"
             with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                 if not open_here:
                     ui.button("Checkliste", icon="checklist",
                               on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
                         .props("outline dense no-caps")
+                ui.button("Zeit nachtragen", icon="more_time",
+                          on_click=lambda: _add_time_dialog(job, user, activate)) \
+                    .props(("outline color=primary" if nachtragen else "flat") + " dense no-caps")
                 ui.button("Infos & Tausch", icon="open_in_full",
                           on_click=lambda: open_booking_dialog(job, user, admin, staff, activate)) \
                     .props("flat dense no-caps").mark("booking-details")
@@ -2267,6 +2301,9 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                       on_click=lambda: (dlg.close(),
                                         _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"]))) \
                 .props("unelevated dense no-caps")
+            ui.button("Zeit nachtragen", icon="more_time",
+                      on_click=lambda: (dlg.close(), _add_time_dialog(bk, user, activate))) \
+                .props("outline dense no-caps")
             _booking_time_controls(bk, user)
     dlg.open()
 

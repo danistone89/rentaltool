@@ -8,6 +8,7 @@ als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
 """
 import json
 import os
+import uuid
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -69,6 +70,20 @@ def check_out(user, loc=None, ip=None, ort=None, dist=None, now=None):
             _write(items)
             return e
     return None
+
+
+def add_manual(user, checkin, checkout, booking_id=None, apartment=None):
+    """Arbeitszeit nachträglich erfassen (fertiger Eintrag mit Start+Ende)."""
+    items = _read()
+    e = {"id": "m-" + uuid.uuid4().hex[:10], "user": user,
+         "checkin": checkin.isoformat(timespec="seconds"),
+         "checkin_loc": None, "checkin_ip": None, "checkin_ort": None, "checkin_dist": None,
+         "booking_id": booking_id, "apartment": apartment, "manual": True,
+         "checkout": checkout.isoformat(timespec="seconds"),
+         "checkout_loc": None, "checkout_ip": None, "checkout_ort": None, "checkout_dist": None}
+    items.append(e)
+    _write(items)
+    return e
 
 
 def entries(user=None):
