@@ -1936,11 +1936,14 @@ def _cleaning_card(job, user, admin, staff, activate):
         def _assignee():
             if who_name:
                 ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
+                if who != user:
+                    ui.button("übernehmen", icon="swap_horiz",
+                              on_click=lambda j=job: _assign(j, user, user, staff, activate)) \
+                        .props("outline dense no-caps color=primary")
             else:
-                ui.label("noch offen").classes("text-sm text-gray-500")
-            if who != user:
-                ui.button("Ich übernehme", on_click=lambda j=job: _assign(j, user, user, staff, activate)) \
-                    .props("flat dense no-caps size=sm")
+                ui.button("Ich übernehme", icon="how_to_reg",
+                          on_click=lambda j=job: _assign(j, user, user, staff, activate)) \
+                    .props("unelevated dense no-caps color=primary")
         _row("Reinigung", _assignee)
 
         def _prep():
