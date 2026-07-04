@@ -57,14 +57,16 @@ ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
 # die feinen Rechte definieren wir später, hier nur das Grundgerüst.
 AREAS = [
     {"key": "buchungen", "label": "Buchungen", "icon": "calendar_month"},
-    {"key": "reinigung", "label": "Reinigung", "icon": "cleaning_services"},
+    {"key": "uebersicht", "label": "Übersicht", "icon": "insights"},
     {"key": "belege", "label": "Belege", "icon": "receipt"},
     {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
 ]
+# "reinigung" ist KEIN Menüpunkt mehr – die Checkliste wird aus einer Buchung geöffnet
+# (activate('reinigung') via _open_checkliste). "uebersicht" ist die Admin-Auswertung.
 ROLE_AREAS = {
     "admin": {a["key"] for a in AREAS},          # Admin sieht alles
-    "putzkraft": {"buchungen", "reinigung", "belege", "zeiterfassung"},  # Putzkräfte
+    "putzkraft": {"buchungen", "belege", "zeiterfassung"},  # Putzkräfte
 }
 
 
@@ -1232,10 +1234,9 @@ def _hk_header(title, subtitle):
 
 
 def render_reinigung(activate=None):
-    if _is_admin():
-        reinigung_admin()
-    else:
-        reinigung_putzkraft(activate)
+    # "reinigung" wird nur noch aus einer Buchung geöffnet -> immer die Checklisten-
+    # Durchgangs-Ansicht (auch für Admins, die eine Reinigung inspizieren).
+    reinigung_putzkraft(activate)
 
 
 _ROOM_ICONS = {"bad": "bathtub", "wc": "wc", "küche": "kitchen", "kueche": "kitchen",
@@ -1445,15 +1446,18 @@ def reinigung_putzkraft(activate=None):
     render()
 
 
-def reinigung_admin():
-    _hk_header("Reinigung", "Durchgänge, Schäden, Einkaufsliste & Konfiguration")
+def reinigung_uebersicht(activate=None):
+    _hk_header("Übersicht", "Zusammenfassung aller Reinigungen, Schäden & Bestand")
     apts = _apts()
     with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
+        t_sum = ui.tab("Zusammenfassung", icon="insights")
         t_runs = ui.tab("Durchgänge", icon="fact_check")
         t_dmg = ui.tab("Schäden", icon="report_problem")
         t_shop = ui.tab("Einkaufsliste", icon="shopping_cart")
         t_cfg = ui.tab("Konfiguration", icon="tune")
-    with ui.tab_panels(tabs, value=t_runs).classes("w-full"):
+    with ui.tab_panels(tabs, value=t_sum).classes("w-full"):
+        with ui.tab_panel(t_sum):
+            _admin_summary(activate)
         with ui.tab_panel(t_runs):
             _admin_runs()
         with ui.tab_panel(t_dmg):
@@ -1462,6 +1466,52 @@ def reinigung_admin():
             _admin_shopping()
         with ui.tab_panel(t_cfg):
             _admin_config(apts)
+
+
+def _sum_kpi(label, value, icon, color="text-primary"):
+    with ui.card().classes("rounded-xl shadow-sm border border-slate-100 p-3 items-center gap-0 min-w-[104px]"):
+        ui.icon(icon).classes(color + " text-2xl")
+        ui.label(str(value)).classes("text-2xl font-bold text-slate-800 leading-tight")
+        ui.label(label).classes("text-xs text-gray-500")
+
+
+def _admin_summary(activate):
+    staff = _staff_users()
+    jobs = _cleaning_jobs()
+    statuses = [_booking_status(j) for j in jobs]
+    fertig = statuses.count("abgeschlossen")
+    ueberf = statuses.count("nachtragen")
+    dmg_open = len(housekeeping.list_damages(only_open=True))
+    rest_open = len(housekeeping.list_restock(only_open=True))
+    with ui.row().classes("w-full gap-2 flex-wrap"):
+        _sum_kpi("Reinigungen", len(jobs), "cleaning_services")
+        _sum_kpi("Fertig", fertig, "check_circle", "text-green-600")
+        _sum_kpi("Überfällig", ueberf, "warning", "text-red-600")
+        _sum_kpi("Offene Schäden", dmg_open, "report_problem", "text-red-600")
+        _sum_kpi("Einkäufe offen", rest_open, "shopping_cart", "text-primary")
+
+    if not jobs:
+        ui.label("Keine Reinigungen im Zeitraum.").classes("text-gray-500 mt-3"); return
+    ui.label("Alle Reinigungen").classes("text-sm font-semibold text-gray-500 mt-3")
+    for j, st in zip(jobs, statuses):
+        dprog, tprog = _checklist_progress(j, None)
+        done_entries = [e for e in timetrack.entries_for_booking(j["id"]) if e.get("checkout")]
+        total_min = sum(timetrack.duration_minutes(e) or 0 for e in done_entries)
+        who = bookings.assignee_of(j["id"])
+        wn = staff.get(who, who) if who else "nicht zugewiesen"
+        card = ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 cursor-pointer")
+        card.on("click", lambda b=j: open_booking_dialog(b, _cur_user(), True, staff, activate))
+        with card:
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.icon("home").classes("text-primary shrink-0")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    ui.label(f"{j['apartment_name']} · {_dfmt(j['departure'])}") \
+                        .classes("font-medium truncate")
+                    ui.label(f"{wn} · Checkliste {dprog}/{tprog} · "
+                             f"{timetrack.fmt_dur(total_min) if total_min else '0:00 h'}") \
+                        .classes("text-xs text-gray-500 truncate")
+                _status_chip(j)
+                ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
 
 def _admin_runs():
@@ -2829,6 +2879,9 @@ def main_page():
     def build_reinigung():
         render_reinigung(activate)
 
+    def build_uebersicht():
+        reinigung_uebersicht(activate)
+
     def build_buchungen():
         render_buchungen(activate)
 
@@ -2836,8 +2889,9 @@ def main_page():
         render_belege()
 
     builders = {"buchungen": build_buchungen,
+                "uebersicht": build_uebersicht,
                 "beherbergungssteuer": build_beherbergungssteuer,
-                "reinigung": build_reinigung,
+                "reinigung": build_reinigung,   # kein Menüpunkt; Ziel von _open_checkliste
                 "belege": build_belege,
                 "zeiterfassung": build_zeiterfassung}
 

@@ -81,16 +81,17 @@ async def test_belege_bereich(user: User, mock_backend, tmp_path, monkeypatch):
     await user.should_see("Neuen Beleg hochladen")
 
 
-async def test_reinigung_admin(user: User, mock_backend, tmp_path, monkeypatch):
-    from app import housekeeping as hk
+async def test_uebersicht_admin(user: User, mock_backend, tmp_path, monkeypatch):
+    from app import housekeeping as hk, bookings
     for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
         monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "a.json"))
     await _login(user)
-    user.find(marker="nav-reinigung").click()
-    await user.should_see("Durchgänge")       # Admin-Tabs
+    user.find(marker="nav-uebersicht").click()
+    await user.should_see("Zusammenfassung")  # neue Auswertung
+    await user.should_see("Durchgänge")       # weitere Admin-Tabs
     await user.should_see("Schäden")
-    await user.should_see("Einkaufsliste")
     await user.should_see("Konfiguration")
 
 
@@ -108,13 +109,8 @@ async def test_mein_konto(user: User, mock_backend):
     await user.should_see("2FA aktivieren")
 
 
-async def test_putzkraft_sieht_nur_reinigung_und_zeit(user: User, mock_backend,
-                                                      tmp_path, monkeypatch):
-    from app import housekeeping as hk
+async def test_putzkraft_bereiche(user: User, mock_backend, tmp_path, monkeypatch):
     monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
-    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setitem(web.USERS, "putzi", {
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
@@ -123,28 +119,10 @@ async def test_putzkraft_sieht_nur_reinigung_und_zeit(user: User, mock_backend,
     user.find("Passwort").type("putzi")
     user.find("Anmelden").click()
     await user.open("/")
-    await user.should_see("Reinigung")       # Standard-Bereich der Putzkraft
-    await user.should_see("Zeiterfassung")   # zweiter erlaubter Bereich (Menü)
+    await user.should_see("Buchungen")       # Standard-Bereich der Putzkraft
+    await user.should_see("Zeiterfassung")   # erlaubter Bereich (Menü)
     await user.should_not_see("Berechnen")   # kein Zugriff auf Beherbergungssteuer
-
-
-async def test_reinigung_putzkraft_picker(user: User, mock_backend, tmp_path, monkeypatch):
-    """Putzkraft-Startansicht (Apartment-Auswahl) rendert ohne Fehler."""
-    from app import housekeeping as hk
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
-    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setitem(web.USERS, "putzi", {
-        "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
-        "totp_secret": "", "name": "putzi"})
-    await user.open("/login")
-    user.find("Benutzername").type("putzi")
-    user.find("Passwort").type("putzi")
-    user.find("Anmelden").click()
-    await user.open("/")
-    user.find(marker="nav-reinigung").click()
-    await user.should_see("Apartment wählen:")
-    await user.should_see("Reinigung starten")
+    await user.should_not_see("Zusammenfassung")   # Admin-Auswertung nicht für Putzkraft
 
 
 async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
