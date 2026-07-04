@@ -160,12 +160,11 @@ async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     await _login(user)            # Standard-Landeseite = Buchungen-Hub
     await user.should_see("Cottaer Straße")
     await user.should_see("Arbeitszeit starten")   # primäre Aktion
-    await user.should_see("Übernehmen")            # tertiäre Aktion
     # Detail-Dialog muss sich beim Klick wirklich ÖFFNEN (value=True),
     # nicht nur im Elementbaum existieren.
     from nicegui import ui as _ui
     user.find(marker="booking-details").click()
-    await user.should_see("Zuständig")
+    await user.should_see("Tauschen / Zuweisen")   # Aktionen-Liste im Dialog
     assert any(getattr(d, "value", False) for d in user.find(_ui.dialog).elements), \
         "Buchungs-Detail-Dialog wurde nicht geöffnet (dlg.open() fehlt?)"
     # Kalender-Tab rendert Timeline (Datumsband ab heute vorhanden)
