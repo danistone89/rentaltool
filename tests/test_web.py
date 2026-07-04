@@ -157,8 +157,8 @@ async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     await user.should_see("Zuständig")
     assert any(getattr(d, "value", False) for d in user.find(_ui.dialog).elements), \
         "Buchungs-Detail-Dialog wurde nicht geöffnet (dlg.open() fehlt?)"
-    # Kalender-Tab rendert Monatsraster (aktueller Monatsname vorhanden)
-    await user.should_see(web._MONTHS[date.today().month - 1])
+    # Kalender-Tab rendert Timeline (Datumsband ab heute vorhanden)
+    await user.should_see(f"{date.today().strftime('%d.%m.')} –")
 
 
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):

@@ -1634,148 +1634,105 @@ def render_buchungen(activate):
             _render_calendar(user, admin, staff, activate)
 
 
-_MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
-           "August", "September", "Oktober", "November", "Dezember"]
-
-
 def _render_calendar(user, admin, staff, activate):
-    today = date.today()
-    state = {"y": today.year, "m": today.month}
+    state = {"start": date.today().isoformat()}
     box = ui.column().classes("w-full gap-2")
 
     def render():
         box.clear()
         with box:
-            _month_grid(state, user, admin, staff, activate, render)
+            _timeline(state, user, admin, staff, activate, render)
     render()
 
 
-def _shift_month(state, delta, rerender):
-    m, y = state["m"] + delta, state["y"]
-    while m < 1:
-        m += 12; y -= 1
-    while m > 12:
-        m -= 12; y += 1
-    state["y"], state["m"] = y, m
+def _shift_days(state, delta, rerender):
+    from datetime import timedelta
+    state["start"] = (date.fromisoformat(state["start"]) + timedelta(days=delta)).isoformat()
     rerender()
 
 
-_APT_PALETTE = ["bg-violet-500", "bg-teal-500", "bg-amber-500", "bg-pink-500",
-                "bg-cyan-600", "bg-indigo-500", "bg-emerald-600", "bg-rose-500"]
-
-
-def _apt_color(apt_id):
-    try:
-        idx = int(apt_id) % len(_APT_PALETTE)
-    except Exception:
-        idx = 0
-    return _APT_PALETTE[idx]
-
-
-def _month_grid(state, user, admin, staff, activate, rerender):
-    import calendar as _cal
+def _timeline(state, user, admin, staff, activate, rerender):
+    """Reservierungs-Timeline: Wohnungen als Zeilen, Tage als Spalten, Buchungen als
+    Balken (skaliert mit weiteren Wohnungen). Klick auf einen Balken öffnet Details."""
     from datetime import timedelta
-    y, m = state["y"], state["m"]
-    first = date(y, m, 1)
-    start = first - timedelta(days=first.weekday())          # Montag der ersten Woche
-    last = date(y, m, _cal.monthrange(y, m)[1])
-    weeks = ((last - start).days) // 7 + 1
-    days = [start + timedelta(days=i) for i in range(weeks * 7)]
+    CELL, LABELW, NDAYS = 58, 130, 21
+    start = date.fromisoformat(state["start"])
+    days = [start + timedelta(days=i) for i in range(NDAYS)]
     gs, ge = days[0].isoformat(), days[-1].isoformat()
-
-    # Komplette Buchungen im Rasterbereich laden
+    today = date.today()
+    apts = _apts()
     try:
         raw = data._reservations(gs, ge)
     except smoobu.SmoobuError as ex:
         ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
         raw = []
-    bks = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
-    bks = [b for b in bks if b["arrival"] and b["departure"]]
-    bks.sort(key=lambda b: (b["arrival"], b["id"]))
-    # Lanes zuweisen (überlappende Buchungen in verschiedene Zeilen)
-    lane_end, lane_of = [], {}
-    for b in bks:
-        placed = False
-        for i, end in enumerate(lane_end):
-            if b["arrival"] > end:            # Lane frei (voriger Aufenthalt vorbei)
-                lane_end[i] = b["departure"]; lane_of[b["id"]] = i; placed = True; break
-        if not placed:
-            lane_end.append(b["departure"]); lane_of[b["id"]] = len(lane_end) - 1
-    nlanes = len(lane_end)
-    # pro Tag: {lane: buchung}
-    day_lane = {}
-    for b in bks:
-        di = date.fromisoformat(max(b["arrival"], gs))
-        dz = date.fromisoformat(min(b["departure"], ge))
-        while di <= dz:
-            day_lane.setdefault(di.isoformat(), {})[lane_of[b["id"]]] = b
-            di += timedelta(days=1)
+    by_apt = {}
+    for b in raw:
+        if not bookings.is_real(b):
+            continue
+        nb = bookings.normalize(b)
+        if nb["arrival"] and nb["departure"] and nb["apartment_id"]:
+            by_apt.setdefault(nb["apartment_id"], []).append(nb)
+    for lst in by_apt.values():
+        lst.sort(key=lambda x: x["arrival"])
 
-    # Kopf: Monat + Navigation
+    # Navigation
     with ui.row().classes("w-full items-center gap-1"):
-        ui.button(icon="chevron_left", on_click=lambda: _shift_month(state, -1, rerender)) \
+        ui.button(icon="chevron_left", on_click=lambda: _shift_days(state, -7, rerender)) \
             .props("flat round dense")
-        ui.label(f"{_MONTHS[m - 1]} {y}").classes("text-lg font-semibold min-w-[150px] text-center")
-        ui.button(icon="chevron_right", on_click=lambda: _shift_month(state, 1, rerender)) \
+        ui.label(f"{start.strftime('%d.%m.')} – {days[-1].strftime('%d.%m.%Y')}") \
+            .classes("text-sm font-semibold min-w-[150px] text-center")
+        ui.button(icon="chevron_right", on_click=lambda: _shift_days(state, 7, rerender)) \
             .props("flat round dense")
         ui.space()
         ui.button("Heute", icon="today",
-                  on_click=lambda: (state.update(y=date.today().year, m=date.today().month), rerender())) \
+                  on_click=lambda: (state.update(start=date.today().isoformat()), rerender())) \
             .props("flat dense no-caps")
-    # Legende: Farbe je Wohnung
-    with ui.row().classes("items-center gap-3 flex-wrap text-xs text-gray-500"):
-        for aid, name in _apts().items():
-            with ui.row().classes("items-center gap-1"):
-                ui.element("div").classes(f"w-3 h-3 rounded-full {_apt_color(aid)}")
-                ui.label(name)
 
-    # Wochentags-Kopf
-    with ui.grid(columns=7).classes("w-full gap-[2px]"):
-        for wd in _WD:
-            ui.label(wd).classes("text-xs font-medium text-gray-400 text-center")
-    # Tageszellen
-    with ui.grid(columns=7).classes("w-full gap-[2px]"):
-        for d in days:
-            _day_cell(d, m, day_lane.get(d.isoformat(), {}), nlanes, gs, ge,
-                      user, admin, staff, activate)
-
-
-def _day_cell(d, month, lanes_map, nlanes, gs, ge, user, admin, staff, activate):
-    today = date.today()
-    other = d.month != month
-    is_today = (d == today)
-    cls = "min-h-[72px] pt-1 pb-1 rounded-lg border gap-[2px] overflow-hidden "
-    cls += "border-primary bg-violet-50 " if is_today else "border-slate-100 "
-    if other:
-        cls += "opacity-40 "
-    iso = d.isoformat()
-    with ui.column().classes(cls):
-        ui.label(str(d.day)).classes(
-            "text-xs leading-none px-1 " + ("font-bold text-primary" if is_today else "text-gray-500"))
-        for i in range(nlanes):
-            b = lanes_map.get(i)
-            if not b:
-                ui.element("div").classes("h-[18px]")     # Platzhalter für Ausrichtung
-                continue
-            is_start = b["arrival"] == iso or iso == gs      # Balkenanfang (oder Rasterrand)
-            is_end = b["departure"] == iso or iso == ge
-            true_start = b["arrival"] == iso
-            true_end = b["departure"] == iso
-            if true_start and true_end:
-                rnd, mx = "rounded", "mx-1"
-            elif true_start:
-                rnd, mx = "rounded-l", "ml-1"
-            elif true_end:
-                rnd, mx = "rounded-r", "mr-1"
-            else:
-                rnd, mx = "", ""
-            label = ""
-            if is_start or d.weekday() == 0:                 # Beschriftung am Anfang + montags
-                label = b["guest"] or b["apartment_name"]
-            seg = ui.label(label).classes(
-                f"h-[18px] text-[10px] leading-[18px] text-white truncate cursor-pointer px-1 "
-                f"{_apt_color(b['apartment_id'])} {rnd} {mx}")
-            seg.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
+    lbl = f"width:{LABELW}px; flex:0 0 {LABELW}px"
+    with ui.element("div").classes("w-full overflow-x-auto rounded-xl border border-slate-100"):
+        with ui.column().classes("gap-0").style(f"min-width:{LABELW + NDAYS * CELL}px"):
+            # Kopfzeile: Tage
+            with ui.row().classes("no-wrap items-stretch gap-0 bg-slate-50 border-b border-slate-100"):
+                ui.element("div").style(lbl)
+                for d in days:
+                    is_today = (d == today)
+                    weekend = d.weekday() >= 5
+                    with ui.column().classes("items-center justify-center gap-0 py-1") \
+                            .style(f"width:{CELL}px; flex:0 0 {CELL}px"):
+                        ui.label(_WD[d.weekday()]).classes(
+                            "text-[10px] leading-none " + ("text-primary font-bold" if is_today
+                            else ("text-blue-500" if weekend else "text-gray-400")))
+                        ui.label(str(d.day)).classes(
+                            "text-xs leading-tight " + ("text-primary font-bold" if is_today else "text-gray-600"))
+            # Zeile je Wohnung
+            grid_bg = ("background-image:repeating-linear-gradient(to right,"
+                       "#eef2f7 0 1px,transparent 1px %dpx)" % CELL)
+            for aid, name in apts.items():
+                with ui.row().classes("no-wrap items-center gap-0 border-b border-slate-100").style("height:44px"):
+                    ui.label(name).classes("text-sm font-medium truncate px-2 text-slate-700").style(lbl)
+                    with ui.element("div").style(
+                            f"position:relative; height:44px; width:{NDAYS * CELL}px; "
+                            f"flex:0 0 {NDAYS * CELL}px; {grid_bg}"):
+                        if gs <= today.isoformat() <= ge:
+                            ti = (today - start).days
+                            ui.element("div").style(
+                                f"position:absolute; left:{ti * CELL}px; top:0; width:{CELL}px; "
+                                "height:100%; background:rgba(94,42,132,0.07)")
+                        for b in by_apt.get(aid, []):
+                            a_idx = max((date.fromisoformat(b["arrival"]) - start).days, 0)
+                            d_idx = min((date.fromisoformat(b["departure"]) - start).days, NDAYS)
+                            if d_idx <= 0 or a_idx >= NDAYS or d_idx <= a_idx:
+                                continue
+                            w = (d_idx - a_idx) * CELL - 6
+                            bar = ui.label((b["guest"] or b["apartment_name"])).classes(
+                                "absolute text-white text-xs truncate cursor-pointer rounded-full px-3 "
+                                "shadow-sm hover:brightness-110").style(
+                                f"left:{a_idx * CELL + 3}px; width:{w}px; top:8px; height:28px; "
+                                "line-height:28px; background:#5E2A84")
+                            bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
+            if not apts:
+                ui.label("Keine Wohnungen geladen.").classes("text-gray-500 p-4")
 
 
 def _render_cleaning(user, admin, staff, activate):
