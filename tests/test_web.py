@@ -153,7 +153,7 @@ async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     # Detail-Dialog muss sich beim Klick wirklich ÖFFNEN (value=True),
     # nicht nur im Elementbaum existieren.
     from nicegui import ui as _ui
-    user.find("Details").click()
+    user.find(marker="booking-details").click()
     await user.should_see("Zuständig")
     assert any(getattr(d, "value", False) for d in user.find(_ui.dialog).elements), \
         "Buchungs-Detail-Dialog wurde nicht geöffnet (dlg.open() fehlt?)"
