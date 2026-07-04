@@ -1910,17 +1910,13 @@ def _cleaning_card(job, user, admin, staff, activate):
     nxt = job.get("next")
     same_day = bool(nxt and nxt["arrival"] == job["departure"])
     with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4 mt-1"):
-        # Kopf: Wohnung + Wechseltag (+ Details rechts)
-        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        # Kopf: Wohnung + Wechseltag
+        with ui.row().classes("w-full items-center gap-2"):
             ui.icon("cleaning_services").classes("text-primary text-xl shrink-0")
             ui.label(job["apartment_name"]).classes("font-bold text-lg leading-tight")
             if same_day:
                 ui.chip("Wechseltag", icon="bolt").props("color=red text-color=white dense") \
                     .tooltip("Anreise am selben Tag – Zeitdruck")
-            ui.space()
-            ui.button(icon="open_in_full",
-                      on_click=lambda j=job: open_booking_dialog(j, user, admin, staff, activate)) \
-                .props("flat round dense").tooltip("Details").mark("booking-details")
 
         # Liste: Verlässt / Reinigung / Vorbereiten
         def _row(label, build):
@@ -1956,11 +1952,14 @@ def _cleaning_card(job, user, admin, staff, activate):
                 ui.label("Standard-Vorbereitung").classes("text-sm text-gray-500")
         _row("Vorbereiten", _prep)
 
-        # Durchgehende Buttons (volle Breite): Arbeitszeit, Checkliste
+        # Durchgehende Buttons (volle Breite): Arbeitszeit, Checkliste, Details
         _booking_time_controls(job, user)
         ui.button("Checkliste abhaken", icon="checklist",
                   on_click=lambda j=job: _open_checkliste(j["apartment_id"], j["apartment_name"], activate)) \
             .props("unelevated no-caps").classes("w-full")
+        ui.button("Alle Infos & Tausch", icon="open_in_full",
+                  on_click=lambda j=job: open_booking_dialog(j, user, admin, staff, activate)) \
+            .props("flat no-caps color=primary").classes("w-full").mark("booking-details")
 
 
 def _event_card(ev, user, admin, staff, activate):
