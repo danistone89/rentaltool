@@ -33,10 +33,12 @@ def get_open(user):
     return None
 
 
-def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None):
+def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None,
+             booking_id=None, apartment=None):
     """Check-in. Gibt None zurück, wenn bereits ein offener Eintrag existiert.
 
     loc: GPS-Dict. ip: öffentliche IP. ort: erkanntes Objekt (Geofence). dist: m.
+    booking_id/apartment: optionale Kopplung an eine Smoobu-Buchung/Wohnung.
     """
     items = _read()
     if any(e["user"] == user and not e.get("checkout") for e in items):
@@ -45,6 +47,7 @@ def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None):
     e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
          "checkin": now.isoformat(timespec="seconds"),
          "checkin_loc": loc, "checkin_ip": ip, "checkin_ort": ort, "checkin_dist": dist,
+         "booking_id": booking_id, "apartment": apartment,
          "checkout": None, "checkout_loc": None, "checkout_ip": None,
          "checkout_ort": None, "checkout_dist": None}
     items.append(e)
@@ -73,6 +76,11 @@ def entries(user=None):
     if user:
         items = [e for e in items if e["user"] == user]
     return list(reversed(items))   # neueste zuerst
+
+
+def entries_for_booking(booking_id):
+    bid = str(booking_id)
+    return [e for e in reversed(_read()) if str(e.get("booking_id")) == bid]
 
 
 def duration_minutes(e):

@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 from nicegui.testing import User
 
-from app import data, steuer, web, archive, auth, timetrack  # noqa: F401
+from app import data, steuer, web, archive, auth, timetrack, bookings  # noqa: F401
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixture_2025-12.json")
 STICHTAG = date(2026, 6, 29)
@@ -25,6 +25,7 @@ def mock_backend(monkeypatch):
         {"id": 2960031, "name": "Wernerstraße"},
     ])
     monkeypatch.setattr(data, "compute", lambda *a, **k: result)
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: [])   # Buchungen-Hub
     web._APARTMENTS.clear()
     # Login: Test-Admin (Benutzer "test"), kein TOTP
     monkeypatch.setitem(web.USERS, "test", {
@@ -47,12 +48,14 @@ async def test_login_schuetzt_startseite(user: User, mock_backend):
 
 async def test_seite_laedt(user: User, mock_backend):
     await _login(user)
-    await user.should_see("Beherbergungssteuer")   # Feature-Titel
+    await user.should_see("Buchungen")             # Standard-Landeseite = Hub
+    user.find(marker="nav-beherbergungssteuer").click()
     await user.should_see("Berechnen")
 
 
 async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     await _login(user)
+    user.find(marker="nav-beherbergungssteuer").click()
     user.find("Berechnen").click()
     await user.should_see("341,90")          # Steuer-KPI
     await user.should_see("Buchungen")        # Tabellen-Überschrift
@@ -129,13 +132,30 @@ async def test_reinigung_putzkraft_picker(user: User, mock_backend, tmp_path, mo
     user.find("Passwort").type("putzi")
     user.find("Anmelden").click()
     await user.open("/")
+    user.find(marker="nav-reinigung").click()
     await user.should_see("Apartment wählen:")
     await user.should_see("Reinigung starten")
+
+
+async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
+    """Buchungs-Hub rendert eine Buchung mit Zuweisungs-Aktion."""
+    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "assignments.json"))
+    fake = [{"id": 999, "type": "reservation", "is-blocked-booking": False,
+             "apartment": {"id": 2748963, "name": "Cottaer Straße"},
+             "arrival": "2026-07-01", "departure": date.today().isoformat(),
+             "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 0,
+             "guest-name": "Max Muster", "email": "x@y.de", "phone": "",
+             "channel": {"name": "Booking.com"}, "notice": ""}]
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: fake)
+    await _login(user)            # Standard-Landeseite = Buchungen-Hub
+    await user.should_see("Cottaer Straße")
+    await user.should_see("Ich übernehme")
 
 
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
     monkeypatch.setattr(archive, "ARCHIVE_DIR", str(tmp_path))
     monkeypatch.setattr(archive, "LEDGER_PATH", str(tmp_path / "ledger.jsonl"))
     await _login(user)
+    user.find(marker="nav-beherbergungssteuer").click()
     user.find("Archiv").click()
     await user.should_see("revisionssicher abgelegte")

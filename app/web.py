@@ -18,7 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping  # noqa: E402
+from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping, bookings  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -48,13 +48,14 @@ ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
 # Bereiche (Features). Welche Rolle was sieht, wird über ROLE_AREAS gesteuert –
 # die feinen Rechte definieren wir später, hier nur das Grundgerüst.
 AREAS = [
-    {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
+    {"key": "buchungen", "label": "Buchungen", "icon": "calendar_month"},
     {"key": "reinigung", "label": "Reinigung", "icon": "cleaning_services"},
     {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
+    {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
 ]
 ROLE_AREAS = {
     "admin": {a["key"] for a in AREAS},          # Admin sieht alles
-    "putzkraft": {"reinigung", "zeiterfassung"},  # Putzkräfte: Reinigung + Zeit
+    "putzkraft": {"buchungen", "reinigung", "zeiterfassung"},  # Putzkräfte
 }
 
 
@@ -421,6 +422,8 @@ def open_account():
         ui.label("Mein Konto").classes("text-xl font-bold")
         ui.label(f"Angemeldet als {username} · {ROLES.get(u.get('role'), u.get('role', ''))}") \
             .classes("text-sm text-gray-500")
+        email_in = ui.input("E-Mail (für Benachrichtigungen)",
+                            value=u.get("email", "")).classes("w-full")
         new_pw = ui.input("Neues Passwort (leer = unverändert)", password=True,
                           password_toggle_button=True).classes("w-full")
         with ui.row().classes("items-center gap-2 mt-1"):
@@ -436,12 +439,13 @@ def open_account():
                           on_click=lambda: (dlg.close(), open_2fa_setup())).props("outline no-caps")
 
         def save():
+            u["email"] = (email_in.value or "").strip()
             if (new_pw.value or "").strip():
                 if len(new_pw.value.strip()) < 6:
                     ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
                 u["password_hash"] = auth.hash_password(new_pw.value.strip())
-                data.save_config()
-                ui.notify("Passwort geändert.", type="positive")
+            data.save_config()
+            ui.notify("Gespeichert.", type="positive")
             dlg.close()
         with ui.row().classes("w-full justify-end"):
             ui.button("Schließen", on_click=dlg.close).props("flat")
@@ -513,13 +517,25 @@ def open_users():
                                     ui.notify(f"{un} gelöscht.", type="warning"); render()
                                 ui.button(icon="delete", on_click=_del) \
                                     .props("flat dense round color=negative").tooltip("Löschen")
+                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            em = ui.input("E-Mail (für Benachrichtigungen)",
+                                          value=u.get("email", "")).props("dense outlined") \
+                                .classes("flex-grow")
+
+                            def _email_handler(un, field):
+                                def h(e):
+                                    USERS[un]["email"] = (field.value or "").strip()
+                                    data.save_config()
+                                return h
+                            em.on("blur", _email_handler(uname, em))
         render()
 
         ui.separator()
         ui.label("Neuen Benutzer anlegen").classes("font-medium")
-        with ui.row().classes("w-full items-end gap-2"):
+        with ui.row().classes("w-full items-end gap-2 flex-wrap"):
             nu = ui.input("Benutzername").props("dense outlined")
             npw = ui.input("Passwort", password=True).props("dense outlined")
+            nem = ui.input("E-Mail").props("dense outlined").classes("min-w-[200px]")
             nrole = ui.select(ROLES, value="putzkraft", label="Rolle") \
                 .props("dense outlined").classes("w-40")
 
@@ -532,10 +548,11 @@ def open_users():
                 if len(npw.value or "") < 6:
                     ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
                 USERS[name] = {"password_hash": auth.hash_password(npw.value),
-                               "role": nrole.value, "totp_secret": "", "name": name}
+                               "role": nrole.value, "totp_secret": "", "name": name,
+                               "email": (nem.value or "").strip()}
                 data.save_config()
                 ui.notify(f"Benutzer {name} angelegt.", type="positive")
-                nu.value = ""; npw.value = ""; render()
+                nu.value = ""; npw.value = ""; nem.value = ""; render()
             ui.button("Anlegen", icon="person_add", on_click=add).props("unelevated no-caps")
 
         with ui.row().classes("w-full justify-end"):
@@ -759,6 +776,33 @@ def open_settings():
                     ui.label("kurze Test-Mail an den Empfänger (ohne Anhang, ohne Ablage)") \
                         .classes("text-xs text-gray-400")
 
+                ui.separator().classes("my-2")
+                nb = CFG.setdefault("notify_email", {})
+                ui.label("Benachrichtigungen an Mitarbeiter (Reinigungs-Tausch, Schäden). "
+                         "Eigenes Gmail-Konto als Absender, z. B. d.steinhauss@gmail.com "
+                         "(Gmail: 2FA + App-Passwort nötig). Leer = Absender oben nutzen.") \
+                    .classes("text-sm text-gray-500")
+                with ui.grid(columns=2).classes("w-full gap-3"):
+                    n_from = ui.input("Absender Benachrichtigungen (Gmail)",
+                                      value=nb.get("absender", "")).props("outlined dense").classes("w-full")
+                    n_pw = ui.input("App-Passwort (leer = unverändert)", password=True,
+                                    placeholder="•••• unverändert").props("outlined dense").classes("w-full")
+
+                def test_notify():
+                    to = _user_email(_cur_user()) or (n_from.value or "").strip()
+                    tc = dict(CFG)
+                    tc["notify_email"] = {"absender": (n_from.value or "").strip(),
+                                          "app_password": (n_pw.value or "").strip() or nb.get("app_password", "")}
+                    try:
+                        mailer.send_notify(tc, to, "LIVARO – Test Benachrichtigung",
+                                           "Dies ist eine Test-Benachrichtigung der LIVARO-App.")
+                        ui.notify(f"Test-Benachrichtigung an {to} gesendet ✓", type="positive", timeout=8000)
+                    except mailer.MailError as ex:
+                        ui.notify(f"Test fehlgeschlagen: {ex}", type="negative", timeout=12000)
+                with ui.row().classes("items-center gap-2 mt-1"):
+                    ui.button("Test-Benachrichtigung", icon="send", on_click=test_notify).props("outline no-caps")
+                    ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-gray-400")
+
         def save():
             for key in inputs:
                 betr[key] = inputs[key].value or ""
@@ -784,6 +828,13 @@ def open_settings():
             if (m_pw.value or "").strip():
                 ec["app_password"] = m_pw.value.strip()
             CFG["email"] = ec
+            # Benachrichtigungs-Absender
+            nb.setdefault("smtp_host", "smtp.gmail.com")
+            nb.setdefault("smtp_port", 587)
+            nb["absender"] = (n_from.value or "").strip()
+            if (n_pw.value or "").strip():
+                nb["app_password"] = n_pw.value.strip()
+            CFG["notify_email"] = nb
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
             dialog.close()
@@ -1165,7 +1216,9 @@ def reinigung_putzkraft():
     user = _cur_user()
     _hk_header("Reinigung", "Checkliste, Fotonachweis, Schäden & Bestand")
     apts = _apts()
-    state = {"apt": None}
+    # Aus einer Buchung vorausgewähltes Apartment (Workflow-Sprung) übernehmen
+    pre = _PENDING_REINIGUNG.pop("apt", None)
+    state = {"apt": pre}
     body = ui.column().classes("w-full gap-4")
 
     def open_apt(aid, anm):
@@ -1445,6 +1498,243 @@ def _admin_config(apts):
     render_cfg()
 
 
+# ---------------------------------------------------------------- Buchungen
+_PENDING_REINIGUNG = {}   # {"apt": (id, name)} – Workflow-Sprung Buchung → Checkliste
+
+
+def _staff_users():
+    """{username: Anzeigename} aller Mitarbeiter (Putzkräfte + Admins)."""
+    return {u: (info.get("name") or u) for u, info in USERS.items()}
+
+
+def _user_email(username):
+    return (USERS.get(username, {}) or {}).get("email", "")
+
+
+def _fetch_bookings(days_ahead=21, days_back=1):
+    from datetime import timedelta
+    today = date.today()
+    d_from = (today - timedelta(days=days_back)).isoformat()
+    d_to = (today + timedelta(days=days_ahead)).isoformat()
+    try:
+        raw = data._reservations(d_from, d_to)
+    except smoobu.SmoobuError as ex:
+        ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+        return []
+    lo, hi = (today - timedelta(days=days_back)).isoformat(), d_to
+    out = []
+    for b in raw:
+        if not bookings.is_real(b):
+            continue
+        nb = bookings.normalize(b)
+        if nb["departure"] and lo <= nb["departure"] <= hi:
+            out.append(nb)
+    out.sort(key=lambda x: (x["departure"], x["apartment_name"]))
+    return out
+
+
+def render_buchungen(activate):
+    user = _cur_user()
+    admin = _is_admin()
+    with ui.row().classes("w-full items-center gap-3"):
+        ui.icon("calendar_month").classes("text-3xl text-primary")
+        with ui.column().classes("gap-0"):
+            ui.label("Buchungen").classes("text-2xl font-bold text-slate-800 leading-tight")
+            ui.label("Reinigungen zuweisen, tauschen, Checkliste & Zeit erfassen") \
+                .classes("text-sm text-gray-500")
+        ui.space()
+        ui.button(icon="refresh", on_click=lambda: (data.clear_cache(), activate("buchungen"))) \
+            .props("flat round").tooltip("Aktualisieren")
+
+    lst = _fetch_bookings()
+    if not lst:
+        ui.label("Keine anstehenden Abreisen in den nächsten Wochen.") \
+            .classes("text-gray-500 mt-4"); return
+
+    staff = _staff_users()
+    today = date.today().isoformat()
+    cur_date = None
+    for bk in lst:
+        if bk["departure"] != cur_date:
+            cur_date = bk["departure"]
+            heute = " · heute" if cur_date == today else ""
+            ui.label(f"Abreise {cur_date}{heute}") \
+                .classes("text-sm font-semibold text-primary mt-3")
+        _booking_card(bk, user, admin, staff, activate)
+
+
+def _booking_card(bk, user, admin, staff, activate):
+    who = bookings.assignee_of(bk["id"])
+    who_name = staff.get(who, who) if who else None
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-3"):
+        with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+            ui.icon("home").classes("text-primary")
+            ui.label(bk["apartment_name"]).classes("font-semibold")
+            ui.label(f"· {bk['persons']} Pers.").classes("text-sm text-gray-500")
+            ui.label(f"· Check-out {bk['checkout_time'] or '—'}").classes("text-sm text-gray-500")
+            ui.space()
+            if who_name:
+                ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
+            else:
+                ui.chip("nicht zugewiesen", icon="person_off").props("color=grey-4 dense")
+        with ui.row().classes("w-full items-center gap-2 flex-wrap text-sm text-gray-500"):
+            ui.label(f"{bk['guest'] or 'Gast'} · {bk['channel']}")
+            ui.label(f"An {bk['arrival']} → Ab {bk['departure']}")
+        with ui.row().classes("w-full items-center gap-2 flex-wrap mt-1"):
+            ui.button("Öffnen", icon="open_in_full",
+                      on_click=lambda b=bk: open_booking_dialog(b, user, admin, staff, activate)) \
+                .props("unelevated dense no-caps")
+            if who != user:
+                ui.button("Ich übernehme", icon="how_to_reg",
+                          on_click=lambda b=bk: _assign(b, user, user, staff, activate)) \
+                    .props("outline dense no-caps")
+
+
+def _assign(bk, assignee, by, staff, activate, note=""):
+    bookings.set_assignment(bk["id"], assignee, by, note)
+    if assignee != by:   # jemandem anderen zugewiesen → benachrichtigen
+        _notify_assignee(bk, assignee, by, staff)
+    ui.notify(f"{bk['apartment_name']} → {staff.get(assignee, assignee)} zugewiesen ✓",
+              type="positive")
+    activate("buchungen")
+
+
+def _notify_assignee(bk, assignee, by, staff):
+    to = _user_email(assignee)
+    if not to:
+        ui.notify(f"Hinweis: {staff.get(assignee, assignee)} hat keine E-Mail hinterlegt "
+                  "(Benutzerverwaltung).", type="warning", timeout=8000)
+        return
+    body = (f"Hallo {staff.get(assignee, assignee)},\n\n"
+            f"dir wurde eine Reinigung zugewiesen:\n\n"
+            f"Wohnung: {bk['apartment_name']}\n"
+            f"Abreise (Reinigung): {bk['departure']}, Check-out {bk['checkout_time'] or '—'}\n"
+            f"Anreise nächster Gast: {bk['arrival']}\n"
+            f"Personen: {bk['persons']}\n\n"
+            f"Zugewiesen von: {staff.get(by, by)}\n\n"
+            f"Bitte in der LIVARO-App bestätigen: https://app.ds-apartments.de\n")
+    try:
+        mailer.send_notify(CFG, to, f"Neue Reinigung: {bk['apartment_name']} ({bk['departure']})", body)
+        ui.notify(f"{staff.get(assignee, assignee)} per E-Mail benachrichtigt ✓", type="positive")
+    except mailer.MailError as ex:
+        ui.notify(f"E-Mail nicht gesendet: {ex}", type="warning", timeout=9000)
+
+
+def open_booking_dialog(bk, user, admin, staff, activate):
+    who = bookings.assignee_of(bk["id"])
+    with ui.dialog() as dlg, ui.card().classes("w-[560px] max-w-full gap-2"):
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.icon("home").classes("text-primary text-2xl")
+            ui.label(bk["apartment_name"]).classes("text-xl font-bold")
+            ui.space()
+            ui.button(icon="close", on_click=dlg.close).props("flat round dense")
+        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1 text-sm"):
+            ui.label("Anreise").classes("text-gray-500")
+            ui.label(f"{bk['arrival']}  ·  Check-in {bk['checkin_time'] or '—'}")
+            ui.label("Abreise").classes("text-gray-500")
+            ui.label(f"{bk['departure']}  ·  Check-out {bk['checkout_time'] or '—'}")
+            ui.label("Personen").classes("text-gray-500")
+            ui.label(f"{bk['persons']} ({bk['adults']} Erw., {bk['children']} Kinder)")
+            ui.label("Gast").classes("text-gray-500")
+            ui.label(bk["guest"] or "—")
+            ui.label("Kanal").classes("text-gray-500")
+            ui.label(bk["channel"] or "—")
+        if bk["notice"]:
+            with ui.expansion("Notiz / Buchungsdetails", icon="sticky_note_2").classes("w-full"):
+                ui.label(bk["notice"]).classes("text-sm whitespace-pre-wrap")
+
+        ui.separator()
+        # Zuständigkeit
+        with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+            ui.icon("assignment_ind").classes("text-primary")
+            ui.label("Zuständig: " + (staff.get(who, who) if who else "nicht zugewiesen")) \
+                .classes("font-medium")
+        with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+            if who != user:
+                ui.button("Ich übernehme", icon="how_to_reg",
+                          on_click=lambda: (dlg.close(), _assign(bk, user, user, staff, activate))) \
+                    .props("unelevated dense no-caps")
+            # Tauschen / Zuweisen an anderen
+            others = {u: n for u, n in staff.items() if u != who}
+            if others:
+                sel = ui.select(others, label="Tauschen/Zuweisen an") \
+                    .props("dense outlined").classes("min-w-[200px]")
+
+                def do_swap():
+                    if not sel.value:
+                        ui.notify("Bitte Mitarbeiter wählen.", type="warning"); return
+                    dlg.close()
+                    _assign(bk, sel.value, user, staff, activate)
+                ui.button("Übergeben", icon="swap_horiz", on_click=do_swap) \
+                    .props("outline dense no-caps color=primary")
+
+        ui.separator()
+        # Workflow-Aktionen
+        with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+            def to_checkliste():
+                _PENDING_REINIGUNG["apt"] = (bk["apartment_id"], bk["apartment_name"])
+                dlg.close()
+                activate("reinigung")
+            ui.button("Checkliste öffnen", icon="checklist", on_click=to_checkliste) \
+                .props("unelevated dense no-caps")
+            _booking_time_controls(bk, user)
+
+
+def _booking_time_controls(bk, user):
+    """Buchungsgebundener Check-in/-out + gebuchte Zeiten dieser Buchung."""
+    box = ui.column().classes("gap-1")
+
+    def render():
+        box.clear()
+        with box:
+            oe = timetrack.get_open(user)
+            open_here = oe and str(oe.get("booking_id")) == str(bk["id"])
+            if open_here:
+                ui.label(f"⏱ Eingecheckt seit {_t(oe['checkin'])} Uhr") \
+                    .classes("text-sm text-green-700")
+                ui.button("Arbeit beenden", icon="logout", on_click=_do_out) \
+                    .props("outline dense no-caps color=negative")
+            elif oe:
+                ui.label("Läuft bereits ein anderer Check-in.").classes("text-xs text-amber-700")
+            else:
+                ui.button("Arbeitszeit starten", icon="play_arrow", on_click=_do_in) \
+                    .props("outline dense no-caps")
+            done = [e for e in timetrack.entries_for_booking(bk["id"]) if e.get("checkout")]
+            if done:
+                total = sum(timetrack.duration_minutes(e) or 0 for e in done)
+                ui.label(f"Erfasst für diese Buchung: {timetrack.fmt_dur(total)} "
+                         f"({len(done)} Einträge)").classes("text-xs text-gray-500")
+
+    async def _do_in():
+        gps = None
+        try:
+            loc = await get_location()
+            gps = None if loc.get("error") else loc
+        except Exception:
+            pass
+        ort, dist = _match_geofence(gps)
+        if timetrack.check_in(user, gps, None, ort, dist,
+                              booking_id=bk["id"], apartment=bk["apartment_name"]) is None:
+            ui.notify("Du bist bereits eingecheckt (anderer Ort).", type="warning")
+        else:
+            ui.notify("Arbeitszeit gestartet ✓", type="positive")
+        render()
+
+    async def _do_out():
+        gps = None
+        try:
+            loc = await get_location()
+            gps = None if loc.get("error") else loc
+        except Exception:
+            pass
+        ort, dist = _match_geofence(gps)
+        timetrack.check_out(user, gps, None, ort, dist)
+        ui.notify("Arbeit beendet ✓", type="positive")
+        render()
+
+    render()
+
+
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
@@ -1613,7 +1903,11 @@ def main_page():
     def build_reinigung():
         render_reinigung()
 
-    builders = {"beherbergungssteuer": build_beherbergungssteuer,
+    def build_buchungen():
+        render_buchungen(activate)
+
+    builders = {"buchungen": build_buchungen,
+                "beherbergungssteuer": build_beherbergungssteuer,
                 "reinigung": build_reinigung,
                 "zeiterfassung": build_zeiterfassung}
 

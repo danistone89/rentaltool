@@ -116,3 +116,35 @@ def send_plain(cfg, to, subject, body):
     msg.set_content(body)
     send(ec, msg)
     return to
+
+
+def notify_cfg(cfg):
+    """Absender-Konfig für Mitarbeiter-Benachrichtigungen (z. B. Tausch).
+
+    Nutzt cfg.notify_email (eigenes Gmail wie d.steinhauss@gmail.com), fällt sonst
+    auf cfg.email zurück.
+    """
+    nb = cfg.get("notify_email") or {}
+    if (nb.get("absender") or "").strip() and (nb.get("app_password") or "").strip():
+        nb.setdefault("smtp_host", "smtp.gmail.com")
+        nb.setdefault("smtp_port", 587)
+        return nb
+    return cfg.get("email", {})
+
+
+def send_notify(cfg, to, subject, body):
+    """Mitarbeiter-Benachrichtigung über den Benachrichtigungs-Absender senden."""
+    sc = notify_cfg(cfg)
+    to = (to or "").strip()
+    if not to:
+        raise MailError("Kein Empfänger (E-Mail des Mitarbeiters fehlt).")
+    if not (sc.get("absender") and sc.get("app_password")):
+        raise MailError("Kein Benachrichtigungs-Absender konfiguriert "
+                        "(Einstellungen → E-Mail → Benachrichtigungen).")
+    msg = EmailMessage()
+    msg["From"] = (sc.get("absender") or "").strip()
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(body)
+    send(sc, msg)
+    return to

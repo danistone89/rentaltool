@@ -36,3 +36,6 @@ cleanings.json
 damages.json
 restock.json
 media/
+
+# Buchungs-Zuweisungen (betrieblich)
+assignments.json

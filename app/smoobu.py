@@ -70,3 +70,33 @@ def get_reservations(api_key, date_from, date_to, apartment_ids=None):
         ids = set(apartment_ids)
         out = [b for b in out if (b.get("apartment") or {}).get("id") in ids]
     return out
+
+
+def get_reservation(api_key, reservation_id):
+    """Einzelne Buchung mit allen Details."""
+    return _get(f"/reservations/{reservation_id}", api_key)
+
+
+def get_messages(api_key, reservation_id):
+    """Nachrichtenverlauf einer Buchung: [{id, subject, message, type, createdAt}]."""
+    return _get(f"/reservations/{reservation_id}/messages", api_key).get("messages", [])
+
+
+def send_message(api_key, reservation_id, body, subject=""):
+    """Nachricht an den Gast senden (POST). Nur bei ausdrücklicher Aktion aufrufen."""
+    payload = json.dumps({"messageBody": body, "subject": subject,
+                          "internal": False}).encode("utf-8")
+    url = f"{BASE}/reservations/{reservation_id}/messages"
+    req = urllib.request.Request(url, data=payload, method="POST", headers={
+        "Api-Key": api_key, "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise SmoobuError(f"Smoobu HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
+    except urllib.error.URLError as e:
+        raise SmoobuError(f"Smoobu nicht erreichbar: {e}")
