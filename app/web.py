@@ -1238,115 +1238,210 @@ def render_reinigung(activate=None):
         reinigung_putzkraft(activate)
 
 
+_ROOM_ICONS = {"bad": "bathtub", "wc": "wc", "küche": "kitchen", "kueche": "kitchen",
+               "schlafzimmer": "bed", "wohnbereich": "weekend", "wohnzimmer": "weekend",
+               "flur": "door_front", "balkon": "balcony", "allgemein": "home"}
+
+
+def _room_icon(name):
+    key = (name or "").lower()
+    for k, ic in _ROOM_ICONS.items():
+        if k in key:
+            return ic
+    return "checklist"
+
+
 def reinigung_putzkraft(activate=None):
     user = _cur_user()
-    _hk_header("Reinigung", "Checkliste, Fotonachweis, Schäden & Bestand")
     apts = _apts()
-    # Aus einer Buchung vorausgewähltes Apartment (Workflow-Sprung) übernehmen
     pre = _PENDING_REINIGUNG.pop("apt", None)
     ret = _PENDING_REINIGUNG.pop("return", None)
     bkid = _PENDING_REINIGUNG.pop("booking", None)
-    state = {"apt": pre, "return": ret, "booking": bkid}
+    co = _PENDING_REINIGUNG.pop("co", None)
+    ci = _PENDING_REINIGUNG.pop("ci", None)
+    state = {"apt": pre, "return": ret, "booking": bkid, "co": co, "ci": ci,
+             "group": True, "collapsed": set()}
     body = ui.column().classes("w-full gap-4")
 
     def open_apt(aid, anm):
         state["apt"] = (aid, anm); render()
 
-    def _task_row(run, t):
-        st = run["tasks"].get(t["id"], {})
-        with ui.column().classes("w-full gap-2 py-2 border-b border-slate-100"):
-            cb = ui.checkbox(t["text"], value=st.get("done", False)).classes("text-base")
-            cb.on_value_change(lambda e, tid=t["id"]: housekeeping.update_task(run["id"], tid, done=e.value))
-            with ui.row().classes("w-full items-end gap-4 pl-9 flex-wrap"):
+    def _photo_dialog(run, t):
+        with ui.dialog() as dlg, ui.card().classes("w-[380px] max-w-full gap-2"):
+            ui.label(t["text"]).classes("font-bold")
+            with ui.row().classes("gap-3 flex-wrap"):
                 if t.get("ref_photo"):
                     with ui.column().classes("items-center gap-0"):
-                        _photo_thumb(f"/media/{t['ref_photo']}", "w-20 h-20")
+                        _photo_thumb(f"/media/{t['ref_photo']}", "w-24 h-24")
                         ui.label("Soll").classes("text-xs text-gray-400")
                 istc = ui.column().classes("items-center gap-1")
 
-                def refresh_ist(col=istc, tid=t["id"], run_id=run["id"]):
-                    col.clear()
-                    with col:
-                        p = _run_ist(run_id, tid)
+                def draw():
+                    istc.clear()
+                    with istc:
+                        p = _run_ist(run["id"], t["id"])
                         if p:
-                            _photo_thumb(f"/media/{p}", "w-20 h-20")
-                            with ui.row().classes("items-center gap-1"):
-                                ui.icon("check_circle").classes("text-green-600 text-sm")
-                                ui.button("ändern", on_click=lambda c=col, td=tid, r=run_id:
-                                          (housekeeping.update_task(r, td, ist_photo=""),
-                                           refresh_ist(c, td, r))).props("flat dense no-caps size=sm")
+                            _photo_thumb(f"/media/{p}", "w-24 h-24")
+                            ui.button("entfernen", on_click=lambda: (
+                                housekeeping.update_task(run["id"], t["id"], ist_photo=""),
+                                draw(), render())).props("flat dense no-caps size=sm")
                         else:
-                            def saved(rel, c=col, td=tid, r=run_id):
-                                housekeeping.update_task(r, td, ist_photo=rel)
-                                refresh_ist(c, td, r)
+                            def saved(rel):
+                                housekeeping.update_task(run["id"], t["id"], ist_photo=rel)
+                                draw(); render()
                             _photo_button("Ist-Foto", "ist", saved)
                             ui.label("Ist").classes("text-xs text-gray-400")
-                refresh_ist()
+                draw()
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Schließen", on_click=dlg.close).props("flat")
+        dlg.open()
 
-    def _restock_card(aid, anm):
-        with ui.card().classes("w-full"):
-            with ui.expansion("Verbrauch / Wäsche nachbestellen", icon="inventory_2").classes("w-full"):
-                for it in housekeeping.get_inventory(aid):
-                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                        ui.label(it["name"]).classes("flex-grow")
-                        qty = ui.input("Menge", value="1").props("dense outlined").classes("w-24")
+    def _task_row(run, t):
+        done = run["tasks"].get(t["id"], {}).get("done", False)
+        has_photo = bool(_run_ist(run["id"], t["id"]))
+        with ui.row().classes("w-full items-center gap-2 no-wrap py-1"):
+            cb = ui.checkbox(value=done).props("dense")
+            cb.on_value_change(lambda e, tid=t["id"]:
+                               (housekeeping.update_task(run["id"], tid, done=e.value), render()))
+            ui.label(t["text"]).classes(
+                "flex-grow text-sm " + ("line-through text-gray-400" if done else "text-slate-700"))
+            ui.button(icon="photo_camera", on_click=lambda: _photo_dialog(run, t)) \
+                .props("flat round dense").classes("text-green-600" if has_photo else "text-primary") \
+                .tooltip("Foto")
 
-                        def melden(name=it["name"], kat=it["kategorie"], q=qty):
-                            housekeeping.add_restock(aid, anm, name, (q.value or "1").strip(), kat, user)
-                            ui.notify(f"{name} zum Nachkauf gemeldet.", type="positive")
-                        ui.button("melden", icon="add_shopping_cart",
-                                  on_click=melden).props("flat dense no-caps")
+    def _picker():
+        _hk_header("Reinigung", "Checkliste, Fotonachweis, Schäden & Bestand")
+        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2"):
+            due = _due_today()
+            if due:
+                ui.label("Heute fällig (nach Abreise):").classes("font-medium")
+                with ui.row().classes("gap-2 flex-wrap"):
+                    for aid, anm in due:
+                        ui.button(anm, icon="event_available",
+                                  on_click=lambda a=aid, n=anm: open_apt(a, n)) \
+                            .props("unelevated no-caps")
+            ui.label("Apartment wählen:").classes("text-sm text-gray-500 mt-1")
+            with ui.row().classes("items-end gap-2"):
+                sel = ui.select(apts, label="Apartment").props("outlined dense").classes("min-w-[240px]")
+                ui.button("Reinigung starten", icon="play_arrow",
+                          on_click=lambda: (open_apt(sel.value, apts.get(sel.value)) if sel.value
+                                            else ui.notify("Bitte Apartment wählen.", type="warning"))) \
+                    .props("unelevated no-caps")
 
     def render():
         body.clear()
         with body:
             if state["apt"] is None:
-                with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2"):
-                    due = _due_today()
-                    if due:
-                        ui.label("Heute fällig (nach Abreise):").classes("font-medium")
-                        with ui.row().classes("gap-2 flex-wrap"):
-                            for aid, anm in due:
-                                ui.button(anm, icon="event_available",
-                                          on_click=lambda a=aid, n=anm: open_apt(a, n)) \
-                                    .props("unelevated no-caps")
-                    ui.label("Apartment wählen:").classes("text-sm text-gray-500 mt-1")
-                    with ui.row().classes("items-end gap-2"):
-                        s = ui.select(apts, label="Apartment").props("outlined dense").classes("min-w-[240px]")
-                        ui.button("Reinigung starten", icon="play_arrow",
-                                  on_click=lambda: (open_apt(s.value, apts.get(s.value)) if s.value
-                                                    else ui.notify("Bitte Apartment wählen.", type="warning"))) \
-                            .props("unelevated no-caps")
-                return
+                _picker(); return
             aid, anm = state["apt"]
             run = housekeeping.start_run(aid, anm, user)
             cl = housekeeping.get_checklist(aid)
-            with ui.row().classes("w-full items-center gap-2"):
-                ui.button(icon="arrow_back", on_click=lambda: (state.update(apt=None), render())).props("flat round")
-                ui.label(anm).classes("text-xl font-bold")
-                ui.space()
-                ui.button("Schaden melden", icon="report_problem",
-                          on_click=lambda: open_damage_dialog(aid, anm, user)) \
-                    .props("outline no-caps color=negative")
-            for room in cl["rooms"]:
-                with ui.card().classes("w-full"):
-                    ui.label(room["name"]).classes("font-medium")
-                    for t in room["tasks"]:
-                        _task_row(run, t)
-            _restock_card(aid, anm)
+            all_tasks = [t for r in cl["rooms"] for t in r["tasks"]]
+            total = len(all_tasks)
+            done = sum(1 for t in all_tasks if run["tasks"].get(t["id"], {}).get("done"))
 
+            # Kopfzeile: zurück + Titel + Menü
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.button(icon="arrow_back",
+                          on_click=lambda: (state.update(apt=None), render())).props("flat round color=primary")
+                ui.label(anm).classes("text-xl font-bold text-primary")
+                ui.space()
+                with ui.button(icon="more_vert").props("flat round color=primary"):
+                    with ui.menu():
+                        ui.menu_item("Schaden melden", lambda: open_damage_dialog(aid, anm, user))
+                        ui.menu_item("Verbrauch / Wäsche",
+                                     lambda: _restock_dialog({"apartment_id": aid, "apartment_name": anm}, user))
+
+            # Wohnungs-Karte mit Zeiten
+            with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-4 gap-2"):
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.icon("apartment").classes("text-primary text-xl")
+                    ui.label(anm).classes("font-bold text-lg")
+                if state.get("co") or state.get("ci"):
+                    with ui.row().classes("w-full items-center gap-4"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("logout").classes("text-deep-orange")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Check-out").classes("text-xs text-gray-500")
+                                ui.label(state.get("co") or "—").classes("font-semibold")
+                        ui.element("div").classes("w-px h-8 bg-slate-200")
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("login").classes("text-green-700")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Check-in").classes("text-xs text-gray-500")
+                                ui.label(state.get("ci") or "—").classes("font-semibold")
+
+            # Fortschritt
+            with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-4 gap-1"):
+                with ui.row().classes("w-full items-center"):
+                    ui.label("Fortschritt").classes("font-medium")
+                    ui.space()
+                    ui.label(f"{done} / {total} erledigt").classes("font-semibold")
+                ui.linear_progress(value=(done / total if total else 0), show_value=False) \
+                    .props("color=primary rounded track-color=grey-3").classes("w-full")
+
+            # Räume & Aufgaben + Umschalter
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.label("Räume & Aufgaben").classes("font-medium")
+                ui.space()
+                ui.label("Nach Raum gruppieren").classes("text-xs text-gray-500")
+                sw = ui.switch(value=state["group"]).props("dense")
+                sw.on_value_change(lambda e: (state.update(group=e.value), render()))
+
+            if state["group"]:
+                collapsed = state["collapsed"]
+                for room in cl["rooms"]:
+                    rtasks = room["tasks"]
+                    if not rtasks:
+                        continue
+                    rn = room["name"]
+                    rdone = sum(1 for t in rtasks if run["tasks"].get(t["id"], {}).get("done"))
+                    is_open = rn not in collapsed
+                    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 gap-1"):
+                        hdr = ui.row().classes("w-full items-center gap-2 cursor-pointer no-wrap")
+
+                        def _toggle(name=rn):
+                            (collapsed.discard(name) if name in collapsed else collapsed.add(name))
+                            render()
+                        hdr.on("click", _toggle)
+                        with hdr:
+                            with ui.element("div").classes("rounded-full bg-violet-50 p-1 flex"):
+                                ui.icon(_room_icon(rn)).classes("text-primary text-lg")
+                            ui.label(rn).classes("font-medium")
+                            ui.space()
+                            ui.label(f"{rdone} / {len(rtasks)} erledigt").classes("text-xs text-gray-500")
+                            ui.icon("expand_less" if is_open else "expand_more").classes("text-gray-400")
+                        ui.linear_progress(value=(rdone / len(rtasks) if rtasks else 0), show_value=False) \
+                            .props("color=primary rounded track-color=grey-3 size=5px").classes("w-full")
+                        if is_open:
+                            for t in rtasks:
+                                _task_row(run, t)
+                # Alle aus-/einklappen
+                if collapsed:
+                    ui.button("Alle Aufgaben anzeigen", icon="more_horiz",
+                              on_click=lambda: (collapsed.clear(), render())) \
+                        .props("flat no-caps color=primary").classes("w-full")
+                else:
+                    ui.button("Alle einklappen", icon="unfold_less",
+                              on_click=lambda: (state["collapsed"].update(r["name"] for r in cl["rooms"]), render())) \
+                        .props("flat no-caps color=primary").classes("w-full")
+            else:
+                with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3"):
+                    for t in all_tasks:
+                        _task_row(run, t)
+
+            # Abschließen
             def finish():
                 housekeeping.finish_run(run["id"])
                 if state.get("booking"):
                     bookings.mark_checklist_done(state["booking"], user)
-                ui.notify("Durchgang abgeschlossen ✓", type="positive")
-                # Kam man aus einer Buchung: zurück zu Buchungen (dort Arbeitszeit stoppen)
+                ui.notify("Checkliste abgeschlossen ✓", type="positive")
                 if state.get("return") == "buchungen" and activate:
                     activate("buchungen")
                 else:
                     state.update(apt=None); render()
-            ui.button("Durchgang abschließen", icon="check_circle", on_click=finish) \
-                .props("unelevated no-caps")
+            ui.button("Checkliste abschließen", icon="check_circle", on_click=finish) \
+                .props("unelevated no-caps size=lg").classes("w-full mt-2")
     render()
 
 
@@ -1634,10 +1729,12 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
     return jobs
 
 
-def _open_checkliste(apt_id, apt_name, activate, booking_id=None):
+def _open_checkliste(apt_id, apt_name, activate, booking_id=None, checkout=None, checkin=None):
     _PENDING_REINIGUNG["apt"] = (apt_id, apt_name)
     _PENDING_REINIGUNG["return"] = "buchungen"   # nach Abschluss zurück zu Buchungen
     _PENDING_REINIGUNG["booking"] = booking_id
+    _PENDING_REINIGUNG["co"] = checkout
+    _PENDING_REINIGUNG["ci"] = checkin
     activate("reinigung")
 
 
@@ -2177,7 +2274,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                         .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
                     if not complete:
                         ui.button("Weiter zur Checkliste", icon="checklist",
-                                  on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
+                                  on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"], job.get("checkout_time"), (job.get("next") or {}).get("checkin_time"))) \
                             .props("unelevated no-caps size=lg").classes("w-full")
                     else:
                         with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
@@ -2443,7 +2540,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen)),
                color="negative")
         action("Checkliste & Fotos", "checklist",
-               lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"])))
+               lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
         if admin:
             action("Zurücksetzen (Admin)", "restart_alt",
                    lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
