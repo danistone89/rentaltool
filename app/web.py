@@ -882,16 +882,16 @@ def _save_upload(e, kind):
 
 
 def _photo_button(label, kind, on_saved, icon="photo_camera"):
-    """Sauberer Foto-Button: versteckter Uploader + Button, der den Dateidialog
-    (bzw. auf dem Handy die Kamera) öffnet. on_saved(rel) nach dem Hochladen."""
+    """Sauberer Foto-Button auf Basis des ECHTEN Uploaders (nativer Tap öffnet den
+    Datei-/Kameradialog – wichtig für iOS Safari, das Server-getriggerte pickFiles()
+    blockt). Die Quasar-Chrome (Byte/Prozent, Dateiliste) wird per CSS (.hk-upload)
+    ausgeblendet. on_saved(rel) nach dem Hochladen."""
     def handle(e):
         rel = _save_upload(e, kind)
         ui.notify("Foto gespeichert ✓", type="positive")
         on_saved(rel)
-    up = ui.upload(auto_upload=True, on_upload=handle) \
-        .props('accept="image/*"').classes("hidden")
-    ui.button(label, icon=icon, on_click=lambda: up.run_method("pickFiles")) \
-        .props("outline dense no-caps color=primary")
+    ui.upload(auto_upload=True, on_upload=handle, label=label) \
+        .props('accept="image/*"').classes("hk-upload w-[135px]")
 
 
 def _run_ist(run_id, task_id):
@@ -1255,6 +1255,18 @@ def main_page():
     ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
               positive="#16a34a", negative="#dc2626", dark="#2D2D2D")
     ui.query("body").classes("bg-[#F5F2EB]")
+    # Foto-Uploader (.hk-upload) als kompakten Button darstellen: Byte/Prozent-
+    # Anzeige und Dateiliste ausblenden; nativer Tap öffnet Kamera/Galerie (iOS-fest).
+    ui.add_css("""
+    .hk-upload.q-uploader { box-shadow:none; border:1px solid #5E2A84; border-radius:10px;
+        max-height:44px; min-height:44px; overflow:hidden; background:#fff; }
+    .hk-upload .q-uploader__header { background:transparent; color:#5E2A84; min-height:44px; }
+    .hk-upload .q-uploader__header-content { padding:2px 8px; min-height:44px; align-items:center; }
+    .hk-upload .q-uploader__subtitle { display:none !important; }
+    .hk-upload .q-uploader__list { display:none !important; }
+    .hk-upload .q-uploader__spinner { display:none !important; }
+    .hk-upload .q-uploader__title { font-size:.8rem; font-weight:600; line-height:1; white-space:nowrap; }
+    """)
     today = date.today()
     role = _cur_role()
     areas = _role_areas(role)
