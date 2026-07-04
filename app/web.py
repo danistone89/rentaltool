@@ -881,6 +881,19 @@ def _save_upload(e, kind):
     return housekeeping.save_photo(kind, content, ext=ext, mirror_dir=_photo_mirror())
 
 
+def _photo_button(label, kind, on_saved, icon="photo_camera"):
+    """Sauberer Foto-Button: versteckter Uploader + Button, der den Dateidialog
+    (bzw. auf dem Handy die Kamera) öffnet. on_saved(rel) nach dem Hochladen."""
+    def handle(e):
+        rel = _save_upload(e, kind)
+        ui.notify("Foto gespeichert ✓", type="positive")
+        on_saved(rel)
+    up = ui.upload(auto_upload=True, on_upload=handle) \
+        .props('accept="image/*"').classes("hidden")
+    ui.button(label, icon=icon, on_click=lambda: up.run_method("pickFiles")) \
+        .props("outline dense no-caps color=primary")
+
+
 def _run_ist(run_id, task_id):
     for r in housekeeping._read(housekeeping.CLEANINGS, []):
         if r["id"] == run_id:
@@ -914,13 +927,13 @@ def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None):
                         label="Dringlichkeit").props("dense outlined").classes("w-full")
         thumb = ui.row()
 
-        def on_up(e):
-            photo["rel"] = _save_upload(e, "damage")
+        def saved(rel):
+            photo["rel"] = rel
             thumb.clear()
             with thumb:
-                ui.image(f"/media/{photo['rel']}").classes("w-24 h-24 object-cover rounded")
-        ui.upload(auto_upload=True, on_upload=on_up, label="Foto (optional)") \
-            .props('accept="image/*"').classes("w-full")
+                ui.image(f"/media/{rel}").classes("w-24 h-24 object-cover rounded")
+        with ui.row().classes("items-center gap-2"):
+            _photo_button("Foto (optional)", "damage", saved)
 
         def save():
             if not (desc.value or "").strip():
@@ -973,7 +986,7 @@ def reinigung_putzkraft():
                 with ui.column().classes("items-center gap-0"):
                     ui.image(f"/media/{t['ref_photo']}").classes("w-16 h-16 object-cover rounded")
                     ui.label("Soll").classes("text-xs text-gray-400")
-            istc = ui.column().classes("items-center gap-0")
+            istc = ui.column().classes("items-center gap-1")
 
             def refresh_ist(col=istc, tid=t["id"], run_id=run["id"]):
                 col.clear()
@@ -981,17 +994,17 @@ def reinigung_putzkraft():
                     p = _run_ist(run_id, tid)
                     if p:
                         ui.image(f"/media/{p}").classes("w-16 h-16 object-cover rounded")
-                        ui.label("Ist ✓").classes("text-xs text-green-600")
+                        with ui.row().classes("items-center gap-1"):
+                            ui.icon("check_circle").classes("text-green-600 text-sm")
+                            ui.button("ändern", on_click=lambda c=col, td=tid, r=run_id:
+                                      (housekeeping.update_task(r, td, ist_photo=""),
+                                       refresh_ist(c, td, r))).props("flat dense no-caps size=sm")
                     else:
-                        ui.upload(auto_upload=True,
-                                  on_upload=lambda e: (_save_ist(e, run_id, tid), refresh_ist())) \
-                            .props('accept="image/*" flat dense').classes("max-w-[110px]")
-                        ui.label("Ist-Foto").classes("text-xs text-gray-400")
+                        def saved(rel, c=col, td=tid, r=run_id):
+                            housekeeping.update_task(r, td, ist_photo=rel)
+                            refresh_ist(c, td, r)
+                        _photo_button("Ist-Foto", "ist", saved)
             refresh_ist()
-
-    def _save_ist(e, run_id, tid):
-        rel = _save_upload(e, "ist")
-        housekeeping.update_task(run_id, tid, ist_photo=rel)
 
     def _restock_card(aid, anm):
         with ui.card().classes("w-full"):
@@ -1197,9 +1210,13 @@ def _admin_config(apts):
                             task_inputs.append((t, tt))
                             if t.get("ref_photo"):
                                 ui.image(f"/media/{t['ref_photo']}").classes("w-12 h-12 object-cover rounded")
-                            ui.upload(auto_upload=True,
-                                      on_upload=lambda e, tid=t["id"]: (collect(), housekeeping.save_checklist(aid, cl), housekeeping.set_task_ref_photo(aid, tid, _save_upload(e, "ref")), render_cfg())) \
-                                .props('accept="image/*" flat dense').classes("max-w-[120px]").tooltip("Soll-Foto")
+
+                            def ref_saved(rel, tid=t["id"]):
+                                collect()
+                                housekeeping.save_checklist(aid, cl)
+                                housekeeping.set_task_ref_photo(aid, tid, rel)
+                                render_cfg()
+                            _photo_button("Soll-Foto", "ref", ref_saved, icon="add_a_photo")
                             ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                                 .props("flat dense round color=negative")
                     ui.button("Aufgabe hinzufügen", icon="add",

@@ -114,6 +114,24 @@ async def test_putzkraft_sieht_nur_reinigung_und_zeit(user: User, mock_backend,
     await user.should_not_see("Berechnen")   # kein Zugriff auf Beherbergungssteuer
 
 
+async def test_reinigung_putzkraft_picker(user: User, mock_backend, tmp_path, monkeypatch):
+    """Putzkraft-Startansicht (Apartment-Auswahl) rendert ohne Fehler."""
+    from app import housekeeping as hk
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setitem(web.USERS, "putzi", {
+        "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
+        "totp_secret": "", "name": "putzi"})
+    await user.open("/login")
+    user.find("Benutzername").type("putzi")
+    user.find("Passwort").type("putzi")
+    user.find("Anmelden").click()
+    await user.open("/")
+    await user.should_see("Apartment wählen:")
+    await user.should_see("Reinigung starten")
+
+
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
     monkeypatch.setattr(archive, "ARCHIVE_DIR", str(tmp_path))
     monkeypatch.setattr(archive, "LEDGER_PATH", str(tmp_path / "ledger.jsonl"))
