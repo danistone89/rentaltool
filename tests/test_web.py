@@ -65,6 +65,7 @@ async def test_einstellungen_dialog(user: User, mock_backend):
     user.find("Einstellungen").click()
     await user.should_see("Ablage-Ordner")   # Ordner-Ablage
     await user.should_see("Betreiberdaten")
+    await user.should_see("Standorte")        # GPS-Standorte-Tab
 
 
 async def test_reinigung_admin(user: User, mock_backend, tmp_path, monkeypatch):

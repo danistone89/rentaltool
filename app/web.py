@@ -15,6 +15,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nicegui import app, ui  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping  # noqa: E402
@@ -82,17 +83,107 @@ def _d(iso):
     return iso[:10] if iso else ""
 
 
+# ---- Zeiterfassung: Standort + Anzeige-Helfer ------------------------------
+_GEO_JS = (
+    "return await new Promise((res)=>{"
+    "if(!navigator.geolocation){res({error:'nicht unterstützt',code:0});return;}"
+    "navigator.geolocation.getCurrentPosition("
+    "p=>res({lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy}),"
+    "e=>res({error:e.message||'verweigert',code:e.code}),"
+    "{enableHighAccuracy:true,timeout:12000,maximumAge:0});});"
+)
+
+
+async def get_location():
+    try:
+        r = await ui.run_javascript(_GEO_JS, timeout=15.0)
+    except Exception as ex:
+        r = {"error": str(ex)}
+    return r if isinstance(r, dict) else {"error": "unbekannt"}
+
+
+async def get_ip():
+    """Öffentliche IP des Clients (Router) über /api/whoami."""
+    try:
+        r = await ui.run_javascript("return await (await fetch('/api/whoami')).json();",
+                                    timeout=8.0)
+        return (r or {}).get("ip", "") if isinstance(r, dict) else ""
+    except Exception:
+        return ""
+
+
+def _haversine_m(lat1, lon1, lat2, lon2):
+    import math
+    r = 6371000
+    dlat, dlon = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1))
+         * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return int(2 * r * math.asin(math.sqrt(a)))
+
+
+def _match_geofence(loc):
+    """(ort_name, dist_m) wenn innerhalb Radius; sonst (None, nächste_distanz)."""
+    if not loc or loc.get("error"):
+        return None, None
+    best_name, best_dist = None, None
+    inside_name, inside_dist = None, None
+    for o in CFG.get("arbeitsorte", []):
+        if o.get("lat") in (None, "") or o.get("lon") in (None, ""):
+            continue
+        d = _haversine_m(loc["lat"], loc["lon"], float(o["lat"]), float(o["lon"]))
+        if best_dist is None or d < best_dist:
+            best_dist, best_name = d, o.get("name")
+        radius = int(o.get("radius_m", 150) or 150)
+        if d <= radius and (inside_dist is None or d < inside_dist):
+            inside_dist, inside_name = d, o.get("name")
+    if inside_name is not None:
+        return inside_name, inside_dist
+    return None, best_dist
+
+
+def geocode(address):
+    """Adresse -> (lat, lon) via OpenStreetMap Nominatim. None bei Fehler."""
+    import json as _json
+    import urllib.parse
+    import urllib.request
+    url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+        {"q": address, "format": "json", "limit": 1})
+    req = urllib.request.Request(url, headers={"User-Agent": "LIVARO-Suites/1.0 (zeiterfassung)"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = _json.load(r)
+        if res:
+            return float(res[0]["lat"]), float(res[0]["lon"])
+    except Exception:
+        pass
+    return None
+
+
+def _presence(ort, dist, loc, ip):
+    """Kurztext für den Anwesenheits-Nachweis."""
+    if ort:
+        return f"✓ {ort}" + (f" ({dist} m)" if dist is not None else "")
+    if loc and not loc.get("error"):
+        return "⚠️ nicht am Objekt" + (f" (nächstes {dist} m)" if dist else "")
+    if ip:
+        return f"⚠️ kein GPS · IP {ip}"
+    return "⚠️ kein Standort"
+
+
 def _export_csv(rows, show_user):
     import csv
     import io
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow((["Mitarbeiter"] if show_user else []) +
-               ["Datum", "Check-in", "Check-out", "Dauer"])
+               ["Datum", "Check-in", "Ort ein", "Check-out", "Ort aus", "Dauer"])
     for e in rows:
         w.writerow((([e["user"]] if show_user else []) + [
             _d(e["checkin"]), _t(e["checkin"]),
+            _presence(e.get("checkin_ort"), e.get("checkin_dist"), e.get("checkin_loc"), e.get("checkin_ip")),
             _t(e["checkout"]) if e.get("checkout") else "",
+            _presence(e.get("checkout_ort"), e.get("checkout_dist"), e.get("checkout_loc"), e.get("checkout_ip"))
+            if e.get("checkout") else "",
             timetrack.fmt_dur(timetrack.duration_minutes(e))]))
     ui.download.content(buf.getvalue().encode("utf-8-sig"), "arbeitszeiten.csv",
                         media_type="text/csv")
@@ -104,12 +195,17 @@ def _zeit_table(container, rows, show_user, title, export=False):
             if show_user else []) + [
         {"name": "date", "label": "Datum", "field": "date", "align": "left"},
         {"name": "cin", "label": "Check-in", "field": "cin", "align": "left"},
+        {"name": "lin", "label": "Ort ein", "field": "lin", "align": "left"},
         {"name": "cout", "label": "Check-out", "field": "cout", "align": "left"},
+        {"name": "lout", "label": "Ort aus", "field": "lout", "align": "left"},
         {"name": "dur", "label": "Dauer", "field": "dur", "align": "right"},
     ]
     trows = [{
         "id": e["id"], "user": e["user"], "date": _d(e["checkin"]), "cin": _t(e["checkin"]),
+        "lin": _presence(e.get("checkin_ort"), e.get("checkin_dist"), e.get("checkin_loc"), e.get("checkin_ip")),
         "cout": _t(e["checkout"]) if e.get("checkout") else "—",
+        "lout": _presence(e.get("checkout_ort"), e.get("checkout_dist"), e.get("checkout_loc"), e.get("checkout_ip"))
+                if e.get("checkout") else "—",
         "dur": timetrack.fmt_dur(timetrack.duration_minutes(e)),
     } for e in rows]
     with container:
@@ -211,6 +307,14 @@ def _load_apartments():
 async def smoobu_webhook():
     data.clear_cache()
     return {"ok": True}
+
+
+@app.get("/api/whoami")
+def whoami(request: Request):
+    """Öffentliche IP des Aufrufers (hinter nginx via X-Forwarded-For)."""
+    xff = request.headers.get("x-forwarded-for", "")
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "")
+    return {"ip": ip}
 
 
 # ---------------------------------------------------------------- Login
@@ -494,6 +598,7 @@ def open_settings():
             t_betr = ui.tab("Betreiber", icon="person")
             t_pdf = ui.tab("PDF & Steuer", icon="description")
             t_arch = ui.tab("Archiv", icon="cloud_upload")
+            t_orte = ui.tab("Standorte", icon="place")
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
 
@@ -556,6 +661,63 @@ def open_settings():
                         open_folder_picker(start, lambda p: reinigung_ordner.set_value(p))
                     ui.button("Durchsuchen", icon="folder_open",
                               on_click=browse_reinigung).props("outline no-caps")
+
+            with ui.tab_panel(t_orte):
+                ui.label("Objekte für die GPS-Standortprüfung der Zeiterfassung. Adresse "
+                         "eintragen und Lupe antippen (Koordinaten), Radius in Metern "
+                         "(z. B. 150). Check-in außerhalb wird markiert.") \
+                    .classes("text-sm text-gray-500")
+                orte = CFG.setdefault("arbeitsorte", [])
+                orte_box = ui.column().classes("w-full gap-2")
+
+                def render_orte():
+                    orte_box.clear()
+                    with orte_box:
+                        for i, o in enumerate(orte):
+                            with ui.card().classes("w-full p-2 gap-2"):
+                                with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                                    nm = ui.input("Name", value=o.get("name", "")) \
+                                        .props("dense outlined").classes("w-40")
+                                    addr = ui.input("Adresse", value=o.get("address", "")) \
+                                        .props("dense outlined").classes("flex-grow min-w-[200px]")
+                                    lat = ui.number("Breite", value=o.get("lat"), format="%.6f") \
+                                        .props("dense outlined").classes("w-32")
+                                    lon = ui.number("Länge", value=o.get("lon"), format="%.6f") \
+                                        .props("dense outlined").classes("w-32")
+                                    rad = ui.number("Radius m", value=o.get("radius_m", 150),
+                                                    step=10).props("dense outlined").classes("w-24")
+
+                                    def _upd(idx=i, nmf=nm, af=addr, laf=lat, lof=lon, raf=rad):
+                                        orte[idx].update({
+                                            "name": (nmf.value or "").strip(), "address": af.value or "",
+                                            "lat": laf.value, "lon": lof.value,
+                                            "radius_m": int(raf.value or 150)})
+                                        data.save_config()
+                                    for f in (nm, addr, lat, lon, rad):
+                                        f.on("blur", lambda e, fn=_upd: fn())
+
+                                    def _geo(idx=i, af=addr, laf=lat, lof=lon):
+                                        r = geocode(af.value or "")
+                                        if not r:
+                                            ui.notify("Adresse nicht gefunden.", type="negative"); return
+                                        laf.value, lof.value = r
+                                        orte[idx]["lat"], orte[idx]["lon"] = r
+                                        orte[idx]["address"] = af.value or ""
+                                        data.save_config()
+                                        ui.notify(f"Koordinaten: {r[0]:.5f}, {r[1]:.5f}", type="positive")
+                                    ui.button(icon="search", on_click=_geo) \
+                                        .props("flat dense round").tooltip("Koordinaten suchen")
+
+                                    def _del(idx=i):
+                                        orte.pop(idx); data.save_config(); render_orte()
+                                    ui.button(icon="delete", on_click=_del) \
+                                        .props("flat dense round color=negative")
+                render_orte()
+                ui.button("Objekt hinzufügen", icon="add_location",
+                          on_click=lambda: (orte.append({"name": "Neues Objekt", "address": "",
+                                                         "lat": None, "lon": None, "radius_m": 150}),
+                                            data.save_config(), render_orte())) \
+                    .props("outline no-caps mt-1")
 
             with ui.tab_panel(t_smoobu):
                 with ui.grid(columns=2).classes("w-full gap-3"):
@@ -1390,24 +1552,41 @@ def main_page():
 
     def build_zeiterfassung():
         user = _cur_user()
-        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out der Arbeitszeit")
+        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out mit Standort-Nachweis")
         with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
             status_box = ui.column().classes("items-start gap-2")
         own_box = ui.column().classes("w-full")
         admin_box = ui.column().classes("w-full")
 
-        def do_checkin():
-            if timetrack.check_in(user) is None:
+        async def _presence_now():
+            ui.notify("Standort wird geprüft …", type="info", timeout=2000)
+            loc = await get_location()
+            ip = await get_ip()                 # zusätzlich protokolliert
+            gps = None if loc.get("error") else loc
+            ort, dist = _match_geofence(gps)
+            return gps, ip, ort, dist
+
+        async def do_checkin():
+            gps, ip, ort, dist = await _presence_now()
+            if timetrack.check_in(user, gps, ip, ort, dist) is None:
                 ui.notify("Du bist bereits eingecheckt.", type="warning")
+            elif ort:
+                ui.notify(f"Eingecheckt ✓ · {ort} ({dist} m)", type="positive")
+            elif gps:
+                ui.notify(f"Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)",
+                          type="warning", timeout=9000)
             else:
-                ui.notify("Eingecheckt ✓", type="positive")
+                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung am Handy aktivieren.",
+                          type="warning", timeout=10000)
             refresh()
 
-        def do_checkout():
-            if timetrack.check_out(user) is None:
+        async def do_checkout():
+            gps, ip, ort, dist = await _presence_now()
+            if timetrack.check_out(user, gps, ip, ort, dist) is None:
                 ui.notify("Kein offener Check-in.", type="warning")
             else:
-                ui.notify("Ausgecheckt ✓", type="positive")
+                ui.notify(f"Ausgecheckt ✓ · {ort} ({dist} m)" if ort else "Ausgecheckt ✓",
+                          type="positive")
             refresh()
 
         def refresh():
@@ -1417,6 +1596,9 @@ def main_page():
                 if oe:
                     ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
                         .classes("text-lg font-medium text-green-700")
+                    ui.label("Nachweis: " + _presence(oe.get("checkin_ort"),
+                             oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
+                        .classes("text-xs text-gray-500")
                     ui.button("Check-out", icon="logout", on_click=do_checkout) \
                         .props("unelevated size=lg color=negative")
                 else:
