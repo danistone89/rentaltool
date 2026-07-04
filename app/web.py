@@ -912,9 +912,10 @@ def _photo_button(label, kind, on_saved, icon="photo_camera"):
 
 def _open_photo(src):
     """Foto im Vollbild-Dialog anzeigen (Klick/Tap schließt)."""
-    with ui.dialog() as dlg, ui.card().classes("p-1 bg-white max-w-[95vw]"):
-        ui.image(src).classes("max-w-[92vw] max-h-[85vh] object-contain cursor-zoom-out") \
-            .on("click", dlg.close)
+    with ui.dialog() as dlg:
+        with ui.card().classes("p-1 bg-white").style("width:90vw; max-width:820px"):
+            ui.image(src).classes("w-full cursor-zoom-out").style("max-height:82vh") \
+                .props("fit=contain").on("click", dlg.close)
     dlg.open()
 
 
