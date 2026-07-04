@@ -26,7 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping, bookings  # noqa: E402
+from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping, bookings, receipts  # noqa: E402
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -58,12 +58,13 @@ ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
 AREAS = [
     {"key": "buchungen", "label": "Buchungen", "icon": "calendar_month"},
     {"key": "reinigung", "label": "Reinigung", "icon": "cleaning_services"},
+    {"key": "belege", "label": "Belege", "icon": "receipt"},
     {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
 ]
 ROLE_AREAS = {
     "admin": {a["key"] for a in AREAS},          # Admin sieht alles
-    "putzkraft": {"buchungen", "reinigung", "zeiterfassung"},  # Putzkräfte
+    "putzkraft": {"buchungen", "reinigung", "belege", "zeiterfassung"},  # Putzkräfte
 }
 
 
@@ -687,6 +688,22 @@ def open_settings():
                     ui.button("Durchsuchen", icon="folder_open",
                               on_click=browse_reinigung).props("outline no-caps")
 
+                ui.label("Belege/Rechnungen werden zusätzlich in diesen Ordner gespiegelt.") \
+                    .classes("text-sm text-gray-500 mt-2")
+                with ui.row().classes("w-full items-end gap-2 mt-1"):
+                    belege_ordner = ui.input("Beleg-Ordner",
+                                             value=CFG.get("belege_ordner", "")) \
+                        .props("outlined dense").classes("flex-grow") \
+                        .tooltip("Ordner (z. B. Nextcloud-Mount), in den hochgeladene Belege "
+                                 "kopiert werden. Leer = nur lokal in media/.")
+
+                    def browse_belege():
+                        detected = data.detect_cloud_folders()
+                        start = belege_ordner.value or (detected[0] if detected else "")
+                        open_folder_picker(start, lambda p: belege_ordner.set_value(p))
+                    ui.button("Durchsuchen", icon="folder_open",
+                              on_click=browse_belege).props("outline no-caps")
+
             with ui.tab_panel(t_orte):
                 ui.label("Objekte für die GPS-Standortprüfung der Zeiterfassung. Adresse "
                          "eintragen und Lupe antippen (Koordinaten), Radius in Metern "
@@ -819,6 +836,7 @@ def open_settings():
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
             CFG["archiv_spiegel"] = spiegel.value or ""
             CFG["reinigung_ordner"] = reinigung_ordner.value or ""
+            CFG["belege_ordner"] = belege_ordner.value or ""
             CFG["archiv_webdav"] = {}   # Ablage über Ordner, nicht Nextcloud/WebDAV
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()
@@ -2153,6 +2171,121 @@ def _booking_time_controls(bk, user):
     render()
 
 
+# ---------------------------------------------------------------- Belege
+def _beleg_mirror():
+    return CFG.get("belege_ordner") or None
+
+
+def render_belege():
+    user = _cur_user()
+    admin = _is_admin()
+    with ui.row().classes("w-full items-center gap-3"):
+        ui.icon("receipt").classes("text-3xl text-primary")
+        with ui.column().classes("gap-0"):
+            ui.label("Belege").classes("text-2xl font-bold text-slate-800 leading-tight")
+            ui.label("Rechnungen scannen, ablegen & per OCR auslesen") \
+                .classes("text-sm text-gray-500")
+
+    box = ui.column().classes("w-full gap-3")
+
+    def render():
+        box.clear()
+        with box:
+            # Upload-Karte
+            with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4"):
+                ui.label("Neuen Beleg hochladen").classes("font-medium")
+                ui.label("Rechnung fotografieren (Kamera) oder aus der Galerie wählen. "
+                         "Der Text wird automatisch per OCR erkannt.") \
+                    .classes("text-xs text-gray-500")
+
+                async def handle(e):
+                    try:
+                        content, name = await _read_upload(e)
+                    except Exception as ex:
+                        ui.notify(f"Upload fehlgeschlagen: {ex}", type="negative"); return
+                    ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
+                    rel = housekeeping.save_photo("beleg", content, ext=ext,
+                                                  mirror_dir=_beleg_mirror())
+                    ui.notify("Beleg gespeichert – Text wird erkannt …", type="info", timeout=3000)
+                    from nicegui import run
+                    try:
+                        text = await run.io_bound(receipts.ocr_image,
+                                                  os.path.join(housekeeping.MEDIA_DIR, rel))
+                    except Exception:
+                        text = ""
+                    receipts.add_receipt(user, rel, ocr_text=text,
+                                         amount=receipts.guess_amount(text),
+                                         merchant=receipts.guess_merchant(text))
+                    ui.notify("Beleg erfasst ✓", type="positive")
+                    render()
+                ui.upload(auto_upload=True, on_upload=handle, label="Beleg wählen") \
+                    .props('accept="image/*"').classes("hk-upload w-full max-w-[260px]")
+                if not receipts.ocr_available():
+                    ui.label("Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
+                             "Belege werden gespeichert, aber nicht automatisch ausgelesen.") \
+                        .classes("text-xs text-amber-700")
+
+            items = receipts.list_receipts()
+            if not items:
+                ui.label("Noch keine Belege abgelegt.").classes("text-gray-500 mt-2")
+                return
+            cur_month = None
+            for r in items:
+                month = r["ts"][:7]
+                if month != cur_month:
+                    cur_month = month
+                    ym = f"{_MONATE[int(month[5:7]) - 1]} {month[:4]}"
+                    ui.label(ym).classes("text-sm font-semibold text-primary mt-3")
+                _beleg_card(r, user, admin, render)
+    render()
+
+
+_MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+           "August", "September", "Oktober", "November", "Dezember"]
+
+
+def _beleg_card(r, user, admin, rerender):
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
+        with ui.row().classes("w-full items-start gap-3 no-wrap"):
+            if r.get("photo"):
+                _photo_thumb(f"/media/{r['photo']}", "w-20 h-20")
+            with ui.column().classes("gap-1 min-w-0 flex-grow"):
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    merch = ui.input(placeholder="Händler", value=r.get("merchant", "")) \
+                        .props("dense borderless").classes("font-semibold flex-grow min-w-0")
+                    merch.on("blur", lambda e, i=r["id"], f=merch:
+                             receipts.update_receipt(i, merchant=f.value or ""))
+                    amount = ui.input(placeholder="€", value=r.get("amount", "")) \
+                        .props("dense borderless").classes("w-20 text-right")
+                    amount.on("blur", lambda e, i=r["id"], f=amount:
+                              receipts.update_receipt(i, amount=f.value or ""))
+                    ui.label("€").classes("text-sm text-gray-400")
+                ui.label(f"{_d(r['ts'])} · {r.get('uploader', '')}").classes("text-xs text-gray-400")
+                note = ui.input(placeholder="Notiz (z. B. Wofür / welche Wohnung)",
+                                value=r.get("note", "")).props("dense borderless").classes("w-full")
+                note.on("blur", lambda e, i=r["id"], f=note:
+                        receipts.update_receipt(i, note=f.value or ""))
+            if admin:
+                ui.button(icon="delete", on_click=lambda i=r["id"]: _del_beleg(i, rerender)) \
+                    .props("flat round dense color=negative").tooltip("Beleg löschen")
+        if r.get("ocr_text"):
+            with ui.expansion("Erkannter Text (OCR)", icon="document_scanner").classes("w-full"):
+                ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-gray-600")
+
+
+def _del_beleg(receipt_id, rerender):
+    with ui.dialog() as dlg, ui.card().classes("gap-2"):
+        ui.label("Beleg wirklich löschen?").classes("font-medium")
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Löschen", on_click=lambda: (receipts.delete_receipt(receipt_id),
+                                                   dlg.close(),
+                                                   ui.notify("Beleg gelöscht.", type="warning"),
+                                                   rerender())) \
+                .props("unelevated color=negative")
+    dlg.open()
+
+
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
@@ -2324,9 +2457,13 @@ def main_page():
     def build_buchungen():
         render_buchungen(activate)
 
+    def build_belege():
+        render_belege()
+
     builders = {"buchungen": build_buchungen,
                 "beherbergungssteuer": build_beherbergungssteuer,
                 "reinigung": build_reinigung,
+                "belege": build_belege,
                 "zeiterfassung": build_zeiterfassung}
 
     _BASE_NAV = "items-center gap-2 mx-2 px-2 py-2 rounded-lg no-wrap cursor-pointer "

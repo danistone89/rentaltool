@@ -39,3 +39,6 @@ media/
 
 # Buchungs-Zuweisungen (betrieblich)
 assignments.json
+
+# Belege/Rechnungen (betrieblich/personenbezogen)
+receipts.json

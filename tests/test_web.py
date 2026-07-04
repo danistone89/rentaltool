@@ -71,6 +71,15 @@ async def test_einstellungen_dialog(user: User, mock_backend):
     await user.should_see("Standorte")        # GPS-Standorte-Tab
 
 
+async def test_belege_bereich(user: User, mock_backend, tmp_path, monkeypatch):
+    from app import receipts, housekeeping as hk
+    monkeypatch.setattr(receipts, "RECEIPTS", str(tmp_path / "receipts.json"))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    await _login(user)
+    user.find(marker="nav-belege").click()
+    await user.should_see("Neuen Beleg hochladen")
+
+
 async def test_reinigung_admin(user: User, mock_backend, tmp_path, monkeypatch):
     from app import housekeeping as hk
     for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
