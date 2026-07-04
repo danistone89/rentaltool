@@ -2032,6 +2032,50 @@ def _checklist_progress(job, user):
     return 0, total
 
 
+def _step_button(label, icon, cb):
+    """Listen-Zeile als Button (Icon · Label · Chevron)."""
+    b = ui.button(on_click=cb).props("flat no-caps align=left").classes("w-full")
+    with b:
+        with ui.row().classes("w-full items-center gap-3 no-wrap"):
+            ui.icon(icon).classes("text-primary")
+            ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
+            ui.icon("chevron_right").classes("text-gray-300")
+
+
+def _note_dialog(job):
+    rec = bookings.get_record(job["id"])
+    with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
+        ui.label(f"Notiz – {job['apartment_name']}").classes("text-lg font-bold")
+        ta = ui.textarea("Notiz", value=rec.get("note", "")).props("outlined autogrow").classes("w-full")
+
+        def save():
+            bookings.set_field(job["id"], note=(ta.value or "").strip())
+            ui.notify("Notiz gespeichert ✓", type="positive"); dlg.close()
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Speichern", icon="save", on_click=save).props("unelevated")
+    dlg.open()
+
+
+def _restock_dialog(job, user):
+    with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
+        ui.label(f"Verbrauch / Wäsche – {job['apartment_name']}").classes("text-lg font-bold")
+        ui.label("Was muss nachgekauft werden?").classes("text-sm text-gray-500")
+        for it in housekeeping.get_inventory(job["apartment_id"]):
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.label(it["name"]).classes("flex-grow")
+                qty = ui.input("Menge", value="1").props("dense outlined").classes("w-20")
+
+                def melden(name=it["name"], kat=it["kategorie"], q=qty):
+                    housekeeping.add_restock(job["apartment_id"], job["apartment_name"],
+                                             name, (q.value or "1").strip(), kat, user)
+                    ui.notify(f"{name} gemeldet ✓", type="positive")
+                ui.button("melden", icon="add_shopping_cart", on_click=melden).props("flat dense no-caps")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Schließen", on_click=dlg.close).props("flat")
+    dlg.open()
+
+
 def _cleaning_card(job, user, admin, staff, activate):
     """Voll-Karte gemäß Entwurf: Status, Zeiten, Gast, Vorbereiten-für, Live-Timer +
     Checklisten-Fortschritt (wenn Arbeit läuft), sonst Arbeitszeit starten."""
@@ -2102,28 +2146,45 @@ def _cleaning_card(job, user, admin, staff, activate):
         # Primärbereich je Zustand
         if open_here:
             checkin_dt = datetime.fromisoformat(oe["checkin"])
+            dprog, tprog = _checklist_progress(job, user)
+            complete = bool(tprog) and dprog >= tprog
             with ui.card().classes("w-full bg-violet-50 rounded-xl p-3 gap-1 shadow-none"):
                 with ui.row().classes("w-full items-center"):
                     ui.label("Arbeitszeit läuft").classes("text-xs text-gray-500")
                     ui.space()
-                    ui.button("Beenden", icon="stop_circle", on_click=_do_out) \
-                        .props("outline dense no-caps color=negative")
+                    if not complete:
+                        ui.button("Beenden", icon="stop_circle", on_click=_do_out) \
+                            .props("outline dense no-caps color=negative")
                 tl = ui.label("0:00:00").classes("text-3xl font-bold text-primary")
 
                 def tick(cd=checkin_dt, lbl=tl):
                     lbl.text = str(datetime.now().replace(microsecond=0) - cd.replace(microsecond=0))
                 tick()
                 ui.timer(1.0, tick)
-            dprog, tprog = _checklist_progress(job, user)
             with ui.row().classes("w-full items-center"):
                 ui.label("Checkliste").classes("font-medium text-sm")
                 ui.space()
                 ui.label(f"{dprog}/{tprog} erledigt").classes("text-xs text-gray-500")
             ui.linear_progress(value=(dprog / tprog if tprog else 0), show_value=False) \
-                .props("color=primary rounded track-color=grey-3").classes("w-full")
-            ui.button("Weiter zur Checkliste", icon="checklist",
-                      on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
-                .props("unelevated no-caps size=lg").classes("w-full")
+                .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
+            if not complete:
+                ui.button("Weiter zur Checkliste", icon="checklist",
+                          on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
+                    .props("unelevated no-caps size=lg").classes("w-full")
+            else:
+                with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
+                    ui.icon("check_circle").classes("text-base")
+                    ui.label("Alle Aufgaben abgeschlossen")
+                ui.label("Nächste Schritte").classes("text-xs font-semibold text-gray-400 mt-1")
+                with ui.column().classes("w-full gap-1"):
+                    _step_button("Fotos & Schäden prüfen", "photo_camera",
+                                 lambda: open_damage_dialog(job["apartment_id"], job["apartment_name"], user))
+                    _step_button("Notiz hinzufügen", "sticky_note_2",
+                                 lambda: _note_dialog(job))
+                    _step_button("Verbrauch / Wäsche", "inventory_2",
+                                 lambda: _restock_dialog(job, user))
+                ui.button("Arbeitszeit beenden", icon="stop_circle", on_click=_do_out) \
+                    .props("unelevated no-caps size=lg color=negative").classes("w-full mt-1")
         elif status == "abgeschlossen":
             dprog, tprog = _checklist_progress(job, user)
             with ui.row().classes("w-full items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2"):
@@ -2314,7 +2375,13 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                     ui.label("Telefon").classes("text-gray-500")
                     ui.label(bk.get("phone") or "—")
             with ui.tab_panel(t_n):
-                ui.label(bk["notice"] or "keine Notizen").classes("text-sm whitespace-pre-wrap")
+                intern = bookings.get_record(bk["id"]).get("note", "")
+                if intern:
+                    ui.label("Interne Notiz").classes("text-xs text-gray-500")
+                    ui.label(intern).classes("text-sm whitespace-pre-wrap")
+                    ui.separator().classes("my-1")
+                ui.label("Buchungsdetails (Smoobu)").classes("text-xs text-gray-500")
+                ui.label(bk["notice"] or "—").classes("text-sm whitespace-pre-wrap")
 
         ui.separator()
         ui.label("Aktionen").classes("text-xs font-semibold text-gray-400 px-3 pt-1")
@@ -2333,6 +2400,10 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                lambda: (dlg.close(), _open_swap(bk, user, staff, activate)))
         action("Zeit nachtragen", "more_time",
                lambda: (dlg.close(), _add_time_dialog(bk, user, activate)))
+        action("Notiz hinzufügen", "sticky_note_2",
+               lambda: (dlg.close(), _note_dialog(bk)))
+        action("Verbrauch / Wäsche", "inventory_2",
+               lambda: (dlg.close(), _restock_dialog(bk, user)))
         action("Schaden melden", "report_problem",
                lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user)),
                color="negative")
