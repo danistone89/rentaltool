@@ -874,11 +874,22 @@ def _due_today():
     return list(out.items())
 
 
-def _save_upload(e, kind):
-    content = e.content.read()
-    name = e.name or "foto.jpg"
+async def _read_upload(e):
+    """Upload-Bytes + Dateiname lesen – kompatibel zu NiceGUI 3.14 (e.file, async
+    read()) und der älteren API (e.content.read(), e.name)."""
+    f = getattr(e, "file", None)
+    if f is not None:                       # NiceGUI 3.14+
+        data = await f.read()
+        name = getattr(f, "name", None) or "foto.jpg"
+    else:                                   # NiceGUI 3.6.x
+        data = e.content.read()
+        name = getattr(e, "name", None) or "foto.jpg"
+    return data, name
+
+
+def _save_bytes(data, name, kind):
     ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
-    return housekeeping.save_photo(kind, content, ext=ext, mirror_dir=_photo_mirror())
+    return housekeeping.save_photo(kind, data, ext=ext, mirror_dir=_photo_mirror())
 
 
 def _photo_button(label, kind, on_saved, icon="photo_camera"):
@@ -886,8 +897,13 @@ def _photo_button(label, kind, on_saved, icon="photo_camera"):
     Datei-/Kameradialog – wichtig für iOS Safari, das Server-getriggerte pickFiles()
     blockt). Die Quasar-Chrome (Byte/Prozent, Dateiliste) wird per CSS (.hk-upload)
     ausgeblendet. on_saved(rel) nach dem Hochladen."""
-    def handle(e):
-        rel = _save_upload(e, kind)
+    async def handle(e):
+        try:
+            data, name = await _read_upload(e)
+            rel = _save_bytes(data, name, kind)
+        except Exception as ex:
+            ui.notify(f"Foto konnte nicht gespeichert werden: {ex}", type="negative")
+            return
         ui.notify("Foto gespeichert ✓", type="positive")
         on_saved(rel)
     ui.upload(auto_upload=True, on_upload=handle, label=label) \
