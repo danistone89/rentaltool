@@ -1540,12 +1540,8 @@ def _persons_text(nb):
     return " · ".join(parts) or f"{nb.get('persons', 0)} Pers."
 
 
-def _fetch_events(days_ahead=21, days_back=1):
-    """An- und Abreise-Ereignisse aus Smoobu im Zeitfenster, chronologisch sortiert."""
-    from datetime import timedelta
-    today = date.today()
-    d_from = (today - timedelta(days=days_back)).isoformat()
-    d_to = (today + timedelta(days=days_ahead)).isoformat()
+def _events_between(d_from, d_to):
+    """An-/Abreise-Ereignisse mit Datum in [d_from, d_to] (unsortiert)."""
     try:
         raw = data._reservations(d_from, d_to)
     except smoobu.SmoobuError as ex:
@@ -1565,6 +1561,15 @@ def _fetch_events(days_ahead=21, days_back=1):
             evs.append({**nb, "kind": "in", "date": nb["arrival"], "time": nb["checkin_time"]})
         if nb["departure"] and d_from <= nb["departure"] <= d_to:
             evs.append({**nb, "kind": "out", "date": nb["departure"], "time": nb["checkout_time"]})
+    return evs
+
+
+def _fetch_events(days_ahead=21, days_back=1):
+    """An- und Abreise-Ereignisse aus Smoobu im Zeitfenster, chronologisch sortiert."""
+    from datetime import timedelta
+    today = date.today()
+    evs = _events_between((today - timedelta(days=days_back)).isoformat(),
+                          (today + timedelta(days=days_ahead)).isoformat())
     evs.sort(key=lambda e: (e["date"], e["time"] or "99:99", e["apartment_name"]))
     return evs
 
@@ -1629,24 +1634,92 @@ def render_buchungen(activate):
             _render_calendar(user, admin, staff, activate)
 
 
+_MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+           "August", "September", "Oktober", "November", "Dezember"]
+
+
 def _render_calendar(user, admin, staff, activate):
-    with ui.row().classes("items-center gap-2 mt-1 flex-wrap"):
-        ui.chip("Anreise", icon="login").props("color=green text-color=white dense")
-        ui.chip("Abreise · Reinigung", icon="logout").props("color=deep-orange text-color=white dense")
-    evs = _fetch_events()
-    if not evs:
-        ui.label("Keine An-/Abreisen in den nächsten Wochen.").classes("text-gray-500 mt-4")
-        return
-    today = date.today().isoformat()
-    cur_date = None
-    for ev in evs:
-        if ev["date"] != cur_date:
-            cur_date = ev["date"]
-            d = date.fromisoformat(cur_date)
-            heute = " · heute" if cur_date == today else ""
-            ui.label(f"{_WD[d.weekday()]} {d.strftime('%d.%m.%Y')}{heute}") \
-                .classes("text-sm font-semibold text-primary mt-3")
-        _event_card(ev, user, admin, staff, activate)
+    today = date.today()
+    state = {"y": today.year, "m": today.month}
+    box = ui.column().classes("w-full gap-2")
+
+    def render():
+        box.clear()
+        with box:
+            _month_grid(state, user, admin, staff, activate, render)
+    render()
+
+
+def _shift_month(state, delta, rerender):
+    m, y = state["m"] + delta, state["y"]
+    while m < 1:
+        m += 12; y -= 1
+    while m > 12:
+        m -= 12; y += 1
+    state["y"], state["m"] = y, m
+    rerender()
+
+
+def _month_grid(state, user, admin, staff, activate, rerender):
+    import calendar as _cal
+    from datetime import timedelta
+    y, m = state["y"], state["m"]
+    first = date(y, m, 1)
+    start = first - timedelta(days=first.weekday())          # Montag der ersten Woche
+    last = date(y, m, _cal.monthrange(y, m)[1])
+    weeks = ((last - start).days) // 7 + 1
+    days = [start + timedelta(days=i) for i in range(weeks * 7)]
+    evmap = {}
+    for ev in _events_between(days[0].isoformat(), days[-1].isoformat()):
+        evmap.setdefault(ev["date"], []).append(ev)
+
+    # Kopf: Monat + Navigation
+    with ui.row().classes("w-full items-center gap-1"):
+        ui.button(icon="chevron_left", on_click=lambda: _shift_month(state, -1, rerender)) \
+            .props("flat round dense")
+        ui.label(f"{_MONTHS[m - 1]} {y}").classes("text-lg font-semibold min-w-[150px] text-center")
+        ui.button(icon="chevron_right", on_click=lambda: _shift_month(state, 1, rerender)) \
+            .props("flat round dense")
+        ui.space()
+        ui.button("Heute", icon="today",
+                  on_click=lambda: (state.update(y=date.today().year, m=date.today().month), rerender())) \
+            .props("flat dense no-caps")
+    with ui.row().classes("items-center gap-3 flex-wrap text-xs text-gray-500"):
+        with ui.row().classes("items-center gap-1"):
+            ui.element("div").classes("w-3 h-3 rounded-full bg-green-600")
+            ui.label("Anreise")
+        with ui.row().classes("items-center gap-1"):
+            ui.element("div").classes("w-3 h-3 rounded-full bg-orange-500")
+            ui.label("Abreise (Reinigung)")
+
+    # Wochentags-Kopf
+    with ui.grid(columns=7).classes("w-full gap-1"):
+        for wd in _WD:
+            ui.label(wd).classes("text-xs font-medium text-gray-400 text-center")
+    # Tageszellen
+    with ui.grid(columns=7).classes("w-full gap-1"):
+        for d in days:
+            _day_cell(d, m, evmap.get(d.isoformat(), []), user, admin, staff, activate)
+
+
+def _day_cell(d, month, evs, user, admin, staff, activate):
+    today = date.today()
+    other = d.month != month
+    is_today = (d == today)
+    cls = "min-h-[68px] p-1 rounded-lg border gap-1 "
+    cls += "border-primary bg-violet-50 " if is_today else "border-slate-100 "
+    if other:
+        cls += "opacity-40 "
+    with ui.column().classes(cls):
+        ui.label(str(d.day)).classes(
+            "text-xs leading-none " + ("font-bold text-primary" if is_today else "text-gray-500"))
+        for ev in sorted(evs, key=lambda e: (e["time"] or "", e["kind"])):
+            is_out = ev["kind"] == "out"
+            short = ev["apartment_name"].split()[0]
+            pill = ui.label(f"{'▼' if is_out else '▲'} {short}").classes(
+                "w-full truncate text-[10px] leading-tight rounded px-1 py-[1px] cursor-pointer "
+                "text-white " + ("bg-orange-500" if is_out else "bg-green-600"))
+            pill.on("click", lambda _e, e=ev: open_booking_dialog(e, user, admin, staff, activate))
 
 
 def _render_cleaning(user, admin, staff, activate):

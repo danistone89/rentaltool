@@ -153,10 +153,12 @@ async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     # Detail-Dialog muss sich beim Klick wirklich ÖFFNEN (value=True),
     # nicht nur im Elementbaum existieren.
     from nicegui import ui as _ui
-    user.find("Öffnen").click()
+    user.find("Details").click()
     await user.should_see("Zuständig")
     assert any(getattr(d, "value", False) for d in user.find(_ui.dialog).elements), \
         "Buchungs-Detail-Dialog wurde nicht geöffnet (dlg.open() fehlt?)"
+    # Kalender-Tab rendert Monatsraster (aktueller Monatsname vorhanden)
+    await user.should_see(web._MONTHS[date.today().month - 1])
 
 
 async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
