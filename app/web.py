@@ -1780,7 +1780,7 @@ def _timeline(state, user, admin, staff, activate, rerender):
 
 
 def _single_month(state, user, admin, staff, activate, rerender):
-    """Monatskalender für EINE Wohnung; Buchungen als Balken über die Tageszellen."""
+    """Monatskalender EINER Wohnung; Buchungen als durchgehende Balken pro Woche."""
     import calendar as _cal
     from datetime import timedelta
     aid = state["apt"]
@@ -1794,8 +1794,8 @@ def _single_month(state, user, admin, staff, activate, rerender):
     start = first - timedelta(days=first.weekday())
     last = date(y, m, _cal.monthrange(y, m)[1])
     weeks = ((last - start).days) // 7 + 1
-    days = [start + timedelta(days=i) for i in range(weeks * 7)]
-    gs, ge = days[0].isoformat(), days[-1].isoformat()
+    gs = start.isoformat()
+    ge = (start + timedelta(days=weeks * 7 - 1)).isoformat()
     try:
         raw = data._reservations(gs, ge)
     except smoobu.SmoobuError as ex:
@@ -1803,24 +1803,9 @@ def _single_month(state, user, admin, staff, activate, rerender):
         raw = []
     bks = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
     bks = [b for b in bks if b["apartment_id"] == aid and b["arrival"] and b["departure"]]
-    bks.sort(key=lambda b: (b["arrival"], b["id"]))
-    lane_end, lane_of = [], {}
-    for b in bks:
-        placed = False
-        for i, end in enumerate(lane_end):
-            if b["arrival"] > end:
-                lane_end[i] = b["departure"]; lane_of[b["id"]] = i; placed = True; break
-        if not placed:
-            lane_end.append(b["departure"]); lane_of[b["id"]] = len(lane_end) - 1
-    nlanes = max(len(lane_end), 1)
-    day_lane = {}
-    for b in bks:
-        di = date.fromisoformat(max(b["arrival"], gs))
-        dz = date.fromisoformat(min(b["departure"], ge))
-        while di <= dz:
-            day_lane.setdefault(di.isoformat(), {})[lane_of[b["id"]]] = b
-            di += timedelta(days=1)
+    bks.sort(key=lambda b: b["arrival"])
 
+    # Kopf: Navigation
     with ui.row().classes("w-full items-center gap-1"):
         ui.button(icon="chevron_left", on_click=lambda: _shift_month(state, -1, rerender)) \
             .props("flat round dense")
@@ -1832,47 +1817,53 @@ def _single_month(state, user, admin, staff, activate, rerender):
         ui.button("Heute", icon="today",
                   on_click=lambda: (state.update(y=date.today().year, m=date.today().month), rerender())) \
             .props("flat dense no-caps")
-    with ui.grid(columns=7).classes("w-full gap-[2px]"):
+    # Wochentags-Kopf
+    with ui.row().classes("no-wrap w-full gap-0"):
         for wd in _WD:
-            ui.label(wd).classes("text-xs font-medium text-gray-400 text-center")
-    with ui.grid(columns=7).classes("w-full gap-[2px]"):
-        for d in days:
-            _single_day_cell(d, m, day_lane.get(d.isoformat(), {}), nlanes, gs, ge,
-                             hexc, user, admin, staff, activate)
+            ui.label(wd).classes("text-xs font-medium text-gray-400 text-center").style("width:14.2857%")
 
-
-def _single_day_cell(d, month, lanes_map, nlanes, gs, ge, hexc, user, admin, staff, activate):
     today = date.today()
-    other = d.month != month
-    is_today = (d == today)
-    cls = "min-h-[66px] pt-1 pb-1 rounded-lg border gap-[2px] overflow-hidden "
-    cls += "border-primary bg-violet-50 " if is_today else "border-slate-100 "
-    if other:
-        cls += "opacity-40 "
-    iso = d.isoformat()
-    with ui.column().classes(cls):
-        ui.label(str(d.day)).classes(
-            "text-xs leading-none px-1 " + ("font-bold text-primary" if is_today else "text-gray-500"))
-        for i in range(nlanes):
-            b = lanes_map.get(i)
-            if not b:
-                ui.element("div").classes("h-[18px]")
-                continue
-            true_start = b["arrival"] == iso
-            true_end = b["departure"] == iso
-            if true_start and true_end:
-                rnd, mx = "rounded", "mx-1"
-            elif true_start:
-                rnd, mx = "rounded-l", "ml-1"
-            elif true_end:
-                rnd, mx = "rounded-r", "mr-1"
-            else:
-                rnd, mx = "", ""
-            label = (b["guest"] or b["apartment_name"]) if (true_start or iso == gs or d.weekday() == 0) else ""
-            seg = ui.label(label).classes(
-                f"h-[18px] text-[10px] leading-[18px] text-white truncate cursor-pointer px-1 {rnd} {mx}") \
-                .style(f"background:{hexc}")
-            seg.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
+    colpct = 100 / 7
+    for w in range(weeks):
+        ws = start + timedelta(days=w * 7)
+        we = ws + timedelta(days=6)
+        with ui.element("div").classes("relative w-full").style("min-height:78px"):
+            # Hintergrund: 7 Tageszellen
+            with ui.row().classes("no-wrap w-full gap-0"):
+                for i in range(7):
+                    d = ws + timedelta(days=i)
+                    other = d.month != m
+                    is_today = (d == today)
+                    cc = "border border-slate-100 " + ("bg-violet-50 " if is_today else "")
+                    with ui.element("div").classes(cc).style("width:14.2857%; min-height:78px"):
+                        ui.label(str(d.day)).classes(
+                            "text-xs px-1 pt-1 " + ("font-bold text-primary" if is_today
+                            else ("text-gray-300" if other else "text-gray-500")))
+            # Balken (durchgehend über die Woche)
+            for b in bks:
+                a = date.fromisoformat(b["arrival"])
+                dep = date.fromisoformat(b["departure"])
+                sc = max((a - ws).days, 0)
+                ec = min((dep - ws).days, 7)        # exklusiv (deckt Nächte ab)
+                if ec <= 0 or sc >= 7 or ec <= sc:
+                    continue
+                round_l = a >= ws                    # echter Anreisetag in dieser Woche
+                round_r = dep <= we                  # echter Abreisetag in dieser Woche
+                il = 3 if round_l else 0
+                ir = 3 if round_r else 0
+                style = (f"position:absolute; top:26px; height:22px; line-height:22px; "
+                         f"left:calc({sc * colpct}% + {il}px); "
+                         f"width:calc({(ec - sc) * colpct}% - {il + ir}px); "
+                         f"background:{hexc};")
+                if round_l:
+                    style += "border-top-left-radius:9999px;border-bottom-left-radius:9999px;"
+                if round_r:
+                    style += "border-top-right-radius:9999px;border-bottom-right-radius:9999px;"
+                label = (b["guest"] or name) if (a >= ws) else ""
+                bar = ui.label(label).classes(
+                    "text-white text-xs truncate cursor-pointer px-2 shadow-sm hover:brightness-110") \
+                    .style(style)
+                bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
 
 
 def _render_cleaning(user, admin, staff, activate):
