@@ -1231,20 +1231,21 @@ def _hk_header(title, subtitle):
             ui.label(subtitle).classes("text-sm text-gray-500")
 
 
-def render_reinigung():
+def render_reinigung(activate=None):
     if _is_admin():
         reinigung_admin()
     else:
-        reinigung_putzkraft()
+        reinigung_putzkraft(activate)
 
 
-def reinigung_putzkraft():
+def reinigung_putzkraft(activate=None):
     user = _cur_user()
     _hk_header("Reinigung", "Checkliste, Fotonachweis, Schäden & Bestand")
     apts = _apts()
     # Aus einer Buchung vorausgewähltes Apartment (Workflow-Sprung) übernehmen
     pre = _PENDING_REINIGUNG.pop("apt", None)
-    state = {"apt": pre}
+    ret = _PENDING_REINIGUNG.pop("return", None)
+    state = {"apt": pre, "return": ret}
     body = ui.column().classes("w-full gap-4")
 
     def open_apt(aid, anm):
@@ -1332,10 +1333,16 @@ def reinigung_putzkraft():
                     for t in room["tasks"]:
                         _task_row(run, t)
             _restock_card(aid, anm)
-            ui.button("Durchgang abschließen", icon="check_circle",
-                      on_click=lambda: (housekeeping.finish_run(run["id"]),
-                                        ui.notify("Durchgang abgeschlossen ✓", type="positive"),
-                                        state.update(apt=None), render())) \
+
+            def finish():
+                housekeeping.finish_run(run["id"])
+                ui.notify("Durchgang abgeschlossen ✓", type="positive")
+                # Kam man aus einer Buchung: zurück zu Buchungen (dort Arbeitszeit stoppen)
+                if state.get("return") == "buchungen" and activate:
+                    activate("buchungen")
+                else:
+                    state.update(apt=None); render()
+            ui.button("Durchgang abschließen", icon="check_circle", on_click=finish) \
                 .props("unelevated no-caps")
     render()
 
@@ -1626,6 +1633,7 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
 
 def _open_checkliste(apt_id, apt_name, activate):
     _PENDING_REINIGUNG["apt"] = (apt_id, apt_name)
+    _PENDING_REINIGUNG["return"] = "buchungen"   # nach Abschluss zurück zu Buchungen
     activate("reinigung")
 
 
@@ -2519,7 +2527,7 @@ def main_page():
         refresh()
 
     def build_reinigung():
-        render_reinigung()
+        render_reinigung(activate)
 
     def build_buchungen():
         render_buchungen(activate)
