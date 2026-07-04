@@ -1511,7 +1511,21 @@ def _user_email(username):
     return (USERS.get(username, {}) or {}).get("email", "")
 
 
-def _fetch_bookings(days_ahead=21, days_back=1):
+_WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+def _persons_text(nb):
+    a, c = nb.get("adults") or 0, nb.get("children") or 0
+    parts = []
+    if a:
+        parts.append("1 Erwachsener" if a == 1 else f"{a} Erwachsene")
+    if c:
+        parts.append("1 Kind" if c == 1 else f"{c} Kinder")
+    return " · ".join(parts) or f"{nb.get('persons', 0)} Pers."
+
+
+def _fetch_events(days_ahead=21, days_back=1):
+    """An- und Abreise-Ereignisse aus Smoobu im Zeitfenster, chronologisch sortiert."""
     from datetime import timedelta
     today = date.today()
     d_from = (today - timedelta(days=days_back)).isoformat()
@@ -1521,16 +1535,22 @@ def _fetch_bookings(days_ahead=21, days_back=1):
     except smoobu.SmoobuError as ex:
         ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
         return []
-    lo, hi = (today - timedelta(days=days_back)).isoformat(), d_to
-    out = []
+    evs = []
     for b in raw:
         if not bookings.is_real(b):
             continue
         nb = bookings.normalize(b)
-        if nb["departure"] and lo <= nb["departure"] <= hi:
-            out.append(nb)
-    out.sort(key=lambda x: (x["departure"], x["apartment_name"]))
-    return out
+        try:
+            nb["nights"] = (date.fromisoformat(nb["departure"])
+                            - date.fromisoformat(nb["arrival"])).days
+        except Exception:
+            nb["nights"] = None
+        if nb["arrival"] and d_from <= nb["arrival"] <= d_to:
+            evs.append({**nb, "kind": "in", "date": nb["arrival"], "time": nb["checkin_time"]})
+        if nb["departure"] and d_from <= nb["departure"] <= d_to:
+            evs.append({**nb, "kind": "out", "date": nb["departure"], "time": nb["checkout_time"]})
+    evs.sort(key=lambda e: (e["date"], e["time"] or "99:99", e["apartment_name"]))
+    return evs
 
 
 def render_buchungen(activate):
@@ -1540,53 +1560,67 @@ def render_buchungen(activate):
         ui.icon("calendar_month").classes("text-3xl text-primary")
         with ui.column().classes("gap-0"):
             ui.label("Buchungen").classes("text-2xl font-bold text-slate-800 leading-tight")
-            ui.label("Reinigungen zuweisen, tauschen, Checkliste & Zeit erfassen") \
+            ui.label("An- & Abreisen, Reinigungen zuweisen, Checkliste & Zeit") \
                 .classes("text-sm text-gray-500")
         ui.space()
         ui.button(icon="refresh", on_click=lambda: (data.clear_cache(), activate("buchungen"))) \
             .props("flat round").tooltip("Aktualisieren")
+    with ui.row().classes("items-center gap-2 mt-1 flex-wrap"):
+        ui.chip("Anreise", icon="login").props("color=green text-color=white dense")
+        ui.chip("Abreise · Reinigung", icon="logout").props("color=deep-orange text-color=white dense")
 
-    lst = _fetch_bookings()
-    if not lst:
-        ui.label("Keine anstehenden Abreisen in den nächsten Wochen.") \
-            .classes("text-gray-500 mt-4"); return
-
+    evs = _fetch_events()
+    if not evs:
+        ui.label("Keine An-/Abreisen in den nächsten Wochen.").classes("text-gray-500 mt-4")
+        return
     staff = _staff_users()
     today = date.today().isoformat()
     cur_date = None
-    for bk in lst:
-        if bk["departure"] != cur_date:
-            cur_date = bk["departure"]
+    for ev in evs:
+        if ev["date"] != cur_date:
+            cur_date = ev["date"]
+            d = date.fromisoformat(cur_date)
             heute = " · heute" if cur_date == today else ""
-            ui.label(f"Abreise {cur_date}{heute}") \
+            ui.label(f"{_WD[d.weekday()]} {d.strftime('%d.%m.%Y')}{heute}") \
                 .classes("text-sm font-semibold text-primary mt-3")
-        _booking_card(bk, user, admin, staff, activate)
+        _event_card(ev, user, admin, staff, activate)
 
 
-def _booking_card(bk, user, admin, staff, activate):
-    who = bookings.assignee_of(bk["id"])
+def _event_card(ev, user, admin, staff, activate):
+    is_out = ev["kind"] == "out"
+    who = bookings.assignee_of(ev["id"])
     who_name = staff.get(who, who) if who else None
     with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-3"):
         with ui.row().classes("w-full items-center gap-2 flex-wrap"):
-            ui.icon("home").classes("text-primary")
-            ui.label(bk["apartment_name"]).classes("font-semibold")
-            ui.label(f"· {bk['persons']} Pers.").classes("text-sm text-gray-500")
-            ui.label(f"· Check-out {bk['checkout_time'] or '—'}").classes("text-sm text-gray-500")
-            ui.space()
-            if who_name:
-                ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
+            if is_out:
+                ui.chip("Abreise", icon="logout").props("color=deep-orange text-color=white dense")
             else:
-                ui.chip("nicht zugewiesen", icon="person_off").props("color=grey-4 dense")
+                ui.chip("Anreise", icon="login").props("color=green text-color=white dense")
+            ui.label(ev["apartment_name"]).classes("font-semibold")
+            with ui.row().classes("items-center gap-1 text-sm text-gray-500"):
+                ui.icon("schedule").classes("text-base")
+                ui.label(ev["time"] or "—")
+            if ev.get("nights") is not None:
+                with ui.row().classes("items-center gap-1 text-sm text-gray-500") \
+                        .tooltip("Nächte"):
+                    ui.icon("dark_mode").classes("text-base")
+                    ui.label(f"{ev['nights']}")
+            ui.space()
+            if is_out:
+                if who_name:
+                    ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
+                else:
+                    ui.chip("nicht zugewiesen", icon="person_off").props("color=grey-4 dense")
         with ui.row().classes("w-full items-center gap-2 flex-wrap text-sm text-gray-500"):
-            ui.label(f"{bk['guest'] or 'Gast'} · {bk['channel']}")
-            ui.label(f"An {bk['arrival']} → Ab {bk['departure']}")
+            ui.label(f"{ev['guest'] or 'Gast'} · {ev['channel']}")
+            ui.label(_persons_text(ev))
         with ui.row().classes("w-full items-center gap-2 flex-wrap mt-1"):
             ui.button("Öffnen", icon="open_in_full",
-                      on_click=lambda b=bk: open_booking_dialog(b, user, admin, staff, activate)) \
+                      on_click=lambda e=ev: open_booking_dialog(e, user, admin, staff, activate)) \
                 .props("unelevated dense no-caps")
-            if who != user:
+            if is_out and who != user:
                 ui.button("Ich übernehme", icon="how_to_reg",
-                          on_click=lambda b=bk: _assign(b, user, user, staff, activate)) \
+                          on_click=lambda e=ev: _assign(e, user, user, staff, activate)) \
                     .props("outline dense no-caps")
 
 
