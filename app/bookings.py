@@ -82,6 +82,22 @@ def is_checklist_done(booking_id):
     return bool(get_record(booking_id).get("checklist_done"))
 
 
+def reset(booking_id):
+    """Workflow-Status zurücksetzen: Zuweisung, Checklisten-Abschluss und Flags löschen
+    (Notiz bleibt erhalten). Status wird damit wieder 'nicht zugewiesen'."""
+    d = _read()
+    key = str(booking_id)
+    rec = d.get(key)
+    if not rec:
+        return
+    for f in ("assignee", "assigned_by", "ts", "checklist_done", "checklist_by",
+              "nachtragen_notified"):
+        rec.pop(f, None)
+    rec.setdefault("history", []).append({"reset": now_iso()})
+    d[key] = rec
+    _write(d)
+
+
 # ----------------------------------------------------- Smoobu-Buchung normalisieren
 def is_real(b):
     """True für echte, nicht stornierte Buchungen (keine Blockierungen)."""

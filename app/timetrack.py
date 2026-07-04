@@ -98,6 +98,15 @@ def entries_for_booking(booking_id):
     return [e for e in reversed(_read()) if str(e.get("booking_id")) == bid]
 
 
+def delete_for_booking(booking_id):
+    """Alle Zeiteinträge dieser Buchung entfernen (Admin-Reset). Anzahl zurück."""
+    items = _read()
+    bid = str(booking_id)
+    kept = [e for e in items if str(e.get("booking_id")) != bid]
+    _write(kept)
+    return len(items) - len(kept)
+
+
 def duration_minutes(e):
     if not e.get("checkout"):
         return None

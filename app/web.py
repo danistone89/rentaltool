@@ -1987,7 +1987,7 @@ def _render_cleaning(user, admin, staff, activate):
                     _cleaning_compact(j, user, admin, staff, activate)
 
 
-def _add_time_dialog(job, user, activate):
+def _add_time_dialog(job, user, on_saved=None):
     """Arbeitszeit für diese Buchung manuell nachtragen."""
     from datetime import datetime
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
@@ -2010,7 +2010,8 @@ def _add_time_dialog(job, user, activate):
             ui.notify(f"Arbeitszeit nachgetragen: {timetrack.fmt_dur(int((co - ci).total_seconds() // 60))}",
                       type="positive")
             dlg.close()
-            activate("buchungen")
+            if on_saved:
+                on_saved()
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("Abbrechen", on_click=dlg.close).props("flat")
             ui.button("Speichern", icon="save", on_click=save).props("unelevated")
@@ -2018,18 +2019,19 @@ def _add_time_dialog(job, user, activate):
 
 
 def _checklist_progress(job, user):
-    """(erledigt, gesamt) der Checkliste für die Wohnung dieser Buchung."""
+    """(erledigt, gesamt) der Checkliste – zählt die TATSÄCHLICH abgehakten Aufgaben
+    des relevanten Durchgangs (offen, sonst letzter für diese Wohnung)."""
     try:
         cl = housekeeping.get_checklist(job["apartment_id"])
         total = sum(len(r["tasks"]) for r in cl["rooms"])
     except Exception:
         total = 0
     run = housekeeping.get_open_run(job["apartment_id"], user)
-    if run:
-        return sum(1 for v in run["tasks"].values() if v.get("done")), total
-    if bookings.is_checklist_done(job["id"]):
-        return total, total
-    return 0, total
+    if not run:
+        run = next((r for r in housekeeping.list_runs()
+                    if str(r["apartment_id"]) == str(job["apartment_id"])), None)
+    done = sum(1 for v in run["tasks"].values() if v.get("done")) if run else 0
+    return min(done, total), total
 
 
 def _step_button(label, icon, cb):
@@ -2042,7 +2044,7 @@ def _step_button(label, icon, cb):
             ui.icon("chevron_right").classes("text-gray-300")
 
 
-def _note_dialog(job):
+def _note_dialog(job, on_saved=None):
     rec = bookings.get_record(job["id"])
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
         ui.label(f"Notiz – {job['apartment_name']}").classes("text-lg font-bold")
@@ -2051,13 +2053,15 @@ def _note_dialog(job):
         def save():
             bookings.set_field(job["id"], note=(ta.value or "").strip())
             ui.notify("Notiz gespeichert ✓", type="positive"); dlg.close()
+            if on_saved:
+                on_saved()
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("Abbrechen", on_click=dlg.close).props("flat")
             ui.button("Speichern", icon="save", on_click=save).props("unelevated")
     dlg.open()
 
 
-def _restock_dialog(job, user):
+def _restock_dialog(job, user, on_close=None):
     with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
         ui.label(f"Verbrauch / Wäsche – {job['apartment_name']}").classes("text-lg font-bold")
         ui.label("Was muss nachgekauft werden?").classes("text-sm text-gray-500")
@@ -2072,7 +2076,7 @@ def _restock_dialog(job, user):
                     ui.notify(f"{name} gemeldet ✓", type="positive")
                 ui.button("melden", icon="add_shopping_cart", on_click=melden).props("flat dense no-caps")
         with ui.row().classes("w-full justify-end"):
-            ui.button("Schließen", on_click=dlg.close).props("flat")
+            ui.button("Schließen", on_click=lambda: (dlg.close(), on_close() if on_close else None)).props("flat")
     dlg.open()
 
 
@@ -2189,7 +2193,7 @@ def _cleaning_card(job, user, admin, staff, activate):
             dprog, tprog = _checklist_progress(job, user)
             with ui.row().classes("w-full items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2"):
                 ui.icon("check_circle")
-                ui.label(f"Fertig · {timetrack.fmt_dur(total_min)} · {tprog}/{tprog} erledigt")
+                ui.label(f"Fertig · {timetrack.fmt_dur(total_min)} · {dprog}/{tprog} erledigt")
         else:
             if total_min:
                 ui.label(f"Erfasst {timetrack.fmt_dur(total_min)}").classes("text-xs text-gray-500")
@@ -2253,13 +2257,14 @@ def _event_card(ev, user, admin, staff, activate):
                     .props("outline dense no-caps")
 
 
-def _assign(bk, assignee, by, staff, activate, note=""):
+def _assign(bk, assignee, by, staff, after, note=""):
     bookings.set_assignment(bk["id"], assignee, by, note)
     if assignee != by:   # jemandem anderen zugewiesen → benachrichtigen
         _notify_assignee(bk, assignee, by, staff)
     ui.notify(f"{bk['apartment_name']} → {staff.get(assignee, assignee)} zugewiesen ✓",
               type="positive")
-    activate("buchungen")
+    if after:
+        after()
 
 
 def _notify_assignee(bk, assignee, by, staff):
@@ -2310,7 +2315,7 @@ def _notify_nachtragen(job, staff):
         pass   # später erneut versuchen (Flag nicht gesetzt)
 
 
-def _open_swap(bk, user, staff, activate):
+def _open_swap(bk, user, staff, on_saved):
     who = bookings.assignee_of(bk["id"])
     others = {u: n for u, n in staff.items() if u != who}
     with ui.dialog() as dlg, ui.card().classes("w-[360px] max-w-full gap-2"):
@@ -2323,10 +2328,31 @@ def _open_swap(bk, user, staff, activate):
             if not sel.value:
                 ui.notify("Bitte Mitarbeiter wählen.", type="warning"); return
             dlg.close()
-            _assign(bk, sel.value, user, staff, activate)
+            _assign(bk, sel.value, user, staff, on_saved)
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button("Abbrechen", on_click=dlg.close).props("flat")
             ui.button("Zuweisen", icon="check", on_click=go).props("unelevated")
+    dlg.open()
+
+
+def _reset_dialog(bk, user, admin, staff, activate):
+    """Admin: Auftrag zurücksetzen (Zuweisung, Checkliste, erfasste Zeiten)."""
+    with ui.dialog() as dlg, ui.card().classes("w-[400px] max-w-full gap-2"):
+        ui.label(f"Auftrag zurücksetzen – {bk['apartment_name']}").classes("font-bold")
+        ui.label("Setzt Zuweisung und Checklisten-Abschluss zurück und entfernt die für "
+                 "diese Buchung erfassten Arbeitszeiten. Status wird wieder Nicht "
+                 "zugewiesen. Die interne Notiz bleibt erhalten.") \
+            .classes("text-sm text-gray-500")
+
+        def do():
+            bookings.reset(bk["id"])
+            n = timetrack.delete_for_booking(bk["id"])
+            dlg.close()
+            ui.notify(f"Auftrag zurückgesetzt (entfernte Zeiteinträge: {n}).", type="warning")
+            open_booking_dialog(bk, user, admin, staff, activate)
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Zurücksetzen", icon="restart_alt", on_click=do).props("unelevated color=negative")
     dlg.open()
 
 
@@ -2334,12 +2360,16 @@ def open_booking_dialog(bk, user, admin, staff, activate):
     who = bookings.assignee_of(bk["id"])
     nxt = bk.get("next")
     same_day = bool(nxt and nxt["arrival"] == bk["departure"])
+    # Nach einer Aktion wieder in dieser Detailübersicht landen:
+    reopen = lambda: open_booking_dialog(bk, user, admin, staff, activate)
     with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-0 p-0"):
         with ui.row().classes("w-full items-center gap-2 p-3 pb-1"):
             ui.icon("home").classes("text-primary text-2xl")
             ui.label(bk["apartment_name"]).classes("text-xl font-bold")
             ui.space()
-            ui.button(icon="close", on_click=dlg.close).props("flat round dense")
+            # Schließen aktualisiert die dahinterliegende Liste
+            ui.button(icon="close", on_click=lambda: (dlg.close(), activate("buchungen"))) \
+                .props("flat round dense")
         with ui.tabs().props("dense no-caps align=left").classes("w-full px-2") as tabs:
             t_b = ui.tab("Buchung")
             t_g = ui.tab("Gast")
@@ -2395,20 +2425,23 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                     ui.icon("chevron_right").classes("text-gray-300")
         if who != user:
             action("Ich übernehme diesen Auftrag", "how_to_reg",
-                   lambda: (dlg.close(), _assign(bk, user, user, staff, activate)))
+                   lambda: (dlg.close(), _assign(bk, user, user, staff, reopen)))
         action("Tauschen / Zuweisen", "swap_horiz",
-               lambda: (dlg.close(), _open_swap(bk, user, staff, activate)))
+               lambda: (dlg.close(), _open_swap(bk, user, staff, reopen)))
         action("Zeit nachtragen", "more_time",
-               lambda: (dlg.close(), _add_time_dialog(bk, user, activate)))
+               lambda: (dlg.close(), _add_time_dialog(bk, user, on_saved=reopen)))
         action("Notiz hinzufügen", "sticky_note_2",
-               lambda: (dlg.close(), _note_dialog(bk)))
+               lambda: (dlg.close(), _note_dialog(bk, on_saved=reopen)))
         action("Verbrauch / Wäsche", "inventory_2",
-               lambda: (dlg.close(), _restock_dialog(bk, user)))
+               lambda: (dlg.close(), _restock_dialog(bk, user, on_close=reopen)))
         action("Schaden melden", "report_problem",
-               lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user)),
+               lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen)),
                color="negative")
         action("Checkliste & Fotos", "checklist",
                lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"])))
+        if admin:
+            action("Zurücksetzen (Admin)", "restart_alt",
+                   lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
     dlg.open()
 
 
