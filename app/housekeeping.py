@@ -166,11 +166,11 @@ def list_runs(limit=100):
 
 
 # ------------------------------------------------------------- Schäden
-def add_damage(apt_id, apt_name, room, desc, urgency, photo, reporter):
+def add_damage(apt_id, apt_name, room, desc, urgency, photo, reporter, booking_id=None):
     items = _read(DAMAGES, [])
     d = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name, "room": room,
          "desc": desc, "urgency": urgency, "photo": photo, "reporter": reporter,
-         "ts": now_iso(), "status": "offen"}
+         "booking_id": booking_id, "ts": now_iso(), "status": "offen"}
     items.append(d)
     _write(DAMAGES, items)
     return d
@@ -179,6 +179,11 @@ def add_damage(apt_id, apt_name, room, desc, urgency, photo, reporter):
 def list_damages(only_open=False):
     items = list(reversed(_read(DAMAGES, [])))
     return [d for d in items if d["status"] == "offen"] if only_open else items
+
+
+def damages_for_booking(booking_id):
+    bid = str(booking_id)
+    return [d for d in list_damages() if str(d.get("booking_id")) == bid]
 
 
 def set_damage_status(damage_id, status):
@@ -190,11 +195,11 @@ def set_damage_status(damage_id, status):
 
 
 # ------------------------------------------------------------- Nachkauf/Bestand
-def add_restock(apt_id, apt_name, item, menge, kategorie, reporter):
+def add_restock(apt_id, apt_name, item, menge, kategorie, reporter, booking_id=None):
     items = _read(RESTOCK, [])
     r = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name, "item": item,
          "menge": menge, "kategorie": kategorie, "reporter": reporter,
-         "ts": now_iso(), "status": "offen"}
+         "booking_id": booking_id, "ts": now_iso(), "status": "offen"}
     items.append(r)
     _write(RESTOCK, items)
     return r
@@ -203,6 +208,11 @@ def add_restock(apt_id, apt_name, item, menge, kategorie, reporter):
 def list_restock(only_open=True):
     items = list(reversed(_read(RESTOCK, [])))
     return [r for r in items if r["status"] == "offen"] if only_open else items
+
+
+def restock_for_booking(booking_id):
+    bid = str(booking_id)
+    return [r for r in list_restock(only_open=False) if str(r.get("booking_id")) == bid]
 
 
 def set_restock_status(restock_id, status):

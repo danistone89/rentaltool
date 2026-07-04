@@ -1191,7 +1191,7 @@ def _notify_damage(d):
         pass
 
 
-def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None):
+def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None, booking_id=None):
     photo = {"rel": None}
     with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-2"):
         ui.label(f"Schaden melden – {apt_name}").classes("text-lg font-bold")
@@ -1213,7 +1213,8 @@ def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None):
             if not (desc.value or "").strip():
                 ui.notify("Bitte Beschreibung angeben.", type="warning"); return
             d = housekeeping.add_damage(apt_id, apt_name, (room.value or "").strip(),
-                                        desc.value.strip(), urg.value, photo["rel"], reporter)
+                                        desc.value.strip(), urg.value, photo["rel"], reporter,
+                                        booking_id=booking_id)
             _notify_damage(d)
             ui.notify("Schaden gemeldet – Danke!", type="positive")
             dlg.close()
@@ -1349,9 +1350,9 @@ def reinigung_putzkraft(activate=None):
                 ui.space()
                 with ui.button(icon="more_vert").props("flat round color=primary"):
                     with ui.menu():
-                        ui.menu_item("Schaden melden", lambda: open_damage_dialog(aid, anm, user))
+                        ui.menu_item("Schaden melden", lambda: open_damage_dialog(aid, anm, user, booking_id=state.get("booking")))
                         ui.menu_item("Verbrauch / Wäsche",
-                                     lambda: _restock_dialog({"apartment_id": aid, "apartment_name": anm}, user))
+                                     lambda: _restock_dialog({"apartment_id": aid, "apartment_name": anm, "id": state.get("booking")}, user))
 
             # Wohnungs-Karte mit Zeiten
             with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-4 gap-2"):
@@ -2221,7 +2222,8 @@ def _restock_dialog(job, user, on_close=None):
 
                 def melden(name=it["name"], kat=it["kategorie"], q=qty):
                     housekeeping.add_restock(job["apartment_id"], job["apartment_name"],
-                                             name, (q.value or "1").strip(), kat, user)
+                                             name, (q.value or "1").strip(), kat, user,
+                                             booking_id=job.get("id"))
                     ui.notify(f"{name} gemeldet ✓", type="positive")
                 ui.button("melden", icon="add_shopping_cart", on_click=melden).props("flat dense no-caps")
         with ui.row().classes("w-full justify-end"):
@@ -2333,7 +2335,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                         ui.label("Nächste Schritte").classes("text-xs font-semibold text-gray-400 mt-1")
                         with ui.column().classes("w-full gap-1"):
                             _step_button("Fotos & Schäden prüfen", "photo_camera",
-                                         lambda: open_damage_dialog(job["apartment_id"], job["apartment_name"], user))
+                                         lambda: open_damage_dialog(job["apartment_id"], job["apartment_name"], user, booking_id=job["id"]))
                             _step_button("Notiz hinzufügen", "sticky_note_2",
                                          lambda: _note_dialog(job))
                             _step_button("Verbrauch / Wäsche", "inventory_2",
@@ -2508,6 +2510,60 @@ def _reset_dialog(bk, user, admin, staff, activate):
     dlg.open()
 
 
+def _run_photo_count(apt_id):
+    """Anzahl aufgenommener Ist-Fotos im letzten Durchgang dieser Wohnung."""
+    run = next((r for r in housekeeping.list_runs()
+                if str(r["apartment_id"]) == str(apt_id)), None)
+    if not run:
+        return 0
+    return sum(1 for v in run["tasks"].values() if v.get("ist_photo"))
+
+
+def _booking_log(bk):
+    """Protokoll: was für diese Buchung schon erledigt/gemeldet wurde."""
+    bid = bk["id"]
+    entries = [e for e in timetrack.entries_for_booking(bid) if e.get("checkout")]
+    total_min = sum(timetrack.duration_minutes(e) or 0 for e in entries)
+    dprog, tprog = _checklist_progress(bk, _cur_user())
+    photos = _run_photo_count(bk["apartment_id"])
+    dmgs = housekeeping.damages_for_booking(bid)
+    rst = housekeeping.restock_for_booking(bid)
+    something = entries or dprog or photos or dmgs or rst
+
+    # Arbeitszeit
+    with ui.row().classes("w-full items-center gap-2"):
+        ui.icon("schedule").classes("text-primary")
+        ui.label(f"Arbeitszeit: {timetrack.fmt_dur(total_min) if total_min else '0:00 h'}"
+                 + (f" ({len(entries)} Einträge)" if entries else "")).classes("text-sm font-medium")
+    for e in entries:
+        ui.label(f"· {_d(e['checkin'])} {_t(e['checkin'])}–{_t(e['checkout'])}"
+                 + (" (nachgetragen)" if e.get("manual") else "")).classes("text-xs text-gray-500 pl-6")
+    # Checkliste
+    with ui.row().classes("w-full items-center gap-2 mt-1"):
+        ui.icon("checklist").classes("text-primary")
+        ui.label(f"Checkliste: {dprog}/{tprog} erledigt · {photos} Foto(s)").classes("text-sm font-medium")
+    # Schäden
+    with ui.row().classes("w-full items-center gap-2 mt-1"):
+        ui.icon("report_problem").classes("text-red-600")
+        ui.label(f"Schäden gemeldet: {len(dmgs)}").classes("text-sm font-medium")
+    for d in dmgs:
+        with ui.row().classes("w-full items-start gap-2 pl-6 no-wrap"):
+            if d.get("photo"):
+                _photo_thumb(f"/media/{d['photo']}", "w-12 h-12")
+            ui.label(f"{d.get('room') or '—'} · {d['desc']} ({d['urgency']})"
+                     + ("" if d["status"] == "offen" else " ✓")).classes("text-xs text-gray-600")
+    # Verbrauch / Wäsche
+    with ui.row().classes("w-full items-center gap-2 mt-1"):
+        ui.icon("inventory_2").classes("text-primary")
+        ui.label(f"Nachbestellt: {len(rst)}").classes("text-sm font-medium")
+    for r in rst:
+        ui.label(f"· {r['menge']}× {r['item']}" + ("" if r["status"] == "offen" else " ✓")) \
+            .classes("text-xs text-gray-600 pl-6")
+
+    if not something:
+        ui.label("Für diese Buchung wurde noch nichts erfasst.").classes("text-sm text-gray-400 mt-2")
+
+
 def open_booking_dialog(bk, user, admin, staff, activate):
     who = bookings.assignee_of(bk["id"])
     nxt = bk.get("next")
@@ -2524,6 +2580,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                 .props("flat round dense")
         with ui.tabs().props("dense no-caps align=left").classes("w-full px-2") as tabs:
             t_b = ui.tab("Buchung")
+            t_log = ui.tab("Protokoll")
             t_g = ui.tab("Gast")
             t_n = ui.tab("Notizen")
         with ui.tab_panels(tabs, value=t_b).classes("w-full"):
@@ -2548,6 +2605,8 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                             "text-sm font-semibold " + ("text-red-700" if same_day else "text-green-700"))
                         ui.label(f"Nächste Anreise: {_dfmt(nxt['arrival'])} · {nxt['checkin_time'] or ''}"
                                  + (" (Wechseltag)" if same_day else "")).classes("text-xs text-gray-500")
+            with ui.tab_panel(t_log):
+                _booking_log(bk)
             with ui.tab_panel(t_g):
                 with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1 text-sm"):
                     ui.label("Name").classes("text-gray-500")
@@ -2587,7 +2646,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
         action("Verbrauch / Wäsche", "inventory_2",
                lambda: (dlg.close(), _restock_dialog(bk, user, on_close=reopen)))
         action("Schaden melden", "report_problem",
-               lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen)),
+               lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
                color="negative")
         action("Checkliste & Fotos", "checklist",
                lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
