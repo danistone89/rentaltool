@@ -1922,62 +1922,129 @@ def _render_cleaning(user, admin, staff, activate):
                     _cleaning_card(j, user, admin, staff, activate)
 
 
+def _cleaning_actions(job, user, admin, staff, activate):
+    """Aktionen nach Wichtigkeit gestaffelt; Checkliste wird dominant, sobald die
+    Arbeitszeit für diese Buchung läuft."""
+    box = ui.column().classes("w-full gap-2")
+
+    def render():
+        box.clear()
+        with box:
+            oe = timetrack.get_open(user)
+            open_here = oe and str(oe.get("booking_id")) == str(job["id"])
+            who = bookings.assignee_of(job["id"])
+            if open_here:
+                # Primär: Checkliste; darunter Arbeit beenden
+                ui.button("Checkliste abhaken", icon="checklist",
+                          on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate)) \
+                    .props("unelevated no-caps size=lg").classes("w-full")
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.button("Arbeit beenden", icon="stop_circle", on_click=_do_out) \
+                        .props("outline no-caps color=negative").classes("flex-grow")
+                    ui.label(f"läuft seit {_t(oe['checkin'])}").classes("text-xs text-green-700")
+            else:
+                b = ui.button("Arbeitszeit starten", icon="play_arrow", on_click=_do_in) \
+                    .props("unelevated no-caps size=lg").classes("w-full")
+                if oe:
+                    b.props("disable")
+                    ui.label("anderer Check-in aktiv – dort erst beenden").classes("text-xs text-amber-700")
+
+            # Weitere Aktionen (sekundär/tertiär)
+            ui.label("Weitere Aktionen").classes("text-xs font-semibold text-gray-400 mt-1")
+            with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                if not open_here:
+                    ui.button("Checkliste", icon="checklist",
+                              on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate)) \
+                        .props("outline dense no-caps")
+                ui.button("Infos & Tausch", icon="open_in_full",
+                          on_click=lambda: open_booking_dialog(job, user, admin, staff, activate)) \
+                    .props("flat dense no-caps").mark("booking-details")
+                if who != user:
+                    ui.button("Übernehmen", icon="how_to_reg",
+                              on_click=lambda: _assign(job, user, user, staff, activate)) \
+                        .props("flat dense no-caps")
+
+    async def _do_in():
+        gps = None
+        try:
+            loc = await get_location()
+            gps = None if loc.get("error") else loc
+        except Exception:
+            pass
+        ort, dist = _match_geofence(gps)
+        if timetrack.check_in(user, gps, None, ort, dist,
+                              booking_id=job["id"], apartment=job["apartment_name"]) is None:
+            ui.notify("Du bist bereits eingecheckt (anderer Ort).", type="warning")
+        else:
+            ui.notify("Arbeitszeit gestartet ✓", type="positive")
+        render()
+
+    async def _do_out():
+        gps = None
+        try:
+            loc = await get_location()
+            gps = None if loc.get("error") else loc
+        except Exception:
+            pass
+        ort, dist = _match_geofence(gps)
+        timetrack.check_out(user, gps, None, ort, dist)
+        ui.notify("Arbeit beendet ✓", type="positive")
+        render()
+
+    render()
+
+
 def _cleaning_card(job, user, admin, staff, activate):
+    today = date.today().isoformat()
     who = bookings.assignee_of(job["id"])
     who_name = staff.get(who, who) if who else None
     nxt = job.get("next")
     same_day = bool(nxt and nxt["arrival"] == job["departure"])
-    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4 mt-1"):
-        # Kopf: Wohnung + Wechseltag
+    overdue = job["departure"] < today
+    dep = date.fromisoformat(job["departure"])
+    done = [e for e in timetrack.entries_for_booking(job["id"]) if e.get("checkout")]
+    total = sum(timetrack.duration_minutes(e) or 0 for e in done)
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-4 mt-1"):
+        # Status-Badges
+        if overdue or same_day:
+            with ui.row().classes("items-center gap-2"):
+                if overdue:
+                    ui.chip("Überfällig", icon="warning").props("color=red text-color=white dense")
+                if same_day:
+                    ui.chip("Wechseltag", icon="bolt").props("color=deep-orange text-color=white dense")
+        # Titel + Datum
         with ui.row().classes("w-full items-center gap-2"):
             ui.icon("cleaning_services").classes("text-primary text-xl shrink-0")
-            ui.label(job["apartment_name"]).classes("font-bold text-lg leading-tight")
-            if same_day:
-                ui.chip("Wechseltag", icon="bolt").props("color=red text-color=white dense") \
-                    .tooltip("Anreise am selben Tag – Zeitdruck")
-        ui.button("Alle Infos & Tausch", icon="open_in_full",
-                  on_click=lambda j=job: open_booking_dialog(j, user, admin, staff, activate)) \
-            .props("flat no-caps dense color=primary").mark("booking-details")
-
-        # Liste: Verlässt / Reinigung / Vorbereiten
-        def _row(label, build):
-            with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                ui.label(label).classes("text-xs text-gray-400 w-24 shrink-0")
-                with ui.row().classes("items-center gap-2 min-w-0"):
-                    build()
-
-        _row("Verlässt", lambda: ui.label(
-            f"{job['guest'] or 'Gast'} · {_persons_text(job)} · Check-out {job['checkout_time'] or '—'}")
-            .classes("text-sm text-slate-700 truncate"))
-
-        def _assignee():
-            if who_name:
-                ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
-                if who != user:
-                    ui.button("übernehmen", icon="swap_horiz",
-                              on_click=lambda j=job: _assign(j, user, user, staff, activate)) \
-                        .props("outline dense no-caps color=primary")
-            else:
-                ui.button("Ich übernehme", icon="how_to_reg",
-                          on_click=lambda j=job: _assign(j, user, user, staff, activate)) \
-                    .props("unelevated dense no-caps color=primary")
-        _row("Reinigung", _assignee)
-
-        def _prep():
-            if nxt:
-                ui.label(_persons_text(nxt)).classes(
-                    "text-sm font-semibold " + ("text-red-700" if same_day else "text-green-700"))
-                ui.label(f"· Anreise {_dfmt(nxt['arrival'])} {nxt['checkin_time'] or ''}") \
-                    .classes("text-xs text-gray-500 truncate")
-            else:
-                ui.label("Standard-Vorbereitung").classes("text-sm text-gray-500")
-        _row("Vorbereiten", _prep)
-
-        # Durchgehende Buttons (volle Breite): Arbeitszeit, Checkliste, Details
-        _booking_time_controls(job, user)
-        ui.button("Checkliste abhaken", icon="checklist",
-                  on_click=lambda j=job: _open_checkliste(j["apartment_id"], j["apartment_name"], activate)) \
-            .props("unelevated no-caps").classes("w-full")
+            ui.label(job["apartment_name"]).classes("font-bold text-xl leading-tight")
+        ui.label(f"{_WD[dep.weekday()]} {dep.strftime('%d.%m.%Y')}").classes("text-sm text-gray-500")
+        ui.separator().classes("my-1")
+        # Zeitfluss Check-out -> Check-in
+        with ui.row().classes("w-full items-center gap-2 text-sm no-wrap"):
+            ui.icon("logout").classes("text-deep-orange text-base")
+            ui.label(f"Check-out {job['checkout_time'] or '—'}").classes("text-slate-700")
+            ui.icon("arrow_forward").classes("text-gray-400 text-base")
+            ui.icon("login").classes("text-green-700 text-base")
+            ui.label(f"Check-in {nxt['checkin_time'] if nxt else '—'}").classes("text-slate-700")
+        # Zuständigkeit + erfasste Zeit
+        with ui.row().classes("w-full items-center gap-1 text-sm"):
+            ui.icon("person").classes("text-primary text-base")
+            ui.label(who_name or "noch niemand zugewiesen") \
+                .classes("font-medium text-slate-700" if who_name else "text-gray-500")
+            if total:
+                ui.label(f"· {timetrack.fmt_dur(total)} erfasst").classes("text-gray-500")
+        # Abreise / Anreise
+        ui.label("Abreise").classes("text-xs text-gray-400 mt-1")
+        ui.label(f"{job['guest'] or 'Gast'} · {_persons_text(job)}").classes("text-sm text-slate-700 truncate")
+        ui.label("Anreise – vorbereiten für").classes(
+            "text-xs mt-1 " + ("text-red-500" if same_day else "text-gray-400"))
+        if nxt:
+            ui.label(_persons_text(nxt)).classes(
+                "text-sm font-semibold truncate " + ("text-red-700" if same_day else "text-green-700"))
+        else:
+            ui.label("keine Folgebuchung").classes("text-sm text-gray-500")
+        # Aktionen (gestaffelt)
+        with ui.column().classes("w-full gap-2 mt-2"):
+            _cleaning_actions(job, user, admin, staff, activate)
 
 
 def _event_card(ev, user, admin, staff, activate):
