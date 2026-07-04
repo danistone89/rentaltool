@@ -1245,7 +1245,8 @@ def reinigung_putzkraft(activate=None):
     # Aus einer Buchung vorausgewähltes Apartment (Workflow-Sprung) übernehmen
     pre = _PENDING_REINIGUNG.pop("apt", None)
     ret = _PENDING_REINIGUNG.pop("return", None)
-    state = {"apt": pre, "return": ret}
+    bkid = _PENDING_REINIGUNG.pop("booking", None)
+    state = {"apt": pre, "return": ret, "booking": bkid}
     body = ui.column().classes("w-full gap-4")
 
     def open_apt(aid, anm):
@@ -1336,6 +1337,8 @@ def reinigung_putzkraft(activate=None):
 
             def finish():
                 housekeeping.finish_run(run["id"])
+                if state.get("booking"):
+                    bookings.mark_checklist_done(state["booking"], user)
                 ui.notify("Durchgang abgeschlossen ✓", type="positive")
                 # Kam man aus einer Buchung: zurück zu Buchungen (dort Arbeitszeit stoppen)
                 if state.get("return") == "buchungen" and activate:
@@ -1631,10 +1634,58 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
     return jobs
 
 
-def _open_checkliste(apt_id, apt_name, activate):
+def _open_checkliste(apt_id, apt_name, activate, booking_id=None):
     _PENDING_REINIGUNG["apt"] = (apt_id, apt_name)
     _PENDING_REINIGUNG["return"] = "buchungen"   # nach Abschluss zurück zu Buchungen
+    _PENDING_REINIGUNG["booking"] = booking_id
     activate("reinigung")
+
+
+# ------------------------------------------------------- Buchungs-/Reinigungs-Status
+_STATUS = {
+    "nicht_zugewiesen": ("Nicht zugewiesen", "grey-5", "person_off"),
+    "zugewiesen":       ("Zugewiesen", "blue-6", "assignment_ind"),
+    "in_progress":      ("In Arbeit", "amber-7", "pending"),
+    "abgeschlossen":    ("Abgeschlossen", "green-6", "check_circle"),
+    "nachtragen":       ("Nachtragen", "red-6", "warning"),
+}
+
+
+def _past_checkout(job):
+    from datetime import datetime, time as _time_cls
+    try:
+        d = date.fromisoformat(job["departure"])
+        hh, mm = (job.get("checkout_time") or "10:00").split(":")[:2]
+        return datetime.now() > datetime.combine(d, _time_cls(int(hh), int(mm)))
+    except Exception:
+        return job.get("departure", "") < date.today().isoformat()
+
+
+def _booking_status(job):
+    """Status-Key gemäß Zuweisung / Arbeitszeit / Checkliste / Check-out-Zeit."""
+    bid = job["id"]
+    who = bookings.assignee_of(bid)
+    cl_done = bookings.is_checklist_done(bid)
+    entries = timetrack.entries_for_booking(bid)
+    has_time = any(e.get("checkout") for e in entries)
+    open_now = any(not e.get("checkout") for e in entries)
+    started = bool(entries)
+    if cl_done and has_time:
+        return "abgeschlossen"
+    if open_now:
+        return "in_progress"
+    if _past_checkout(job):
+        return "nachtragen"
+    if started:
+        return "in_progress"
+    if who:
+        return "zugewiesen"
+    return "nicht_zugewiesen"
+
+
+def _status_chip(job):
+    label, color, icon = _STATUS[_booking_status(job)]
+    ui.chip(label, icon=icon).props(f"color={color} text-color=white dense")
 
 
 def render_buchungen(activate):
@@ -1897,6 +1948,10 @@ def _render_cleaning(user, admin, staff, activate):
     if not jobs:
         ui.label("Keine anstehenden Reinigungen.").classes("text-gray-500 mt-4")
         return
+    # Offene "Nachtragen"-Fälle einmalig per E-Mail anstoßen
+    for j in jobs:
+        if _booking_status(j) == "nachtragen":
+            _notify_nachtragen(j, staff)
     today = date.today().isoformat()
     groups = {}
     for j in jobs:
@@ -1944,7 +1999,7 @@ def _cleaning_actions(job, user, admin, staff, activate):
             if open_here:
                 # Primär: Checkliste; darunter Arbeit beenden
                 ui.button("Checkliste abhaken", icon="checklist",
-                          on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate)) \
+                          on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
                     .props("unelevated no-caps size=lg").classes("w-full")
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.button("Arbeit beenden", icon="stop_circle", on_click=_do_out) \
@@ -1962,7 +2017,7 @@ def _cleaning_actions(job, user, admin, staff, activate):
             with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                 if not open_here:
                     ui.button("Checkliste", icon="checklist",
-                              on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate)) \
+                              on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"])) \
                         .props("outline dense no-caps")
                 ui.button("Infos & Tausch", icon="open_in_full",
                           on_click=lambda: open_booking_dialog(job, user, admin, staff, activate)) \
@@ -2008,18 +2063,15 @@ def _cleaning_card(job, user, admin, staff, activate):
     who_name = staff.get(who, who) if who else None
     nxt = job.get("next")
     same_day = bool(nxt and nxt["arrival"] == job["departure"])
-    overdue = job["departure"] < today
     dep = date.fromisoformat(job["departure"])
     done = [e for e in timetrack.entries_for_booking(job["id"]) if e.get("checkout")]
     total = sum(timetrack.duration_minutes(e) or 0 for e in done)
     with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-4 mt-1"):
         # Status-Badges
-        if overdue or same_day:
-            with ui.row().classes("items-center gap-2"):
-                if overdue:
-                    ui.chip("Überfällig", icon="warning").props("color=red text-color=white dense")
-                if same_day:
-                    ui.chip("Wechseltag", icon="bolt").props("color=deep-orange text-color=white dense")
+        with ui.row().classes("items-center gap-2 flex-wrap"):
+            _status_chip(job)
+            if same_day:
+                ui.chip("Wechseltag", icon="bolt").props("color=deep-orange text-color=white dense")
         # Titel + Datum
         with ui.row().classes("w-full items-center gap-2"):
             ui.icon("cleaning_services").classes("text-primary text-xl shrink-0")
@@ -2123,6 +2175,33 @@ def _notify_assignee(bk, assignee, by, staff):
         ui.notify(f"E-Mail nicht gesendet: {ex}", type="warning", timeout=9000)
 
 
+def _notify_nachtragen(job, staff):
+    """Einmalige Erinnerung, wenn nach Check-out nicht abgeschlossen (Checkliste +
+    Arbeitszeit fehlen). Empfänger: zugewiesener Mitarbeiter, sonst Admin."""
+    rec = bookings.get_record(job["id"])
+    if rec.get("nachtragen_notified"):
+        return
+    who = bookings.assignee_of(job["id"])
+    to = _user_email(who) if who else (CFG.get("notify_email", {}).get("absender")
+                                       or CFG.get("email", {}).get("absender"))
+    if not to:
+        return
+    anrede = staff.get(who, who) if who else "Team"
+    body = (f"Hallo {anrede},\n\n"
+            f"die folgende Reinigung wurde nach dem Check-out noch nicht abgeschlossen. "
+            f"Bitte trage die Checkliste und die Arbeitszeit in der LIVARO-App nach:\n\n"
+            f"Wohnung: {job['apartment_name']}\n"
+            f"Abreise: {job['departure']}, Check-out {job.get('checkout_time') or '—'}\n"
+            f"Gast: {job.get('guest') or '—'}\n\n"
+            f"App: https://app.ds-apartments.de  →  Buchungen → Reinigungen\n")
+    try:
+        mailer.send_notify(CFG, to,
+                           f"Bitte nachtragen: {job['apartment_name']} ({job['departure']})", body)
+        bookings.set_field(job["id"], nachtragen_notified=bookings.now_iso())
+    except mailer.MailError:
+        pass   # später erneut versuchen (Flag nicht gesetzt)
+
+
 def open_booking_dialog(bk, user, admin, staff, activate):
     who = bookings.assignee_of(bk["id"])
     with ui.dialog() as dlg, ui.card().classes("w-[560px] max-w-full gap-2"):
@@ -2186,7 +2265,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
         with ui.row().classes("w-full items-center gap-2 flex-wrap"):
             ui.button("Checkliste öffnen", icon="checklist",
                       on_click=lambda: (dlg.close(),
-                                        _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate))) \
+                                        _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"]))) \
                 .props("unelevated dense no-caps")
             _booking_time_controls(bk, user)
     dlg.open()

@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 from nicegui.testing import User
 
-from app import data, steuer, web, archive, auth, timetrack, bookings  # noqa: F401
+from app import data, steuer, web, archive, auth, timetrack, bookings, mailer  # noqa: F401
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixture_2025-12.json")
 STICHTAG = date(2026, 6, 29)
@@ -26,6 +26,7 @@ def mock_backend(monkeypatch):
     ])
     monkeypatch.setattr(data, "compute", lambda *a, **k: result)
     monkeypatch.setattr(data, "_reservations", lambda *a, **k: [])   # Buchungen-Hub
+    monkeypatch.setattr(mailer, "send_notify", lambda *a, **k: None)  # keine echten Mails
     web._APARTMENTS.clear()
     # Login: Test-Admin (Benutzer "test"), kein TOTP
     monkeypatch.setitem(web.USERS, "test", {

@@ -59,6 +59,29 @@ def clear_assignment(booking_id):
         _write(d)
 
 
+def get_record(booking_id):
+    return _read().get(str(booking_id)) or {}
+
+
+def set_field(booking_id, **fields):
+    """Zusatzfelder am Buchungs-Datensatz setzen (legt ihn bei Bedarf an)."""
+    d = _read()
+    key = str(booking_id)
+    rec = d.get(key) or {"history": []}
+    rec.update(fields)
+    d[key] = rec
+    _write(d)
+    return rec
+
+
+def mark_checklist_done(booking_id, user=None):
+    set_field(booking_id, checklist_done=now_iso(), checklist_by=user or "")
+
+
+def is_checklist_done(booking_id):
+    return bool(get_record(booking_id).get("checklist_done"))
+
+
 # ----------------------------------------------------- Smoobu-Buchung normalisieren
 def is_real(b):
     """True für echte, nicht stornierte Buchungen (keine Blockierungen)."""
