@@ -1678,6 +1678,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
             ui.button("Checkliste öffnen", icon="checklist", on_click=to_checkliste) \
                 .props("unelevated dense no-caps")
             _booking_time_controls(bk, user)
+    dlg.open()
 
 
 def _booking_time_controls(bk, user):
