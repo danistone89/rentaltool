@@ -1917,6 +1917,9 @@ def _cleaning_card(job, user, admin, staff, activate):
             if same_day:
                 ui.chip("Wechseltag", icon="bolt").props("color=red text-color=white dense") \
                     .tooltip("Anreise am selben Tag – Zeitdruck")
+        ui.button("Alle Infos & Tausch", icon="open_in_full",
+                  on_click=lambda j=job: open_booking_dialog(j, user, admin, staff, activate)) \
+            .props("flat no-caps dense color=primary").mark("booking-details")
 
         # Liste: Verlässt / Reinigung / Vorbereiten
         def _row(label, build):
@@ -1957,9 +1960,6 @@ def _cleaning_card(job, user, admin, staff, activate):
         ui.button("Checkliste abhaken", icon="checklist",
                   on_click=lambda j=job: _open_checkliste(j["apartment_id"], j["apartment_name"], activate)) \
             .props("unelevated no-caps").classes("w-full")
-        ui.button("Alle Infos & Tausch", icon="open_in_full",
-                  on_click=lambda j=job: open_booking_dialog(j, user, admin, staff, activate)) \
-            .props("flat no-caps color=primary").classes("w-full").mark("booking-details")
 
 
 def _event_card(ev, user, admin, staff, activate):
