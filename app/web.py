@@ -797,6 +797,7 @@ def open_settings():
             t_orte = ui.tab("Standorte", icon="place")
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
+            t_stb = ui.tab("Steuerberater", icon="account_balance")
 
         with ui.tab_panels(tabs, value=t_betr).classes("w-full"):
             with ui.tab_panel(t_betr):
@@ -998,11 +999,13 @@ def open_settings():
                     ui.button("Test-Benachrichtigung", icon="send", on_click=test_notify).props("outline no-caps")
                     ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-gray-400")
 
-                ui.separator().classes("my-2")
-                ui.label("Steuerberater – Empfänger für den Arbeitszeiten-Versand.") \
+            with ui.tab_panel(t_stb):
+                ui.label("Empfänger für den monatlichen Arbeitszeiten-Versand "
+                         "(Zeiterfassung → Auswertung → An Steuerberater senden). "
+                         "Unabhängig von der E-Mail für die Beherbergungssteuer.") \
                     .classes("text-sm text-gray-500")
                 stb = ui.input("E-Mail Steuerberater", value=CFG.get("steuerberater_email", "")) \
-                    .props("outlined dense").classes("w-full")
+                    .props("outlined dense").classes("w-full max-w-[420px]")
 
         def save():
             CFG["steuerberater_email"] = (stb.value or "").strip()
