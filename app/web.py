@@ -2954,23 +2954,30 @@ def _confirm_send_guest(bk, textarea, reload_cb):
 
 
 def _render_guest_thread(box, msgs, err, reload_cb, bk):
-    """Nachrichtenverlauf (type 1 = Gast, type 2 = wir) als Chat + Antwortfeld."""
+    """Nachrichtenverlauf (type 1 = Gast, type 2 = wir) als Chat + Antwortfeld.
+
+    box ist eine Spalte mit fester Höhe: Kopf + Antwortfeld bleiben fix, nur der
+    Verlauf in der Mitte scrollt (WhatsApp-/Smoobu-Stil)."""
     box.clear()
     with box:
-        with ui.row().classes("w-full items-center"):
+        # --- Kopf (fix) -----------------------------------------------------
+        with ui.row().classes("w-full items-center shrink-0 pb-1"):
             ui.label("Gästekommunikation").classes("text-xs font-semibold text-gray-400")
             ui.space()
             ui.button(icon="refresh", on_click=lambda: reload_cb(True)) \
                 .props("flat round dense size=sm").tooltip("Aktualisieren")
-        if err:
-            with ui.row().classes("w-full items-center gap-2 bg-red-50 rounded p-2"):
-                ui.icon("error_outline").classes("text-red-500")
-                ui.label(f"Nachrichten konnten nicht geladen werden: {err}") \
-                    .classes("text-xs text-red-700")
-        elif not msgs:
-            ui.label("Noch keine Nachrichten zu dieser Buchung.") \
-                .classes("text-sm text-gray-400 py-4 self-center")
-        with ui.column().classes("w-full gap-2 max-h-[46vh] overflow-auto py-1"):
+        # --- Verlauf (scrollt) ---------------------------------------------
+        thread = ui.column().classes(
+            "w-full gap-2 flex-grow overflow-auto min-h-0 py-1 pr-1")
+        with thread:
+            if err:
+                with ui.row().classes("w-full items-center gap-2 bg-red-50 rounded p-2"):
+                    ui.icon("error_outline").classes("text-red-500")
+                    ui.label(f"Nachrichten konnten nicht geladen werden: {err}") \
+                        .classes("text-xs text-red-700")
+            elif not msgs:
+                ui.label("Noch keine Nachrichten zu dieser Buchung.") \
+                    .classes("text-sm text-gray-400 m-auto")
             for m in msgs:
                 mine = m.get("type") == 2
                 with ui.row().classes("w-full no-wrap "
@@ -2989,16 +2996,24 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
                         ui.label(_msg_time(m.get("createdAt"))).classes(
                             "text-[10px] self-end "
                             + ("text-white/70" if mine else "text-gray-400"))
+        # neueste Nachricht sichtbar: Verlauf ans Ende scrollen
+        if msgs:
+            thread_id = thread.id
+            ui.timer(0.05, lambda: ui.run_javascript(
+                f"const e=document.getElementById('c{thread_id}');"
+                f" if(e) e.scrollTop=e.scrollHeight;"), once=True)
+        # --- Antwortfeld (fix, unten) --------------------------------------
         if not err:
-            ui.separator().classes("my-1")
-            ta = ui.textarea(placeholder="Antwort an den Gast …") \
-                .props("outlined autogrow dense").classes("w-full")
-            with ui.row().classes("w-full items-center gap-2"):
-                ui.label("Wird direkt über Smoobu an den Gast gesendet.") \
-                    .classes("text-[11px] text-gray-400 flex-grow")
-                ui.button("Senden", icon="send",
-                          on_click=lambda: _confirm_send_guest(bk, ta, reload_cb)) \
-                    .props("unelevated no-caps")
+            with ui.column().classes("w-full gap-1 shrink-0 pt-2 border-t border-gray-100"):
+                ta = ui.textarea(placeholder="Antwort an den Gast …") \
+                    .props("outlined autogrow dense").classes("w-full") \
+                    .style("max-height:96px;overflow-y:auto")
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.label("Wird direkt über Smoobu an den Gast gesendet.") \
+                        .classes("text-[11px] text-gray-400 flex-grow")
+                    ui.button("Senden", icon="send",
+                              on_click=lambda: _confirm_send_guest(bk, ta, reload_cb)) \
+                        .props("unelevated no-caps")
 
 
 def open_booking_dialog(bk, user, admin, staff, activate):
@@ -3007,7 +3022,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
     same_day = bool(nxt and nxt["arrival"] == bk["departure"])
     # Nach einer Aktion wieder in dieser Detailübersicht landen:
     reopen = lambda: open_booking_dialog(bk, user, admin, staff, activate)
-    with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-0 p-0"):
+    with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-0 p-0 max-h-[92vh] overflow-auto"):
         with ui.row().classes("w-full items-center gap-2 p-3 pb-1"):
             ui.icon("home").classes("text-primary text-2xl")
             ui.label(bk["apartment_name"]).classes("text-xl font-bold")
@@ -3016,7 +3031,8 @@ def open_booking_dialog(bk, user, admin, staff, activate):
             ui.button(icon="close", on_click=lambda: (dlg.close(), activate("buchungen"))) \
                 .props("flat round dense")
         mgr = _cur_role() in ("admin", "manager")   # Nachrichten nur Admin/Manager
-        with ui.tabs().props("dense no-caps align=left").classes("w-full px-2") as tabs:
+        _hooks = {}
+        with ui.tabs().props("dense no-caps align=left inline-label").classes("w-full px-2") as tabs:
             t_b = ui.tab("Buchung")
             t_log = ui.tab("Protokoll")
             t_g = ui.tab("Gast")
@@ -3064,8 +3080,9 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                 ui.label("Buchungsdetails (Smoobu)").classes("text-xs text-gray-500")
                 ui.label(bk["notice"] or "—").classes("text-sm whitespace-pre-wrap")
             if mgr:
-                with ui.tab_panel(t_msg):
-                    _mbox = ui.column().classes("w-full gap-2")
+                with ui.tab_panel(t_msg).classes("p-2"):
+                    # feste Höhe: Verlauf scrollt intern, Antwortfeld bleibt unten sichtbar
+                    _mbox = ui.column().classes("w-full gap-0 h-[68vh] no-wrap")
                     _mstate = {"loaded": False, "busy": False}
 
                     async def load_msgs(force=False):
@@ -3074,7 +3091,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                         _mstate["busy"] = True
                         _mbox.clear()
                         with _mbox:
-                            ui.spinner(size="lg").classes("self-center my-4")
+                            ui.spinner(size="lg").classes("m-auto")
                         from nicegui import run
                         api_key = (CFG.get("smoobu_api_key") or "").strip()
                         err, msgs = None, []
@@ -3088,40 +3105,47 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                         _mstate["loaded"], _mstate["busy"] = True, False
                         _render_guest_thread(_mbox, msgs, err, load_msgs, bk)
 
-                    async def _on_tab(e):
-                        if e.value == "Nachrichten":
-                            await load_msgs()
-                    tabs.on_value_change(_on_tab)
+                    _hooks["load"] = load_msgs
 
-        ui.separator()
-        ui.label("Aktionen").classes("text-xs font-semibold text-gray-400 px-3 pt-1")
+        footer_box = ui.column().classes("w-full gap-0 p-0")
+        with footer_box:
+            ui.separator()
+            ui.label("Aktionen").classes("text-xs font-semibold text-gray-400 px-3 pt-1")
 
-        def action(label, icon, cb, color="primary"):
-            b = ui.button(on_click=cb).props("flat no-caps align=left").classes("w-full")
-            with b:
-                with ui.row().classes("w-full items-center gap-3 no-wrap"):
-                    ui.icon(icon).classes(f"text-{color}")
-                    ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
-                    ui.icon("chevron_right").classes("text-gray-300")
-        if who != user:
-            action("Ich übernehme diesen Auftrag", "how_to_reg",
-                   lambda: (dlg.close(), _assign(bk, user, user, staff, reopen)))
-        action("Tauschen / Zuweisen", "swap_horiz",
-               lambda: (dlg.close(), _open_swap(bk, user, staff, reopen)))
-        action("Zeit nachtragen", "more_time",
-               lambda: (dlg.close(), _add_time_dialog(bk, user, on_saved=reopen)))
-        action("Notiz hinzufügen", "sticky_note_2",
-               lambda: (dlg.close(), _note_dialog(bk, on_saved=reopen)))
-        action("Verbrauch / Wäsche", "inventory_2",
-               lambda: (dlg.close(), _restock_dialog(bk, user, on_close=reopen)))
-        action("Schaden melden", "report_problem",
-               lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
-               color="negative")
-        action("Checkliste & Fotos", "checklist",
-               lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
-        if admin:
-            action("Zurücksetzen (Admin)", "restart_alt",
-                   lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
+            def action(label, icon, cb, color="primary"):
+                b = ui.button(on_click=cb).props("flat no-caps align=left").classes("w-full")
+                with b:
+                    with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                        ui.icon(icon).classes(f"text-{color}")
+                        ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
+                        ui.icon("chevron_right").classes("text-gray-300")
+            if who != user:
+                action("Ich übernehme diesen Auftrag", "how_to_reg",
+                       lambda: (dlg.close(), _assign(bk, user, user, staff, reopen)))
+            action("Tauschen / Zuweisen", "swap_horiz",
+                   lambda: (dlg.close(), _open_swap(bk, user, staff, reopen)))
+            action("Zeit nachtragen", "more_time",
+                   lambda: (dlg.close(), _add_time_dialog(bk, user, on_saved=reopen)))
+            action("Notiz hinzufügen", "sticky_note_2",
+                   lambda: (dlg.close(), _note_dialog(bk, on_saved=reopen)))
+            action("Verbrauch / Wäsche", "inventory_2",
+                   lambda: (dlg.close(), _restock_dialog(bk, user, on_close=reopen)))
+            action("Schaden melden", "report_problem",
+                   lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
+                   color="negative")
+            action("Checkliste & Fotos", "checklist",
+                   lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
+            if admin:
+                action("Zurücksetzen (Admin)", "restart_alt",
+                       lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
+
+        if mgr:
+            async def _on_tab(e):
+                # Im Nachrichten-Tab die Aktionsliste ausblenden (mehr Platz für den Chat)
+                footer_box.set_visibility(e.value != "Nachrichten")
+                if e.value == "Nachrichten":
+                    await _hooks["load"]()
+            tabs.on_value_change(_on_tab)
     dlg.open()
 
 
