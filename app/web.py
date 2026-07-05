@@ -2660,6 +2660,69 @@ def _beleg_mirror():
     return CFG.get("belege_ordner") or None
 
 
+# Client-Scanner: Live-Kamera + Dokument-Randerkennung (OpenCV.js + jscanify).
+# Beim Auslösen (window.__belegCapture) wird das Dokument zugeschnitten/entzerrt und die
+# Data-URL per ui.run_javascript-Rückgabe an Python geliefert.
+_SCAN_JS = r"""
+(function(){
+  let tries=0;
+  function start(){
+    const wrap=document.getElementById('beleg-scan');
+    if(!wrap){ if(tries++<30){setTimeout(start,100);} return; }
+    if(wrap.dataset.init) return; wrap.dataset.init='1';
+    const video=wrap.querySelector('video');
+    const overlay=wrap.querySelector('canvas.ovl');
+    const status=wrap.querySelector('.scan-status');
+    const work=document.createElement('canvas');
+    let scanner=null, running=true, stream=null, ready=false;
+    function setStatus(t){ if(status) status.textContent=t; }
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('load fail'));document.head.appendChild(s);});}
+    async function init(){
+      try{
+        setStatus('Kamera wird gestartet …');
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        video.srcObject=stream; await video.play();
+      }catch(err){ setStatus('Kamera nicht verfügbar ('+(err&&err.message||err)+'). Nutze „Foto / Datei".'); return; }
+      try{
+        setStatus('Scanner wird geladen …');
+        if(typeof cv==='undefined'){ await loadScript('https://docs.opencv.org/4.8.0/opencv.js'); }
+        await new Promise((r)=>{ if(window.cv&&cv.Mat){r();} else { cv['onRuntimeInitialized']=()=>r(); } });
+        if(typeof jscanify==='undefined'){ await loadScript('https://cdn.jsdelivr.net/npm/jscanify@1.2.0/dist/jscanify.min.js'); }
+        scanner=new jscanify();
+        ready=true;
+        setStatus('Beleg im Rahmen ausrichten und auf „Scannen" tippen.');
+        loop();
+      }catch(e){ setStatus('Scanner konnte nicht laden. Nutze „Foto / Datei".'); }
+    }
+    function loop(){
+      if(!running) return;
+      const w=video.videoWidth,h=video.videoHeight;
+      if(ready&&w&&h){
+        work.width=w; work.height=h; work.getContext('2d').drawImage(video,0,0,w,h);
+        try{ const hl=scanner.highlightPaper(work); overlay.width=w; overlay.height=h; overlay.getContext('2d').drawImage(hl,0,0,w,h); }catch(e){}
+      }
+      requestAnimationFrame(loop);
+    }
+    window.__belegStop=function(){ running=false; if(stream){try{stream.getTracks().forEach(t=>t.stop());}catch(e){}} };
+    window.__belegCapture=function(){
+      if(!ready){ setStatus('Bitte einen Moment warten …'); return null; }
+      try{
+        const w=video.videoWidth,h=video.videoHeight;
+        work.width=w; work.height=h; work.getContext('2d').drawImage(video,0,0,w,h);
+        const tw=Math.min(1200,w||1000);
+        const paper=scanner.extractPaper(work, tw, Math.round(tw*1.414));
+        const url=paper.toDataURL('image/jpeg',0.92);
+        window.__belegStop();
+        return url;
+      }catch(e){ setStatus('Kein Beleg erkannt – bitte neu ausrichten.'); return null; }
+    };
+    init();
+  }
+  start();
+})();
+"""
+
+
 def render_belege():
     user = _cur_user()
     admin = _is_admin()
@@ -2671,6 +2734,60 @@ def render_belege():
                 .classes("text-sm text-gray-500")
 
     apts = _apts()
+    sc = {"apt": None, "dlg": None}
+
+    def _process_and_add(data, ext, crop):
+        """Beleg-Bytes -> Dokument/PDF + OCR + Datensatz (blockierender Teil)."""
+        doc = receipts.save_document(data, ext, _beleg_mirror(), crop)
+        try:
+            text = receipts.ocr_image(os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
+        except Exception:
+            text = ""
+        aid = sc["apt"]
+        receipts.add_receipt(user, doc["photo"], ocr_text=text,
+                             amount=receipts.guess_amount(text),
+                             merchant=receipts.guess_merchant(text), pdf=doc.get("pdf"),
+                             apartment_id=aid, apartment_name=apts.get(aid, ""))
+        return doc
+
+    def _open_scanner():
+        with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-2"):
+            with ui.row().classes("w-full items-center"):
+                ui.label("Beleg scannen").classes("font-bold")
+                ui.space()
+                ui.button(icon="close", on_click=lambda: (
+                    ui.run_javascript("window.__belegStop&&window.__belegStop()"), dlg.close())) \
+                    .props("flat round dense")
+            ui.html(
+                '<div id="beleg-scan" style="position:relative;width:100%">'
+                '<video autoplay playsinline muted '
+                'style="width:100%;border-radius:12px;background:#000;display:block"></video>'
+                '<canvas class="ovl" style="position:absolute;inset:0;width:100%;height:100%;'
+                'pointer-events:none"></canvas>'
+                '<div class="scan-status" style="font-size:12px;color:#6b7280;margin-top:6px;'
+                'text-align:center"></div></div>')
+
+            async def capture():
+                from nicegui import run
+                url = await ui.run_javascript(
+                    "return (window.__belegCapture ? window.__belegCapture() : null);", timeout=25)
+                if not url:
+                    ui.notify("Kein Beleg erkannt – bitte neu ausrichten.", type="warning"); return
+                dlg.close()
+                try:
+                    data = base64.b64decode(url.split(",", 1)[1])
+                except Exception:
+                    ui.notify("Scan konnte nicht verarbeitet werden.", type="negative"); return
+                ui.notify("Beleg wird verarbeitet (PDF, OCR) …", type="info", timeout=3000)
+                await run.io_bound(_process_and_add, data, "jpg", False)   # schon zugeschnitten
+                ui.notify("Beleg gescannt ✓", type="positive")
+                render()
+            ui.button("Scannen", icon="document_scanner", on_click=capture) \
+                .props("unelevated no-caps size=lg").classes("w-full")
+        sc["dlg"] = dlg
+        dlg.open()
+        ui.run_javascript(_SCAN_JS)
+
     box = ui.column().classes("w-full gap-3")
 
     def render():
@@ -2678,14 +2795,14 @@ def render_belege():
         with box:
             # Upload-Karte
             with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4"):
-                ui.label("Neuen Beleg hochladen").classes("font-medium")
-                ui.label("Rechnung fotografieren (Kamera) oder aus der Galerie wählen. "
-                         "Der Rand wird automatisch erkannt, das Dokument als PDF abgelegt "
-                         "und der Text per OCR ausgelesen.") \
+                ui.label("Neuen Beleg hinzufügen").classes("font-medium")
+                ui.label("Live scannen (Rand wird erkannt) oder Foto/Datei wählen. "
+                         "Das Dokument wird als PDF abgelegt und per OCR ausgelesen.") \
                     .classes("text-xs text-gray-500")
-                apt_sel = ui.select({None: "— keine Wohnung —", **apts}, value=None,
+                apt_sel = ui.select({None: "— keine Wohnung —", **apts}, value=sc["apt"],
                                     label="Für welche Wohnung?").props("outlined dense") \
                     .classes("min-w-[220px]")
+                apt_sel.on_value_change(lambda e: sc.update(apt=e.value))
 
                 async def handle(e):
                     try:
@@ -2695,23 +2812,16 @@ def render_belege():
                     ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
                     ui.notify("Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …", type="info", timeout=4000)
                     from nicegui import run
-                    doc = await run.io_bound(receipts.save_document, content, ext, _beleg_mirror())
-                    try:
-                        text = await run.io_bound(receipts.ocr_image,
-                                                  os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
-                    except Exception:
-                        text = ""
-                    aid = apt_sel.value
-                    receipts.add_receipt(user, doc["photo"], ocr_text=text,
-                                         amount=receipts.guess_amount(text),
-                                         merchant=receipts.guess_merchant(text),
-                                         pdf=doc.get("pdf"),
-                                         apartment_id=aid, apartment_name=apts.get(aid, ""))
+                    doc = await run.io_bound(_process_and_add, content, ext, True)
                     ui.notify("Beleg erfasst ✓" + (" (als PDF)" if doc.get("pdf") else ""),
                               type="positive")
                     render()
-                ui.upload(auto_upload=True, on_upload=handle, label="Beleg wählen") \
-                    .props('accept="image/*"').classes("hk-upload w-full max-w-[260px]")
+
+                with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                    ui.button("Beleg scannen", icon="document_scanner", on_click=_open_scanner) \
+                        .props("unelevated no-caps")
+                    ui.upload(auto_upload=True, on_upload=handle, label="Foto / Datei") \
+                        .props('accept="image/*"').classes("hk-upload max-w-[220px]")
                 if not receipts.ocr_available():
                     ui.label("Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
                              "Belege werden gespeichert, aber nicht automatisch ausgelesen.") \

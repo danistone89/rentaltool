@@ -202,8 +202,9 @@ def image_to_pdf(img_path, pdf_path):
         return False
 
 
-def save_document(data, ext, mirror_dir=None):
-    """Beleg-Bytes speichern, Dokument automatisch zuschneiden und als PDF ablegen.
+def save_document(data, ext, mirror_dir=None, crop=True):
+    """Beleg-Bytes speichern, Dokument (optional) automatisch zuschneiden und als PDF
+    ablegen. crop=False, wenn der Client (Scanner) bereits zugeschnitten hat.
     Gibt {'photo': rel_jpg, 'pdf': rel_pdf|None} zurück (+ Spiegelung nach mirror_dir)."""
     uid = housekeeping._uid()
     base = os.path.join(housekeeping.MEDIA_DIR, "beleg")
@@ -214,13 +215,14 @@ def save_document(data, ext, mirror_dir=None):
         f.write(data)
 
     img_rel = orig_rel
-    crop_rel = f"beleg/{uid}_doc.jpg"
-    crop_path = os.path.join(housekeeping.MEDIA_DIR, crop_rel)
-    try:
-        if autocrop(orig_path, crop_path):
-            img_rel = crop_rel
-    except Exception:
-        pass
+    if crop:
+        crop_rel = f"beleg/{uid}_doc.jpg"
+        crop_path = os.path.join(housekeeping.MEDIA_DIR, crop_rel)
+        try:
+            if autocrop(orig_path, crop_path):
+                img_rel = crop_rel
+        except Exception:
+            pass
 
     pdf_rel = f"beleg/{uid}.pdf"
     if not image_to_pdf(os.path.join(housekeeping.MEDIA_DIR, img_rel),

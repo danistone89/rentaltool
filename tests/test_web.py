@@ -78,7 +78,8 @@ async def test_belege_bereich(user: User, mock_backend, tmp_path, monkeypatch):
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     await _login(user)
     user.find(marker="nav-belege").click()
-    await user.should_see("Neuen Beleg hochladen")
+    await user.should_see("Neuen Beleg hinzufügen")
+    await user.should_see("Beleg scannen")
 
 
 async def test_uebersicht_admin(user: User, mock_backend, tmp_path, monkeypatch):
