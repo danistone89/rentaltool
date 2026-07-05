@@ -107,6 +107,32 @@ def delete_for_booking(booking_id):
     return len(items) - len(kept)
 
 
+def get_entry(entry_id):
+    return next((e for e in _read() if e["id"] == entry_id), None)
+
+
+def update_entry(entry_id, checkin=None, checkout=None, apartment=None):
+    """Zeiteintrag bearbeiten. checkin/checkout = datetime, apartment = Name/'' ."""
+    items = _read()
+    for e in items:
+        if e["id"] == entry_id:
+            if checkin is not None:
+                e["checkin"] = checkin.isoformat(timespec="seconds")
+            if checkout is not None:
+                e["checkout"] = checkout.isoformat(timespec="seconds")
+            if apartment is not None:
+                e["apartment"] = apartment
+            e["edited"] = datetime.now().isoformat(timespec="seconds")
+    _write(items)
+
+
+def delete_entry(entry_id):
+    items = _read()
+    kept = [e for e in items if e["id"] != entry_id]
+    _write(kept)
+    return len(items) != len(kept)
+
+
 def duration_minutes(e):
     if not e.get("checkout"):
         return None

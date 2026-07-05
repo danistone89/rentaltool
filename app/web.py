@@ -233,6 +233,174 @@ def _zeit_table(container, rows, show_user, title, export=False):
             else:
                 ui.label("Noch keine Einträge.").classes("text-sm text-gray-400")
 
+def _month_label(m):
+    try:
+        return f"{_MONATE[int(m[5:7]) - 1]} {m[:4]}"
+    except Exception:
+        return m
+
+
+def _zeit_csv_bytes(rows, show_user):
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+    w.writerow((["Mitarbeiter"] if show_user else []) +
+               ["Datum", "Von", "Bis", "Wohnung", "Dauer", "Minuten", "Ort ein"])
+    for e in rows:
+        mins = timetrack.duration_minutes(e) or 0
+        w.writerow((([e["user"]] if show_user else []) + [
+            _d(e["checkin"]), _t(e["checkin"]),
+            _t(e["checkout"]) if e.get("checkout") else "",
+            e.get("apartment") or "", timetrack.fmt_dur(mins), mins,
+            _presence(e.get("checkin_ort"), e.get("checkin_dist"),
+                      e.get("checkin_loc"), e.get("checkin_ip"))]))
+    return buf.getvalue().encode("utf-8-sig")
+
+
+def _time_edit_dialog(default_user, apts, admin, staff, entry=None, on_saved=None):
+    from datetime import datetime
+    apt_opts = {"": "— keine Wohnung —", **{v: v for v in apts.values()}}
+    d0 = entry["checkin"][:10] if entry else date.today().isoformat()
+    von0 = _t(entry["checkin"]) if entry else "09:00"
+    bis0 = _t(entry["checkout"]) if entry and entry.get("checkout") else "11:00"
+    with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
+        ui.label("Zeit bearbeiten" if entry else "Zeit manuell erfassen").classes("text-lg font-bold")
+        usel = None
+        if admin and not entry:
+            usel = ui.select({u: (staff.get(u) or u) for u in staff}, value=default_user,
+                             label="Mitarbeiter").props("outlined dense").classes("w-full")
+        d = ui.input("Datum", value=d0).props("type=date outlined dense").classes("w-full")
+        with ui.row().classes("w-full gap-2"):
+            t1 = ui.input("Von", value=von0).props("type=time outlined dense").classes("flex-grow")
+            t2 = ui.input("Bis", value=bis0).props("type=time outlined dense").classes("flex-grow")
+        aptsel = ui.select(apt_opts, value=(entry.get("apartment") if entry else "") or "",
+                           label="Wohnung").props("outlined dense").classes("w-full")
+
+        def save():
+            try:
+                ci = datetime.fromisoformat(f"{d.value}T{t1.value}")
+                co = datetime.fromisoformat(f"{d.value}T{t2.value}")
+            except Exception:
+                ui.notify("Bitte Datum und Uhrzeiten prüfen.", type="warning"); return
+            if co <= ci:
+                ui.notify("Ende muss nach Beginn liegen.", type="warning"); return
+            apt = aptsel.value or ""
+            if entry:
+                timetrack.update_entry(entry["id"], checkin=ci, checkout=co, apartment=apt)
+            else:
+                timetrack.add_manual(usel.value if usel else default_user, ci, co, apartment=apt)
+            dlg.close(); ui.notify("Gespeichert ✓", type="positive")
+            if on_saved:
+                on_saved()
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Speichern", icon="save", on_click=save).props("unelevated")
+    dlg.open()
+
+
+def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-3"):
+        with ui.row().classes("w-full items-center"):
+            ui.label(title).classes("font-medium")
+            ui.space()
+            if rows:
+                ui.button("CSV", icon="download",
+                          on_click=lambda: ui.download.content(
+                              _zeit_csv_bytes(rows, show_user), "arbeitszeiten.csv",
+                              media_type="text/csv")).props("flat dense no-caps")
+        if not rows:
+            ui.label("Noch keine Einträge.").classes("text-sm text-gray-400"); return
+        for e in rows:
+            with ui.row().classes("w-full items-center gap-2 no-wrap border-b border-slate-50 py-1"):
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    ui.label(f"{_d(e['checkin'])} · {_t(e['checkin'])}–"
+                             + (_t(e['checkout']) if e.get('checkout') else '…')) \
+                        .classes("text-sm text-slate-700 truncate")
+                    sub = []
+                    if show_user:
+                        sub.append(staff.get(e["user"], e["user"]))
+                    if e.get("apartment"):
+                        sub.append(e["apartment"])
+                    if e.get("manual") or e.get("edited"):
+                        sub.append("manuell")
+                    if sub:
+                        ui.label(" · ".join(sub)).classes("text-xs text-gray-400 truncate")
+                ui.label(timetrack.fmt_dur(timetrack.duration_minutes(e))) \
+                    .classes("text-sm font-medium shrink-0")
+                ui.button(icon="edit", on_click=lambda ev=e:
+                          _time_edit_dialog(ev["user"], apts, admin, staff, entry=ev, on_saved=on_change)) \
+                    .props("flat round dense").tooltip("Bearbeiten")
+                ui.button(icon="delete", on_click=lambda ev=e:
+                          (timetrack.delete_entry(ev["id"]), ui.notify("Eintrag gelöscht.", type="warning"),
+                           on_change())).props("flat round dense color=negative").tooltip("Löschen")
+
+
+def _admin_zeiten(apts, staff, on_change):
+    from collections import defaultdict
+    all_entries = timetrack.entries()
+    months = sorted({e["checkin"][:7] for e in all_entries}, reverse=True) or [date.today().isoformat()[:7]]
+    state = {"month": months[0], "user": None}
+    box = ui.column().classes("w-full gap-2")
+
+    def render():
+        box.clear()
+        with box:
+            with ui.row().classes("items-end gap-2 flex-wrap"):
+                msel = ui.select({m: _month_label(m) for m in months}, value=state["month"],
+                                 label="Monat").props("outlined dense").classes("min-w-[150px]")
+                msel.on_value_change(lambda e: (state.update(month=e.value), render()))
+                ppl = {None: "Alle Mitarbeiter",
+                       **{u: (staff.get(u) or u) for u in sorted({x["user"] for x in all_entries})}}
+                usel = ui.select(ppl, value=state["user"], label="Mitarbeiter") \
+                    .props("outlined dense").classes("min-w-[180px]")
+                usel.on_value_change(lambda e: (state.update(user=e.value), render()))
+            rows = [e for e in all_entries
+                    if e["checkin"][:7] == state["month"] and e.get("checkout")
+                    and (state["user"] is None or e["user"] == state["user"])]
+            agg = defaultdict(int)
+            for e in rows:
+                agg[e["user"]] += timetrack.duration_minutes(e) or 0
+            total = sum(agg.values())
+            ui.label(f"{_month_label(state['month'])} · Summe {timetrack.fmt_dur(total)}") \
+                .classes("font-semibold mt-1")
+            for u, mins in sorted(agg.items(), key=lambda x: -x[1]):
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.icon("person").classes("text-primary")
+                    ui.label(staff.get(u, u)).classes("flex-grow")
+                    ui.label(timetrack.fmt_dur(mins)).classes("font-medium")
+
+            def send_stb():
+                stb = (CFG.get("steuerberater_email") or "").strip()
+                if not stb:
+                    ui.notify("Keine Steuerberater-E-Mail hinterlegt (Einstellungen → E-Mail).",
+                              type="warning", timeout=8000); return
+                if not rows:
+                    ui.notify("Keine Zeiten im Zeitraum.", type="warning"); return
+                body = (f"Arbeitszeiten {_month_label(state['month'])}\n\n"
+                        f"Summe: {timetrack.fmt_dur(total)}\n\n"
+                        + "".join(f"- {staff.get(u, u)}: {timetrack.fmt_dur(m)}\n"
+                                  for u, m in sorted(agg.items(), key=lambda x: -x[1]))
+                        + "\nDetails siehe CSV-Anhang.\n")
+                try:
+                    mailer.send_document(
+                        CFG, stb, f"Arbeitszeiten {_month_label(state['month'])} – LIVARO Suites",
+                        body, f"arbeitszeiten_{state['month']}.csv", _zeit_csv_bytes(rows, True))
+                    ui.notify(f"An {stb} gesendet ✓", type="positive", timeout=8000)
+                except mailer.MailError as ex:
+                    ui.notify(f"Versand fehlgeschlagen: {ex}", type="negative", timeout=10000)
+            with ui.row().classes("gap-2 mt-2 flex-wrap"):
+                ui.button("An Steuerberater senden", icon="send", on_click=send_stb) \
+                    .props("unelevated no-caps") \
+                    .tooltip(CFG.get("steuerberater_email") or "keine E-Mail konfiguriert")
+                ui.button("CSV herunterladen", icon="download",
+                          on_click=lambda: ui.download.content(
+                              _zeit_csv_bytes(rows, True), f"arbeitszeiten_{state['month']}.csv",
+                              media_type="text/csv")).props("outline no-caps")
+            _zeit_list(rows, apts, True, staff, on_change, "Einzelne Einträge", True)
+    render()
+
+
 # Pfade ohne Login-Zwang: Login-Seite, Smoobu-Webhook, NiceGUI-Interna.
 _UNRESTRICTED = {"/login"}
 
@@ -830,7 +998,14 @@ def open_settings():
                     ui.button("Test-Benachrichtigung", icon="send", on_click=test_notify).props("outline no-caps")
                     ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-gray-400")
 
+                ui.separator().classes("my-2")
+                ui.label("Steuerberater – Empfänger für den Arbeitszeiten-Versand.") \
+                    .classes("text-sm text-gray-500")
+                stb = ui.input("E-Mail Steuerberater", value=CFG.get("steuerberater_email", "")) \
+                    .props("outlined dense").classes("w-full")
+
         def save():
+            CFG["steuerberater_email"] = (stb.value or "").strip()
             for key in inputs:
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
@@ -1525,19 +1700,28 @@ def _admin_runs():
         done = sum(1 for v in r["tasks"].values() if v.get("done"))
         status = "abgeschlossen" if r.get("finished") else "läuft"
         head = f"{r['apartment_name']} · {r['user']} · {_d(r['started'])} · {done}/{total} Aufgaben · {status}"
-        with ui.expansion(head, icon="cleaning_services").classes("w-full"):
+        nfotos = sum(1 for v in r["tasks"].values() if v.get("ist_photo"))
+        with ui.expansion(head + (f" · {nfotos} Foto(s)" if nfotos else ""),
+                          icon="cleaning_services").classes("w-full"):
             for room in cl["rooms"]:
-                ui.label(room["name"]).classes("font-medium text-sm mt-1")
+                ui.label(room["name"]).classes("font-medium text-sm mt-2")
                 for t in room["tasks"]:
                     st = r["tasks"].get(t["id"], {})
-                    with ui.row().classes("w-full items-center gap-3 no-wrap"):
-                        ui.icon("check_circle" if st.get("done") else "radio_button_unchecked") \
-                            .classes("text-green-600" if st.get("done") else "text-gray-300")
-                        ui.label(t["text"]).classes("flex-grow text-sm")
-                        if t.get("ref_photo"):
-                            _photo_thumb(f"/media/{t['ref_photo']}", "w-14 h-14")
-                        if st.get("ist_photo"):
-                            _photo_thumb(f"/media/{st['ist_photo']}", "w-14 h-14")
+                    with ui.column().classes("w-full gap-1 pl-1 py-1 border-b border-slate-50"):
+                        with ui.row().classes("w-full items-center gap-2"):
+                            ui.icon("check_circle" if st.get("done") else "radio_button_unchecked") \
+                                .classes("text-green-600" if st.get("done") else "text-gray-300")
+                            ui.label(t["text"]).classes("text-sm")
+                        if t.get("ref_photo") or st.get("ist_photo"):
+                            with ui.row().classes("items-end gap-4 pl-7 flex-wrap"):
+                                if t.get("ref_photo"):
+                                    with ui.column().classes("items-center gap-0"):
+                                        _photo_thumb(f"/media/{t['ref_photo']}", "w-16 h-16")
+                                        ui.label("Soll").classes("text-xs text-gray-400")
+                                if st.get("ist_photo"):
+                                    with ui.column().classes("items-center gap-0"):
+                                        _photo_thumb(f"/media/{st['ist_photo']}", "w-16 h-16")
+                                        ui.label("Ist (Putzkraft)").classes("text-xs text-green-600")
 
 
 def _admin_damages():
@@ -1996,11 +2180,13 @@ def _timeline(state, user, admin, staff, activate, rerender):
                             if d_idx <= 0 or a_idx >= NDAYS or d_idx <= a_idx:
                                 continue
                             w = (d_idx - a_idx) * CELL - 6
-                            bar = ui.label((b["guest"] or b["apartment_name"])).classes(
+                            taken = "👤 " if bookings.assignee_of(b["id"]) else ""
+                            bar = ui.label(taken + (b["guest"] or b["apartment_name"])).classes(
                                 "absolute text-white text-xs truncate cursor-pointer rounded-full px-3 "
                                 "shadow-sm hover:brightness-110").style(
                                 f"left:{a_idx * CELL + 3}px; width:{w}px; top:8px; height:28px; "
-                                f"line-height:28px; background:{hexc}")
+                                f"line-height:28px; background:{hexc}") \
+                                .tooltip("Reinigung übernommen" if taken else "")
                             bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
             if not apts:
                 ui.label("Keine Wohnungen geladen.").classes("text-gray-500 p-4")
@@ -2086,7 +2272,8 @@ def _single_month(state, user, admin, staff, activate, rerender):
                     style += "border-top-left-radius:9999px;border-bottom-left-radius:9999px;"
                 if round_r:
                     style += "border-top-right-radius:9999px;border-bottom-right-radius:9999px;"
-                label = (b["guest"] or name) if (a >= ws) else ""
+                taken = "👤 " if bookings.assignee_of(b["id"]) else ""
+                label = (taken + (b["guest"] or name)) if (a >= ws) else ""
                 bar = ui.label(label).classes(
                     "text-white text-xs truncate cursor-pointer px-2 shadow-sm hover:brightness-110") \
                     .style(style)
@@ -3008,16 +3195,16 @@ def main_page():
 
     def build_zeiterfassung():
         user = _cur_user()
-        _feature_header("schedule", "Zeiterfassung", "Check-in / Check-out mit Standort-Nachweis")
-        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
-            status_box = ui.column().classes("items-start gap-2")
-        own_box = ui.column().classes("w-full")
-        admin_box = ui.column().classes("w-full")
+        admin = _is_admin()
+        apts = _apts()
+        staff = _staff_users()
+        _feature_header("schedule", "Zeiterfassung", "Start/Stop, manuell erfassen & bearbeiten")
+        body = ui.column().classes("w-full gap-4")
 
         async def _presence_now():
             ui.notify("Standort wird geprüft …", type="info", timeout=2000)
             loc = await get_location()
-            ip = await get_ip()                 # zusätzlich protokolliert
+            ip = await get_ip()
             gps = None if loc.get("error") else loc
             ort, dist = _match_geofence(gps)
             return gps, ip, ort, dist
@@ -3032,9 +3219,9 @@ def main_page():
                 ui.notify(f"Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)",
                           type="warning", timeout=9000)
             else:
-                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung am Handy aktivieren.",
+                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung aktivieren.",
                           type="warning", timeout=10000)
-            refresh()
+            render()
 
         async def do_checkout():
             gps, ip, ort, dist = await _presence_now()
@@ -3043,28 +3230,34 @@ def main_page():
             else:
                 ui.notify(f"Ausgecheckt ✓ · {ort} ({dist} m)" if ort else "Ausgecheckt ✓",
                           type="positive")
-            refresh()
+            render()
 
-        def refresh():
-            status_box.clear()
-            with status_box:
-                oe = timetrack.get_open(user)
-                if oe:
-                    ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
-                        .classes("text-lg font-medium text-green-700")
-                    ui.label("Nachweis: " + _presence(oe.get("checkin_ort"),
-                             oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
-                        .classes("text-xs text-gray-500")
-                    ui.button("Check-out", icon="logout", on_click=do_checkout) \
-                        .props("unelevated size=lg color=negative")
-                else:
-                    ui.label("Nicht eingecheckt").classes("text-gray-500")
-                    ui.button("Check-in", icon="login", on_click=do_checkin) \
-                        .props("unelevated size=lg")
-            _zeit_table(own_box, timetrack.entries(user), False, "Meine Zeiten")
-            if _is_admin():
-                _zeit_table(admin_box, timetrack.entries(), True, "Alle Mitarbeiter", export=True)
-        refresh()
+        def render():
+            body.clear()
+            with body:
+                with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
+                    oe = timetrack.get_open(user)
+                    if oe:
+                        ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
+                            .classes("text-lg font-medium text-green-700")
+                        ui.label("Nachweis: " + _presence(oe.get("checkin_ort"),
+                                 oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
+                            .classes("text-xs text-gray-500")
+                        ui.button("Check-out", icon="logout", on_click=do_checkout) \
+                            .props("unelevated size=lg color=negative")
+                    else:
+                        ui.label("Nicht eingecheckt").classes("text-gray-500")
+                        ui.button("Check-in", icon="login", on_click=do_checkin) \
+                            .props("unelevated size=lg")
+                ui.button("Zeit manuell erfassen", icon="add",
+                          on_click=lambda: _time_edit_dialog(user, apts, admin, staff, on_saved=render)) \
+                    .props("outline no-caps")
+                _zeit_list(timetrack.entries(user), apts, admin, staff, render, "Meine Zeiten", False)
+                if admin:
+                    ui.separator()
+                    ui.label("Auswertung (Admin)").classes("text-lg font-semibold")
+                    _admin_zeiten(apts, staff, render)
+        render()
 
     def build_reinigung():
         render_reinigung(activate)

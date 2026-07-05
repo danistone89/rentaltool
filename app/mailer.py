@@ -148,3 +148,23 @@ def send_notify(cfg, to, subject, body):
     msg.set_content(body)
     send(sc, msg)
     return to
+
+
+def send_document(cfg, to, subject, body, filename, data,
+                  maintype="text", subtype="csv"):
+    """Mail mit Datei-Anhang (z. B. Arbeitszeiten-CSV) über den Benachrichtigungs-
+    Absender (notify_email, sonst email)."""
+    sc = notify_cfg(cfg)
+    to = (to or "").strip()
+    if not to:
+        raise MailError("Kein Empfänger angegeben.")
+    if not (sc.get("absender") and sc.get("app_password")):
+        raise MailError("Kein Absender konfiguriert (Einstellungen → E-Mail).")
+    msg = EmailMessage()
+    msg["From"] = (sc.get("absender") or "").strip()
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(body)
+    msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
+    send(sc, msg)
+    return to
