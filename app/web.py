@@ -2907,6 +2907,100 @@ def _booking_log(bk):
         ui.label("Für diese Buchung wurde noch nichts erfasst.").classes("text-sm text-gray-400 mt-2")
 
 
+def _msg_time(s):
+    """Smoobu-Zeitstempel '2026-04-07 19:09:46' -> '07.04. 19:09'."""
+    from datetime import datetime
+    s = (s or "").strip()
+    try:
+        return datetime.strptime(s[:16], "%Y-%m-%d %H:%M").strftime("%d.%m. %H:%M")
+    except Exception:
+        return s
+
+
+def _confirm_send_guest(bk, textarea, reload_cb):
+    """Bestätigungsdialog vor dem Live-Versand einer Gast-Antwort über Smoobu."""
+    text = (textarea.value or "").strip()
+    if not text:
+        ui.notify("Bitte zuerst eine Antwort eingeben.", type="warning")
+        return
+    with ui.dialog() as cd, ui.card().classes("w-[420px] max-w-full gap-2"):
+        ui.label("Nachricht an den Gast senden?").classes("text-lg font-bold")
+        ui.label(f"Gast: {bk.get('guest') or '—'}").classes("text-sm text-gray-500")
+        with ui.column().classes("w-full bg-gray-50 rounded p-2 max-h-[30vh] overflow-auto"):
+            ui.label(text).classes("text-sm whitespace-pre-wrap")
+        ui.label("Die Nachricht wird sofort über Smoobu an den Gast zugestellt.") \
+            .classes("text-xs text-amber-700")
+
+        async def _do():
+            from nicegui import run
+            api_key = (CFG.get("smoobu_api_key") or "").strip()
+            if not api_key:
+                ui.notify("Kein Smoobu-API-Key konfiguriert.", type="negative")
+                return
+            try:
+                await run.io_bound(smoobu.send_message, api_key, bk["id"], text)
+            except Exception as ex:
+                ui.notify(f"Senden fehlgeschlagen: {ex}", type="negative")
+                return
+            cd.close()
+            textarea.value = ""
+            ui.notify("Nachricht an den Gast gesendet.", type="positive")
+            await reload_cb(True)
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=cd.close).props("flat no-caps")
+            ui.button("Senden", icon="send", on_click=_do).props("unelevated no-caps color=primary")
+    cd.open()
+
+
+def _render_guest_thread(box, msgs, err, reload_cb, bk):
+    """Nachrichtenverlauf (type 1 = Gast, type 2 = wir) als Chat + Antwortfeld."""
+    box.clear()
+    with box:
+        with ui.row().classes("w-full items-center"):
+            ui.label("Gästekommunikation").classes("text-xs font-semibold text-gray-400")
+            ui.space()
+            ui.button(icon="refresh", on_click=lambda: reload_cb(True)) \
+                .props("flat round dense size=sm").tooltip("Aktualisieren")
+        if err:
+            with ui.row().classes("w-full items-center gap-2 bg-red-50 rounded p-2"):
+                ui.icon("error_outline").classes("text-red-500")
+                ui.label(f"Nachrichten konnten nicht geladen werden: {err}") \
+                    .classes("text-xs text-red-700")
+        elif not msgs:
+            ui.label("Noch keine Nachrichten zu dieser Buchung.") \
+                .classes("text-sm text-gray-400 py-4 self-center")
+        with ui.column().classes("w-full gap-2 max-h-[46vh] overflow-auto py-1"):
+            for m in msgs:
+                mine = m.get("type") == 2
+                with ui.row().classes("w-full no-wrap "
+                                      + ("justify-end" if mine else "justify-start")):
+                    with ui.column().classes(
+                            "gap-0 rounded-2xl px-3 py-2 max-w-[82%] "
+                            + ("bg-primary text-white rounded-br-sm" if mine
+                               else "bg-gray-100 rounded-bl-sm")):
+                        subj = (m.get("subject") or "").strip()
+                        if subj:
+                            ui.label(subj).classes(
+                                "text-xs font-semibold "
+                                + ("text-white/90" if mine else "text-gray-600"))
+                        ui.label((m.get("message") or "").strip() or "—") \
+                            .classes("text-sm whitespace-pre-wrap break-words")
+                        ui.label(_msg_time(m.get("createdAt"))).classes(
+                            "text-[10px] self-end "
+                            + ("text-white/70" if mine else "text-gray-400"))
+        if not err:
+            ui.separator().classes("my-1")
+            ta = ui.textarea(placeholder="Antwort an den Gast …") \
+                .props("outlined autogrow dense").classes("w-full")
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.label("Wird direkt über Smoobu an den Gast gesendet.") \
+                    .classes("text-[11px] text-gray-400 flex-grow")
+                ui.button("Senden", icon="send",
+                          on_click=lambda: _confirm_send_guest(bk, ta, reload_cb)) \
+                    .props("unelevated no-caps")
+
+
 def open_booking_dialog(bk, user, admin, staff, activate):
     who = bookings.assignee_of(bk["id"])
     nxt = bk.get("next")
@@ -2921,11 +3015,14 @@ def open_booking_dialog(bk, user, admin, staff, activate):
             # Schließen aktualisiert die dahinterliegende Liste
             ui.button(icon="close", on_click=lambda: (dlg.close(), activate("buchungen"))) \
                 .props("flat round dense")
+        mgr = _cur_role() in ("admin", "manager")   # Nachrichten nur Admin/Manager
         with ui.tabs().props("dense no-caps align=left").classes("w-full px-2") as tabs:
             t_b = ui.tab("Buchung")
             t_log = ui.tab("Protokoll")
             t_g = ui.tab("Gast")
             t_n = ui.tab("Notizen")
+            if mgr:
+                t_msg = ui.tab("Nachrichten")
         with ui.tab_panels(tabs, value=t_b).classes("w-full"):
             with ui.tab_panel(t_b):
                 with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1 text-sm"):
@@ -2966,6 +3063,35 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                     ui.separator().classes("my-1")
                 ui.label("Buchungsdetails (Smoobu)").classes("text-xs text-gray-500")
                 ui.label(bk["notice"] or "—").classes("text-sm whitespace-pre-wrap")
+            if mgr:
+                with ui.tab_panel(t_msg):
+                    _mbox = ui.column().classes("w-full gap-2")
+                    _mstate = {"loaded": False, "busy": False}
+
+                    async def load_msgs(force=False):
+                        if _mstate["busy"] or (_mstate["loaded"] and not force):
+                            return
+                        _mstate["busy"] = True
+                        _mbox.clear()
+                        with _mbox:
+                            ui.spinner(size="lg").classes("self-center my-4")
+                        from nicegui import run
+                        api_key = (CFG.get("smoobu_api_key") or "").strip()
+                        err, msgs = None, []
+                        if not api_key:
+                            err = "Kein Smoobu-API-Key konfiguriert."
+                        else:
+                            try:
+                                msgs = await run.io_bound(smoobu.get_messages, api_key, bk["id"])
+                            except Exception as ex:
+                                err = str(ex)
+                        _mstate["loaded"], _mstate["busy"] = True, False
+                        _render_guest_thread(_mbox, msgs, err, load_msgs, bk)
+
+                    async def _on_tab(e):
+                        if e.value == "Nachrichten":
+                            await load_msgs()
+                    tabs.on_value_change(_on_tab)
 
         ui.separator()
         ui.label("Aktionen").classes("text-xs font-semibold text-gray-400 px-3 pt-1")

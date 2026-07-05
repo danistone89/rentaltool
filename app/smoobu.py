@@ -84,8 +84,10 @@ def get_messages(api_key, reservation_id):
 
 def send_message(api_key, reservation_id, body, subject=""):
     """Nachricht an den Gast senden (POST). Nur bei ausdrücklicher Aktion aufrufen."""
-    payload = json.dumps({"messageBody": body, "subject": subject,
-                          "internal": False}).encode("utf-8")
+    data = {"messageBody": body}
+    if subject:
+        data["subject"] = subject
+    payload = json.dumps(data).encode("utf-8")
     url = f"{BASE}/reservations/{reservation_id}/messages"
     req = urllib.request.Request(url, data=payload, method="POST", headers={
         "Api-Key": api_key, "Content-Type": "application/json",

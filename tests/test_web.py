@@ -166,6 +166,7 @@ async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     from nicegui import ui as _ui
     user.find(marker="booking-details").click()
     await user.should_see("Tauschen / Zuweisen")   # Aktionen-Liste im Dialog
+    await user.should_see("Nachrichten")           # Gäste-Nachrichten (Admin/Manager)
     assert any(getattr(d, "value", False) for d in user.find(_ui.dialog).elements), \
         "Buchungs-Detail-Dialog wurde nicht geöffnet (dlg.open() fehlt?)"
     # Kalender-Tab rendert Timeline (Datumsband ab heute vorhanden)
