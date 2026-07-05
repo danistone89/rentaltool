@@ -243,6 +243,57 @@ def _month_label(m):
         return m
 
 
+# --- Abrechnungslogik Steuerberater: Meldung zum 19., Übertrag danach -----------
+def _easter(year):
+    a = year % 19; b = year // 100; c = year % 100
+    d = b // 4; e = b % 4; f = (b + 8) // 25; g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30; i = c // 4; k = c % 4
+    ll = (32 + 2 * e + 2 * i - h - k) % 7; mm = (a + 11 * h + 22 * ll) // 451
+    month = (h + ll - 7 * mm + 114) // 31; day = ((h + ll - 7 * mm + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def _de_holidays(year):
+    from datetime import timedelta as _td
+    e = _easter(year)
+    hol = {date(year, 1, 1), e - _td(days=2), e + _td(days=1), date(year, 5, 1),
+           e + _td(days=39), e + _td(days=50), date(year, 10, 3), date(year, 10, 31),
+           date(year, 12, 25), date(year, 12, 26)}
+    d = date(year, 11, 23)                    # Buß- und Bettag (Sachsen): Mi vor 23.11.
+    while d.weekday() != 2:
+        d -= _td(days=1)
+    hol.add(d)
+    return hol
+
+
+def _is_feiertag(d):
+    return d in _de_holidays(d.year)
+
+
+def _billing_month(iso):
+    """Abrechnungsmonat: Tage ab dem 19. zählen zum Folgemonat (Meldung zum 19.)."""
+    d = date.fromisoformat(iso[:10])
+    y, m = d.year, d.month
+    if d.day >= 19:
+        m += 1
+        if m > 12:
+            m = 1; y += 1
+    return f"{y:04d}-{m:02d}"
+
+
+def _billing_period(ym):
+    """(Start, Ende) des Abrechnungsmonats: 19. Vormonat bis 18. des Monats."""
+    y, m = int(ym[:4]), int(ym[5:7])
+    end = date(y, m, 18)
+    pm, py = (12, y - 1) if m == 1 else (m - 1, y)
+    return date(py, pm, 19), end
+
+
+def _hours_num(minutes):
+    s = f"{minutes / 60.0:.1f}".replace(".", ",")
+    return s[:-2] if s.endswith(",0") else s
+
+
 def _zeit_csv_bytes(rows, show_user):
     import csv
     import io
@@ -339,10 +390,45 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                            on_change())).props("flat round dense color=negative").tooltip("Löschen")
 
 
+def _stb_email_body(ym, rows, staff):
+    """Vorlagenbasierten Text für den Steuerberater bauen (mit Werktags/Feiertag-Split
+    und Meldung ‘bis 18.’)."""
+    from collections import defaultdict
+    start, end = _billing_period(ym)
+    monat = _MONATE[int(ym[5:7]) - 1]
+    anrede = CFG.get("steuerberater_anrede") or "Sehr geehrte Damen und Herren,"
+    intro = (CFG.get("steuerberater_intro") or "anbei die Stunden für {monat}.") \
+        .replace("{monat}", monat).replace("{jahr}", ym[:4])
+    gruss = CFG.get("steuerberater_gruss") or "Mit freundlichen Grüßen"
+    tot, feier = defaultdict(int), defaultdict(int)
+    for e in rows:
+        mins = timetrack.duration_minutes(e) or 0
+        tot[e["user"]] += mins
+        if _is_feiertag(date.fromisoformat(e["checkin"][:10])):
+            feier[e["user"]] += mins
+    bis = end.strftime("%d.%m.%Y")
+    blocks = []
+    for u in sorted(tot, key=lambda x: -tot[x]):
+        name = staff.get(u, u)
+        werk = tot[u] - feier[u]
+        lines = [f"{name}:"]
+        if feier[u] > 0:
+            lines.append(f"Werktags: {_hours_num(werk)} Stunden")
+            lines.append(f"Feiertag: {_hours_num(feier[u])} Stunden")
+        else:
+            lines.append(f"{_hours_num(tot[u])} Stunden (bis {bis})")
+        note = (USERS.get(u, {}) or {}).get("steuer_notiz", "").strip()
+        if note:
+            lines.append(note)
+        blocks.append("\n".join(lines))
+    return anrede + "\n\n" + intro + "\n\n" + "\n\n".join(blocks) + "\n\n" + gruss
+
+
 def _admin_zeiten(apts, staff, on_change):
     from collections import defaultdict
-    all_entries = timetrack.entries()
-    months = sorted({e["checkin"][:7] for e in all_entries}, reverse=True) or [date.today().isoformat()[:7]]
+    all_entries = [e for e in timetrack.entries() if e.get("checkout")]
+    months = sorted({_billing_month(e["checkin"]) for e in all_entries}, reverse=True) \
+        or [_billing_month(date.today().isoformat())]
     state = {"month": months[0], "user": None}
     box = ui.column().classes("w-full gap-2")
 
@@ -351,40 +437,48 @@ def _admin_zeiten(apts, staff, on_change):
         with box:
             with ui.row().classes("items-end gap-2 flex-wrap"):
                 msel = ui.select({m: _month_label(m) for m in months}, value=state["month"],
-                                 label="Monat").props("outlined dense").classes("min-w-[150px]")
+                                 label="Abrechnungsmonat").props("outlined dense").classes("min-w-[170px]")
                 msel.on_value_change(lambda e: (state.update(month=e.value), render()))
                 ppl = {None: "Alle Mitarbeiter",
                        **{u: (staff.get(u) or u) for u in sorted({x["user"] for x in all_entries})}}
                 usel = ui.select(ppl, value=state["user"], label="Mitarbeiter") \
                     .props("outlined dense").classes("min-w-[180px]")
                 usel.on_value_change(lambda e: (state.update(user=e.value), render()))
+            st, en = _billing_period(state["month"])
+            ui.label(f"Zeitraum {st.strftime('%d.%m.')}–{en.strftime('%d.%m.%Y')} "
+                     "(Meldung zum 19., spätere Stunden im Folgemonat)") \
+                .classes("text-xs text-gray-500")
             rows = [e for e in all_entries
-                    if e["checkin"][:7] == state["month"] and e.get("checkout")
+                    if _billing_month(e["checkin"]) == state["month"]
                     and (state["user"] is None or e["user"] == state["user"])]
-            agg = defaultdict(int)
+            agg, feier = defaultdict(int), defaultdict(int)
             for e in rows:
-                agg[e["user"]] += timetrack.duration_minutes(e) or 0
+                mins = timetrack.duration_minutes(e) or 0
+                agg[e["user"]] += mins
+                if _is_feiertag(date.fromisoformat(e["checkin"][:10])):
+                    feier[e["user"]] += mins
             total = sum(agg.values())
-            ui.label(f"{_month_label(state['month'])} · Summe {timetrack.fmt_dur(total)}") \
+            ui.label(f"{_month_label(state['month'])} · Summe {_hours_num(total)} Stunden") \
                 .classes("font-semibold mt-1")
             for u, mins in sorted(agg.items(), key=lambda x: -x[1]):
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.icon("person").classes("text-primary")
-                    ui.label(staff.get(u, u)).classes("flex-grow")
-                    ui.label(timetrack.fmt_dur(mins)).classes("font-medium")
+                    with ui.column().classes("gap-0 flex-grow min-w-0"):
+                        ui.label(staff.get(u, u)).classes("truncate")
+                        if feier[u] > 0:
+                            ui.label(f"Werktags {_hours_num(mins - feier[u])} · "
+                                     f"Feiertag {_hours_num(feier[u])} Std") \
+                                .classes("text-xs text-gray-400")
+                    ui.label(f"{_hours_num(mins)} Std").classes("font-medium shrink-0")
 
             def send_stb():
                 stb = (CFG.get("steuerberater_email") or "").strip()
                 if not stb:
-                    ui.notify("Keine Steuerberater-E-Mail hinterlegt (Einstellungen → E-Mail).",
+                    ui.notify("Keine Steuerberater-E-Mail (Einstellungen → Steuerberater).",
                               type="warning", timeout=8000); return
                 if not rows:
                     ui.notify("Keine Zeiten im Zeitraum.", type="warning"); return
-                body = (f"Arbeitszeiten {_month_label(state['month'])}\n\n"
-                        f"Summe: {timetrack.fmt_dur(total)}\n\n"
-                        + "".join(f"- {staff.get(u, u)}: {timetrack.fmt_dur(m)}\n"
-                                  for u, m in sorted(agg.items(), key=lambda x: -x[1]))
-                        + "\nDetails siehe CSV-Anhang.\n")
+                body = _stb_email_body(state["month"], rows, staff)
                 try:
                     mailer.send_document(
                         CFG, stb, f"Arbeitszeiten {_month_label(state['month'])} – LIVARO Suites",
@@ -392,11 +486,22 @@ def _admin_zeiten(apts, staff, on_change):
                     ui.notify(f"An {stb} gesendet ✓", type="positive", timeout=8000)
                 except mailer.MailError as ex:
                     ui.notify(f"Versand fehlgeschlagen: {ex}", type="negative", timeout=10000)
+
+            def preview():
+                with ui.dialog() as dlg, ui.card().classes("w-[480px] max-w-full gap-2"):
+                    ui.label("Vorschau E-Mail an Steuerberater").classes("font-bold")
+                    ui.label(_stb_email_body(state["month"], rows, staff)) \
+                        .classes("text-sm whitespace-pre-wrap")
+                    with ui.row().classes("w-full justify-end"):
+                        ui.button("Schließen", on_click=dlg.close).props("flat")
+                dlg.open()
+
             with ui.row().classes("gap-2 mt-2 flex-wrap"):
                 ui.button("An Steuerberater senden", icon="send", on_click=send_stb) \
                     .props("unelevated no-caps") \
                     .tooltip(CFG.get("steuerberater_email") or "keine E-Mail konfiguriert")
-                ui.button("CSV herunterladen", icon="download",
+                ui.button("Vorschau", icon="visibility", on_click=preview).props("outline no-caps")
+                ui.button("CSV", icon="download",
                           on_click=lambda: ui.download.content(
                               _zeit_csv_bytes(rows, True), f"arbeitszeiten_{state['month']}.csv",
                               media_type="text/csv")).props("outline no-caps")
@@ -710,6 +815,17 @@ def open_users():
                                     data.save_config()
                                 return h
                             em.on("blur", _email_handler(uname, em))
+                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            sn = ui.input("Steuerberater-Notiz (z. B. Befreiung Rentenversicherung anbei)",
+                                          value=u.get("steuer_notiz", "")).props("dense outlined") \
+                                .classes("flex-grow")
+
+                            def _note_handler(un, field):
+                                def h(e):
+                                    USERS[un]["steuer_notiz"] = (field.value or "").strip()
+                                    data.save_config()
+                                return h
+                            sn.on("blur", _note_handler(uname, sn))
         render()
 
         ui.separator()
@@ -1009,9 +1125,26 @@ def open_settings():
                     .classes("text-sm text-gray-500")
                 stb = ui.input("E-Mail Steuerberater", value=CFG.get("steuerberater_email", "")) \
                     .props("outlined dense").classes("w-full max-w-[420px]")
+                ui.label("E-Mail-Vorlage (Platzhalter {monat}, {jahr}). Die Stunden je "
+                         "Mitarbeiter und der Zeitraum werden automatisch eingefügt; eine "
+                         "Notiz je Mitarbeiter kommt aus der Benutzerverwaltung.") \
+                    .classes("text-xs text-gray-500 mt-2")
+                stb_anrede = ui.input("Anrede", value=CFG.get("steuerberater_anrede", "")
+                                      or "Sehr geehrte Damen und Herren,") \
+                    .props("outlined dense").classes("w-full max-w-[420px]")
+                stb_intro = ui.input("Einleitung",
+                                     value=CFG.get("steuerberater_intro", "") or "anbei die Stunden für {monat}.") \
+                    .props("outlined dense").classes("w-full max-w-[420px]")
+                stb_gruss = ui.textarea("Grußformel",
+                                        value=CFG.get("steuerberater_gruss", "")
+                                        or "Vielen Dank im Voraus.\n\nMit freundlichen Grüßen\nDaniel Steinhauß") \
+                    .props("outlined autogrow").classes("w-full max-w-[420px]")
 
         def save():
             CFG["steuerberater_email"] = (stb.value or "").strip()
+            CFG["steuerberater_anrede"] = (stb_anrede.value or "").strip()
+            CFG["steuerberater_intro"] = (stb_intro.value or "").strip()
+            CFG["steuerberater_gruss"] = stb_gruss.value or ""
             for key in inputs:
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
@@ -1687,12 +1820,12 @@ def _admin_summary(activate):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.icon("home").classes("text-primary shrink-0")
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
-                    ui.label(f"{j['apartment_name']} · {_dfmt(j['departure'])}") \
-                        .classes("font-medium truncate")
-                    ui.label(f"{wn} · Checkliste {dprog}/{tprog} · "
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.label(j["apartment_name"]).classes("font-medium truncate flex-grow min-w-0")
+                        _status_chip(j)
+                    ui.label(f"{_dfmt(j['departure'])} · {wn} · Checkliste {dprog}/{tprog} · "
                              f"{timetrack.fmt_dur(total_min) if total_min else '0:00 h'}") \
                         .classes("text-xs text-gray-500 truncate")
-                _status_chip(j)
                 ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
 
@@ -2041,7 +2174,8 @@ def _booking_status(job):
 
 def _status_chip(job):
     label, color, icon = _STATUS[_booking_status(job)]
-    ui.chip(label, icon=icon).props(f"color={color} text-color=white dense")
+    ui.chip(label, icon=icon).props(f"color={color} text-color=white dense") \
+        .classes("shrink-0 whitespace-nowrap")
 
 
 def render_buchungen(activate):
