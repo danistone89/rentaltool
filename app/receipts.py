@@ -17,7 +17,7 @@ from app import housekeeping
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RECEIPTS = os.path.join(HERE, "receipts.json")
 
-_EDITABLE = {"merchant", "amount", "note", "kategorie"}
+_EDITABLE = {"merchant", "amount", "note", "kategorie", "apartment_id", "apartment_name"}
 _KNOWN_MERCHANTS = ["ALDI", "LIDL", "REWE", "EDEKA", "KAUFLAND", "PENNY", "NETTO",
                     "ROSSMANN", "IKEA", "OBI", "BAUHAUS", "HORNBACH", "METRO",
                     "TEDI", "ACTION", "MÜLLER", "MEDIAMARKT", "SATURN", "AMAZON",
@@ -40,11 +40,14 @@ def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def add_receipt(uploader, photo, ocr_text="", amount="", merchant="", note="", kategorie=""):
+def add_receipt(uploader, photo, ocr_text="", amount="", merchant="", note="",
+                kategorie="", pdf=None, apartment_id=None, apartment_name=""):
     items = _read()
     r = {"id": housekeeping._uid(), "uploader": uploader, "ts": now_iso(),
-         "photo": photo, "ocr_text": ocr_text or "", "amount": amount or "",
-         "merchant": merchant or "", "note": note or "", "kategorie": kategorie or ""}
+         "photo": photo, "pdf": pdf, "apartment_id": apartment_id,
+         "apartment_name": apartment_name or "", "ocr_text": ocr_text or "",
+         "amount": amount or "", "merchant": merchant or "", "note": note or "",
+         "kategorie": kategorie or ""}
     items.append(r)
     _write(items)
     return r
@@ -75,12 +78,14 @@ def delete_receipt(receipt_id):
             keep.append(r)
     if gone:
         _write(keep)
-        try:
-            p = os.path.join(housekeeping.MEDIA_DIR, gone.get("photo", ""))
-            if gone.get("photo") and os.path.exists(p):
-                os.remove(p)
-        except Exception:
-            pass
+        for rel in (gone.get("photo"), gone.get("pdf")):
+            try:
+                if rel:
+                    p = os.path.join(housekeeping.MEDIA_DIR, rel)
+                    if os.path.exists(p):
+                        os.remove(p)
+            except Exception:
+                pass
     return gone
 
 
@@ -125,6 +130,112 @@ def guess_amount(text):
             return float(x.replace(".", "").replace(",", "."))
         return max(allm, key=_val).replace(".", ",")
     return ""
+
+
+# ------------------------------------------------------------ Dokument -> PDF
+def _order_pts(pts):
+    import numpy as np
+    rect = np.zeros((4, 2), dtype="float32")
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]      # oben-links
+    rect[2] = pts[np.argmax(s)]      # unten-rechts
+    d = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(d)]      # oben-rechts
+    rect[3] = pts[np.argmax(d)]      # unten-links
+    return rect
+
+
+def autocrop(src_path, dst_path):
+    """Dokument-Ränder erkennen und perspektivisch zuschneiden. True bei Erfolg
+    (schreibt dst_path); False, wenn kein Dokument erkennbar oder OpenCV fehlt."""
+    try:
+        import cv2
+        import numpy as np
+    except Exception:
+        return False
+    img = cv2.imread(src_path)
+    if img is None or img.shape[0] < 300:
+        return False
+    ratio = img.shape[0] / 500.0
+    small = cv2.resize(img, (int(img.shape[1] / ratio), 500))
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(gray, 60, 200)
+    edged = cv2.dilate(edged, None, iterations=1)
+    cnts, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:6]
+    area_small = small.shape[0] * small.shape[1]
+    doc = None
+    for c in cnts:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        if len(approx) == 4 and cv2.contourArea(c) > 0.2 * area_small:
+            doc = approx
+            break
+    if doc is None:
+        return False
+    rect = _order_pts(doc.reshape(4, 2).astype("float32") * ratio)
+    (tl, tr, br, bl) = rect
+    maxW = int(max(np.linalg.norm(br - bl), np.linalg.norm(tr - tl)))
+    maxH = int(max(np.linalg.norm(tr - br), np.linalg.norm(tl - bl)))
+    if maxW < 200 or maxH < 200:
+        return False
+    dst = np.array([[0, 0], [maxW - 1, 0], [maxW - 1, maxH - 1], [0, maxH - 1]],
+                   dtype="float32")
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warped = cv2.warpPerspective(img, M, (maxW, maxH))
+    cv2.imwrite(dst_path, warped)
+    return True
+
+
+def image_to_pdf(img_path, pdf_path):
+    """Bild -> PDF (PyMuPDF). True bei Erfolg."""
+    try:
+        import fitz
+        doc = fitz.open(img_path)
+        pdf_bytes = doc.convert_to_pdf()
+        doc.close()
+        with open(pdf_path, "wb") as f:
+            f.write(pdf_bytes)
+        return True
+    except Exception:
+        return False
+
+
+def save_document(data, ext, mirror_dir=None):
+    """Beleg-Bytes speichern, Dokument automatisch zuschneiden und als PDF ablegen.
+    Gibt {'photo': rel_jpg, 'pdf': rel_pdf|None} zurück (+ Spiegelung nach mirror_dir)."""
+    uid = housekeeping._uid()
+    base = os.path.join(housekeeping.MEDIA_DIR, "beleg")
+    os.makedirs(base, exist_ok=True)
+    orig_rel = f"beleg/{uid}.{ext}"
+    orig_path = os.path.join(housekeeping.MEDIA_DIR, orig_rel)
+    with open(orig_path, "wb") as f:
+        f.write(data)
+
+    img_rel = orig_rel
+    crop_rel = f"beleg/{uid}_doc.jpg"
+    crop_path = os.path.join(housekeeping.MEDIA_DIR, crop_rel)
+    try:
+        if autocrop(orig_path, crop_path):
+            img_rel = crop_rel
+    except Exception:
+        pass
+
+    pdf_rel = f"beleg/{uid}.pdf"
+    if not image_to_pdf(os.path.join(housekeeping.MEDIA_DIR, img_rel),
+                        os.path.join(housekeeping.MEDIA_DIR, pdf_rel)):
+        pdf_rel = None
+
+    if mirror_dir:
+        for rel in [img_rel] + ([pdf_rel] if pdf_rel else []):
+            try:
+                dst = os.path.join(mirror_dir, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(os.path.join(housekeeping.MEDIA_DIR, rel), dst)
+            except Exception:
+                pass
+    return {"photo": img_rel, "pdf": pdf_rel}
 
 
 def guess_merchant(text):

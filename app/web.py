@@ -2670,6 +2670,7 @@ def render_belege():
             ui.label("Rechnungen scannen, ablegen & per OCR auslesen") \
                 .classes("text-sm text-gray-500")
 
+    apts = _apts()
     box = ui.column().classes("w-full gap-3")
 
     def render():
@@ -2679,8 +2680,12 @@ def render_belege():
             with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4"):
                 ui.label("Neuen Beleg hochladen").classes("font-medium")
                 ui.label("Rechnung fotografieren (Kamera) oder aus der Galerie wählen. "
-                         "Der Text wird automatisch per OCR erkannt.") \
+                         "Der Rand wird automatisch erkannt, das Dokument als PDF abgelegt "
+                         "und der Text per OCR ausgelesen.") \
                     .classes("text-xs text-gray-500")
+                apt_sel = ui.select({None: "— keine Wohnung —", **apts}, value=None,
+                                    label="Für welche Wohnung?").props("outlined dense") \
+                    .classes("min-w-[220px]")
 
                 async def handle(e):
                     try:
@@ -2688,19 +2693,22 @@ def render_belege():
                     except Exception as ex:
                         ui.notify(f"Upload fehlgeschlagen: {ex}", type="negative"); return
                     ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
-                    rel = housekeeping.save_photo("beleg", content, ext=ext,
-                                                  mirror_dir=_beleg_mirror())
-                    ui.notify("Beleg gespeichert – Text wird erkannt …", type="info", timeout=3000)
+                    ui.notify("Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …", type="info", timeout=4000)
                     from nicegui import run
+                    doc = await run.io_bound(receipts.save_document, content, ext, _beleg_mirror())
                     try:
                         text = await run.io_bound(receipts.ocr_image,
-                                                  os.path.join(housekeeping.MEDIA_DIR, rel))
+                                                  os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
                     except Exception:
                         text = ""
-                    receipts.add_receipt(user, rel, ocr_text=text,
+                    aid = apt_sel.value
+                    receipts.add_receipt(user, doc["photo"], ocr_text=text,
                                          amount=receipts.guess_amount(text),
-                                         merchant=receipts.guess_merchant(text))
-                    ui.notify("Beleg erfasst ✓", type="positive")
+                                         merchant=receipts.guess_merchant(text),
+                                         pdf=doc.get("pdf"),
+                                         apartment_id=aid, apartment_name=apts.get(aid, ""))
+                    ui.notify("Beleg erfasst ✓" + (" (als PDF)" if doc.get("pdf") else ""),
+                              type="positive")
                     render()
                 ui.upload(auto_upload=True, on_upload=handle, label="Beleg wählen") \
                     .props('accept="image/*"').classes("hk-upload w-full max-w-[260px]")
@@ -2720,7 +2728,7 @@ def render_belege():
                     cur_month = month
                     ym = f"{_MONATE[int(month[5:7]) - 1]} {month[:4]}"
                     ui.label(ym).classes("text-sm font-semibold text-primary mt-3")
-                _beleg_card(r, user, admin, render)
+                _beleg_card(r, apts, user, admin, render)
     render()
 
 
@@ -2728,7 +2736,7 @@ _MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
            "August", "September", "Oktober", "November", "Dezember"]
 
 
-def _beleg_card(r, user, admin, rerender):
+def _beleg_card(r, apts, user, admin, rerender):
     with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
         with ui.row().classes("w-full items-start gap-3 no-wrap"):
             if r.get("photo"):
@@ -2744,14 +2752,27 @@ def _beleg_card(r, user, admin, rerender):
                     amount.on("blur", lambda e, i=r["id"], f=amount:
                               receipts.update_receipt(i, amount=f.value or ""))
                     ui.label("€").classes("text-sm text-gray-400")
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    ui.icon("home").classes("text-gray-400 text-sm shrink-0")
+                    apt_sel = ui.select({None: "— keine Wohnung —", **apts},
+                                        value=r.get("apartment_id")).props("dense borderless") \
+                        .classes("min-w-0")
+                    apt_sel.on_value_change(lambda e, i=r["id"]:
+                                            receipts.update_receipt(i, apartment_id=e.value,
+                                                                    apartment_name=apts.get(e.value, "")))
                 ui.label(f"{_d(r['ts'])} · {r.get('uploader', '')}").classes("text-xs text-gray-400")
-                note = ui.input(placeholder="Notiz (z. B. Wofür / welche Wohnung)",
+                note = ui.input(placeholder="Notiz (z. B. wofür)",
                                 value=r.get("note", "")).props("dense borderless").classes("w-full")
                 note.on("blur", lambda e, i=r["id"], f=note:
                         receipts.update_receipt(i, note=f.value or ""))
-            if admin:
-                ui.button(icon="delete", on_click=lambda i=r["id"]: _del_beleg(i, rerender)) \
-                    .props("flat round dense color=negative").tooltip("Beleg löschen")
+            with ui.column().classes("items-center gap-1 shrink-0"):
+                if r.get("pdf"):
+                    ui.button(icon="picture_as_pdf",
+                              on_click=lambda p=r["pdf"]: ui.navigate.to(f"/media/{p}", new_tab=True)) \
+                        .props("flat round dense color=primary").tooltip("PDF öffnen")
+                if admin:
+                    ui.button(icon="delete", on_click=lambda i=r["id"]: _del_beleg(i, rerender)) \
+                        .props("flat round dense color=negative").tooltip("Beleg löschen")
         if r.get("ocr_text"):
             with ui.expansion("Erkannter Text (OCR)", icon="document_scanner").classes("w-full"):
                 ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-gray-600")
