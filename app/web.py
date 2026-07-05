@@ -51,7 +51,7 @@ if not USERS and AUTH.get("password_hash"):   # Migration Single-User -> users
 if _new_secret or _migrated:
     data.save_config()
 
-ROLES = {"admin": "Administrator", "putzkraft": "Putzkraft"}
+ROLES = {"admin": "Administrator", "manager": "Manager", "putzkraft": "Putzkraft"}
 
 # Bereiche (Features). Welche Rolle was sieht, wird über ROLE_AREAS gesteuert –
 # die feinen Rechte definieren wir später, hier nur das Grundgerüst.
@@ -66,6 +66,9 @@ AREAS = [
 # (activate('reinigung') via _open_checkliste). "uebersicht" ist die Admin-Auswertung.
 ROLE_AREAS = {
     "admin": {a["key"] for a in AREAS},          # Admin sieht alles
+    # Manager: operative Koordination (Übersicht + Checklisten/Einkauf/Schäden-Konfig),
+    # aber keine Steuer, keine Benutzer-/Einstellungsverwaltung.
+    "manager": {"buchungen", "uebersicht", "belege", "zeiterfassung"},
     "putzkraft": {"buchungen", "belege", "zeiterfassung"},  # Putzkräfte
 }
 
@@ -1679,7 +1682,7 @@ def _admin_summary(activate):
         who = bookings.assignee_of(j["id"])
         wn = staff.get(who, who) if who else "nicht zugewiesen"
         card = ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 cursor-pointer")
-        card.on("click", lambda b=j: open_booking_dialog(b, _cur_user(), True, staff, activate))
+        card.on("click", lambda b=j: open_booking_dialog(b, _cur_user(), _is_admin(), staff, activate))
         with card:
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.icon("home").classes("text-primary shrink-0")
@@ -1774,10 +1777,12 @@ def render_reinigung_refresh():
 
 
 def _admin_config(apts):
-    ui.label("Checkliste & Bestand je Apartment. Soll-Foto pro Aufgabe hochladen.") \
+    ui.label("Checkliste & Bestand je Wohnung. Pro Aufgabe ein Beispielfoto (Soll-Zustand) "
+             "aufnehmen – die Putzkraft sieht es dann in der Checkliste.") \
         .classes("text-sm text-gray-500")
-    sel = ui.select(apts, label="Apartment",
-                    value=(next(iter(apts), None))).props("outlined dense").classes("min-w-[240px]")
+    sel = ui.select(apts, label="Wohnung wählen",
+                    value=(next(iter(apts), None))).props("outlined dense") \
+        .classes("w-full max-w-[320px]")
     box = ui.column().classes("w-full gap-2")
 
     def render_cfg():
@@ -1823,20 +1828,34 @@ def _admin_config(apts):
                         ui.button(icon="delete", on_click=lambda i=ri: (collect(), cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                             .props("flat dense round color=negative")
                     for ti, t in enumerate(room["tasks"]):
-                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                            tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
-                            task_inputs.append((t, tt))
-                            if t.get("ref_photo"):
-                                _photo_thumb(f"/media/{t['ref_photo']}", "w-12 h-12")
+                        with ui.column().classes("w-full gap-1 py-1 border-b border-slate-50"):
+                            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                                tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
+                                task_inputs.append((t, tt))
+                                ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                                    .props("flat dense round color=negative").tooltip("Aufgabe löschen")
 
                             def ref_saved(rel, tid=t["id"]):
                                 collect()
                                 housekeeping.save_checklist(aid, cl)
                                 housekeeping.set_task_ref_photo(aid, tid, rel)
                                 render_cfg()
-                            _photo_button("Soll-Foto", "ref", ref_saved, icon="add_a_photo")
-                            ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
-                                .props("flat dense round color=negative")
+
+                            def ref_remove(tid=t["id"]):
+                                collect()
+                                housekeeping.save_checklist(aid, cl)
+                                housekeeping.set_task_ref_photo(aid, tid, None)
+                                render_cfg()
+                            with ui.row().classes("w-full items-center gap-2 flex-wrap pl-1"):
+                                if t.get("ref_photo"):
+                                    _photo_thumb(f"/media/{t['ref_photo']}", "w-16 h-16")
+                                    ui.label("Beispielfoto").classes("text-xs text-gray-400")
+                                    _photo_button("ändern", "ref", ref_saved, icon="photo_camera")
+                                    ui.button("entfernen", icon="close", on_click=ref_remove) \
+                                        .props("flat dense no-caps size=sm color=negative")
+                                else:
+                                    _photo_button("Beispielfoto", "ref", ref_saved, icon="add_a_photo")
+                                    ui.label("(Soll-Zustand fotografieren)").classes("text-xs text-gray-400")
                     ui.button("Aufgabe hinzufügen", icon="add",
                               on_click=lambda rm=room: (collect(), rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
                         .props("flat dense no-caps")
@@ -1847,10 +1866,10 @@ def _admin_config(apts):
             ui.separator()
             ui.label("Bestandsliste (Verbrauch/Wäsche)").classes("font-medium")
             for ii, it in enumerate(inv):
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    nm = ui.input("Artikel", value=it["name"]).props("dense outlined").classes("flex-grow")
+                with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                    nm = ui.input("Artikel", value=it["name"]).props("dense outlined").classes("flex-grow min-w-[140px]")
                     ka = ui.select({"verbrauch": "Verbrauch", "waesche": "Wäsche"},
-                                   value=it.get("kategorie", "verbrauch")).props("dense outlined").classes("w-40")
+                                   value=it.get("kategorie", "verbrauch")).props("dense outlined").classes("w-32")
                     inv_inputs.append((it, nm, ka))
                     ui.button(icon="delete", on_click=lambda i=ii: (collect(), inv.pop(i), housekeeping.save_inventory(aid, inv), render_cfg())) \
                         .props("flat dense round color=negative")

@@ -126,6 +126,28 @@ async def test_putzkraft_bereiche(user: User, mock_backend, tmp_path, monkeypatc
     await user.should_not_see("Zusammenfassung")   # Admin-Auswertung nicht für Putzkraft
 
 
+async def test_manager_bereiche(user: User, mock_backend, tmp_path, monkeypatch):
+    from app import housekeeping as hk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "a.json"))
+    monkeypatch.setitem(web.USERS, "mgr", {
+        "password_hash": auth.hash_password("mgr"), "role": "manager",
+        "totp_secret": "", "name": "mgr"})
+    await user.open("/login")
+    user.find("Benutzername").type("mgr")
+    user.find("Passwort").type("mgr")
+    user.find("Anmelden").click()
+    await user.open("/")
+    user.find(marker="nav-uebersicht").click()
+    await user.should_see("Zusammenfassung")   # Manager sieht Auswertung
+    await user.should_see("Konfiguration")     # inkl. Checklisten-Konfiguration
+    await user.should_not_see("Berechnen")     # keine Beherbergungssteuer
+    await user.should_not_see("Benutzer")      # keine Benutzerverwaltung im Kopf
+
+
 async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     """Buchungs-Hub rendert eine Buchung mit Zuweisungs-Aktion."""
     monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "assignments.json"))
