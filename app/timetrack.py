@@ -9,7 +9,9 @@ als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+
+from app import feiertage
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG = os.path.join(HERE, "worklog.json")
@@ -145,3 +147,78 @@ def fmt_dur(mins):
     if mins is None:
         return "läuft…"
     return f"{mins // 60}:{mins % 60:02d} h"
+
+
+# ------------------------------------------------- Tagesart & Vergütung
+def entry_date(e):
+    """Datum des Eintrags = Tag des Check-in. Ein über Mitternacht laufender
+    Einsatz zählt damit vollständig zum Anfangstag."""
+    return date.fromisoformat(e["checkin"][:10])
+
+
+def kind_of(e):
+    """feiertage.WERKTAG oder feiertage.WOCHENENDE für einen Zeiteintrag."""
+    return feiertage.kind_of(entry_date(e))
+
+
+def _num(v):
+    try:
+        return float(str(v).replace(",", "."))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def rate_for(kind, user_cfg, defaults=None):
+    """Stundensatz (€/h) für eine Tagesart.
+
+    Der Wochenend-/Feiertagssatz greift nur, wenn er beim Mitarbeiter aktiviert
+    und gesetzt ist – sonst gilt überall der Werktagssatz. Fehlt beim
+    Mitarbeiter ein Wert, kommt der globale Vorgabewert zum Zug.
+    """
+    user_cfg = user_cfg or {}
+    defaults = defaults or {}
+
+    def pick(key):
+        v = user_cfg.get(key)
+        if v in (None, ""):
+            v = defaults.get(key)
+        return _num(v)
+
+    if kind == feiertage.WOCHENENDE and user_cfg.get("wochenendsatz_aktiv"):
+        r = pick("stundensatz_wochenende")
+        if r:
+            return r
+    return pick("stundensatz_werktag")
+
+
+def amount(minutes, rate):
+    """Betrag in € für Minuten zum Stundensatz, kaufmännisch auf Cent gerundet."""
+    return round((minutes or 0) / 60.0 * _num(rate), 2)
+
+
+def aggregate(rows, users=None, defaults=None):
+    """Zeiten je Mitarbeiter nach Tagesart summieren.
+
+    rows: abgeschlossene Einträge. users: {username: user_cfg} für die Sätze.
+    Rückgabe je Mitarbeiter: minutes/amount/rate je Tagesart plus Summen.
+    """
+    users = users or {}
+    out = {}
+    for e in rows:
+        mins = duration_minutes(e) or 0
+        u = e["user"]
+        slot = out.setdefault(u, {
+            "minutes": {feiertage.WERKTAG: 0, feiertage.WOCHENENDE: 0},
+            "amount": {feiertage.WERKTAG: 0.0, feiertage.WOCHENENDE: 0.0},
+            "rate": {k: rate_for(k, users.get(u), defaults)
+                     for k in (feiertage.WERKTAG, feiertage.WOCHENENDE)},
+            "total_minutes": 0, "total_amount": 0.0,
+        })
+        k = kind_of(e)
+        slot["minutes"][k] += mins
+        slot["total_minutes"] += mins
+    for slot in out.values():
+        for k, mins in slot["minutes"].items():
+            slot["amount"][k] = amount(mins, slot["rate"][k])
+        slot["total_amount"] = round(sum(slot["amount"].values()), 2)
+    return out

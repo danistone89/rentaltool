@@ -180,3 +180,53 @@ async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
     user.find(marker="nav-beherbergungssteuer").click()
     user.find("Archiv").click()
     await user.should_see("revisionssicher abgelegte")
+
+
+async def test_stundensaetze_in_benutzerverwaltung(user: User, mock_backend):
+    """Neue Satz-Felder rendern (u. a. suffix=€ in props) und der Schalter
+    blendet das Wochenend-Feld ein."""
+    await _login(user)
+    user.find("Benutzer").click()
+    await user.should_see("Stundensatz Werktag")
+    await user.should_see("Abweichender Satz an Wochenende/Feiertagen")
+    await user.should_not_see("Stundensatz Wochenende/Feiertag")
+    user.find("Abweichender Satz an Wochenende/Feiertagen").click()
+    await user.should_see("Stundensatz Wochenende/Feiertag")
+    assert web.USERS["test"]["wochenendsatz_aktiv"] is True
+
+
+async def test_vorgabesaetze_in_einstellungen(user: User, mock_backend):
+    await _login(user)
+    user.find("Einstellungen").click()
+    user.find("Steuerberater").click()
+    await user.should_see("Stundensätze (Vorgabe)")
+    await user.should_see("Wochenende/Feiertag")
+
+
+async def test_zeiten_kennzeichnen_wochenende_und_feiertag(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    from datetime import datetime
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    timetrack.add_manual("test", datetime(2026, 5, 1, 8), datetime(2026, 5, 1, 12))   # Feiertag
+    timetrack.add_manual("test", datetime(2026, 7, 5, 9), datetime(2026, 7, 5, 12))   # Sonntag
+    timetrack.add_manual("test", datetime(2026, 7, 1, 9), datetime(2026, 7, 1, 12))   # Mittwoch
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Tag der Arbeit")
+    await user.should_see("Sonntag")
+
+
+async def test_auswertung_zeigt_split_und_betraege(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    from datetime import datetime
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.USERS["test"], "stundensatz_werktag", 15)
+    monkeypatch.setitem(web.USERS["test"], "stundensatz_wochenende", 20)
+    monkeypatch.setitem(web.USERS["test"], "wochenendsatz_aktiv", True)
+    timetrack.add_manual("test", datetime(2026, 7, 1, 8), datetime(2026, 7, 1, 12))   # Mi 4h
+    timetrack.add_manual("test", datetime(2026, 7, 5, 9), datetime(2026, 7, 5, 12))   # So 3h
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    user.find("Auswertung").click()
+    await user.should_see("Werktags 4 · Wochenende/Feiertag 3 Std")
+    await user.should_see("120,00 €")     # 4h*15 + 3h*20

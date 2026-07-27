@@ -1,7 +1,7 @@
 """Tests für die Arbeitszeit-Erfassung (ohne Standort, DSGVO)."""
-from datetime import datetime
+from datetime import date, datetime
 
-from app import timetrack
+from app import feiertage, timetrack
 
 
 def _setup(tmp_path, monkeypatch):
@@ -33,3 +33,85 @@ def test_offene_dauer(tmp_path, monkeypatch):
     e = timetrack.check_in("a", now=datetime(2026, 7, 2, 8))
     assert timetrack.duration_minutes(e) is None
     assert timetrack.fmt_dur(None) == "läuft…"
+
+
+# ---------------------------------------------- Tagesart, Stundensätze, Aggregat
+def _eintrag(user, tag, von, bis, tmp_path=None):
+    return {"user": user, "checkin": f"{tag}T{von}:00", "checkout": f"{tag}T{bis}:00"}
+
+
+def test_kind_of_nutzt_den_checkin_tag():
+    # Einsatz laeuft ueber Mitternacht in den Feiertag hinein -> zaehlt zum Starttag
+    e = {"user": "a", "checkin": "2026-04-30T22:00:00", "checkout": "2026-05-01T02:00:00"}
+    assert timetrack.kind_of(e) == feiertage.WERKTAG
+    assert timetrack.entry_date(e) == date(2026, 4, 30)
+
+
+def test_rate_ohne_wochenendsatz_gilt_werktagssatz_ueberall():
+    u = {"stundensatz_werktag": 15}
+    assert timetrack.rate_for(feiertage.WERKTAG, u) == 15
+    assert timetrack.rate_for(feiertage.WOCHENENDE, u) == 15
+
+
+def test_rate_mit_aktiviertem_wochenendsatz():
+    u = {"stundensatz_werktag": 15, "stundensatz_wochenende": 20,
+         "wochenendsatz_aktiv": True}
+    assert timetrack.rate_for(feiertage.WERKTAG, u) == 15
+    assert timetrack.rate_for(feiertage.WOCHENENDE, u) == 20
+
+
+def test_rate_aktiv_aber_ohne_wert_faellt_auf_werktag_zurueck():
+    u = {"stundensatz_werktag": 15, "wochenendsatz_aktiv": True}
+    assert timetrack.rate_for(feiertage.WOCHENENDE, u) == 15
+
+
+def test_rate_globale_vorgabe_greift_ohne_eigenen_satz():
+    d = {"stundensatz_werktag": 14, "stundensatz_wochenende": 18}
+    assert timetrack.rate_for(feiertage.WERKTAG, {}, d) == 14
+    assert timetrack.rate_for(feiertage.WOCHENENDE, {"wochenendsatz_aktiv": True}, d) == 18
+    # eigener Satz schlaegt die Vorgabe
+    assert timetrack.rate_for(feiertage.WERKTAG, {"stundensatz_werktag": 16}, d) == 16
+
+
+def test_rate_akzeptiert_komma_und_muell():
+    assert timetrack.rate_for(feiertage.WERKTAG, {"stundensatz_werktag": "15,50"}) == 15.5
+    assert timetrack.rate_for(feiertage.WERKTAG, {"stundensatz_werktag": "abc"}) == 0.0
+    assert timetrack.rate_for(feiertage.WERKTAG, {}) == 0.0
+
+
+def test_amount():
+    assert timetrack.amount(90, 20) == 30.0
+    assert timetrack.amount(50, 15) == 12.5
+    assert timetrack.amount(0, 20) == 0.0
+
+
+def test_aggregate_trennt_werktag_und_wochenende():
+    rows = [
+        _eintrag("a", "2026-07-01", "08:00", "12:00"),   # Mi  -> 240 min Werktag
+        _eintrag("a", "2026-07-05", "09:00", "12:00"),   # So  -> 180 min Wochenende
+        _eintrag("a", "2026-05-01", "10:00", "11:00"),   # Feiertag -> 60 min
+        _eintrag("b", "2026-07-02", "08:00", "10:00"),   # Do  -> 120 min Werktag
+    ]
+    users = {"a": {"stundensatz_werktag": 15, "stundensatz_wochenende": 20,
+                   "wochenendsatz_aktiv": True},
+             "b": {"stundensatz_werktag": 12}}
+    agg = timetrack.aggregate(rows, users)
+
+    a = agg["a"]
+    assert a["minutes"][feiertage.WERKTAG] == 240
+    assert a["minutes"][feiertage.WOCHENENDE] == 240      # 180 + 60
+    assert a["total_minutes"] == 480
+    assert a["amount"][feiertage.WERKTAG] == 60.0         # 4 h * 15
+    assert a["amount"][feiertage.WOCHENENDE] == 80.0      # 4 h * 20
+    assert a["total_amount"] == 140.0
+
+    b = agg["b"]
+    assert b["minutes"][feiertage.WOCHENENDE] == 0
+    assert b["total_amount"] == 24.0                      # 2 h * 12
+
+
+def test_aggregate_ohne_saetze_liefert_null_betraege():
+    rows = [_eintrag("a", "2026-07-01", "08:00", "12:00")]
+    agg = timetrack.aggregate(rows, {})
+    assert agg["a"]["total_minutes"] == 240
+    assert agg["a"]["total_amount"] == 0.0

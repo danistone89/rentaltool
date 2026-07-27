@@ -33,6 +33,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/archive.py` | Revisionssichere Ablage (Hash-Kette, Versionen, Spiegel) |
 | `app/mailer.py` | E-Mail-Versand über Gmail (Vorlagen) |
 | `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
+| `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular

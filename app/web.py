@@ -26,7 +26,8 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
-from app import data, smoobu, archive, mailer, auth, timetrack, housekeeping, bookings, receipts  # noqa: E402
+from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402
+                 bookings, receipts, feiertage)
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -244,32 +245,6 @@ def _month_label(m):
 
 
 # --- Abrechnungslogik Steuerberater: Meldung zum 19., Übertrag danach -----------
-def _easter(year):
-    a = year % 19; b = year // 100; c = year % 100
-    d = b // 4; e = b % 4; f = (b + 8) // 25; g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30; i = c // 4; k = c % 4
-    ll = (32 + 2 * e + 2 * i - h - k) % 7; mm = (a + 11 * h + 22 * ll) // 451
-    month = (h + ll - 7 * mm + 114) // 31; day = ((h + ll - 7 * mm + 114) % 31) + 1
-    return date(year, month, day)
-
-
-def _de_holidays(year):
-    from datetime import timedelta as _td
-    e = _easter(year)
-    hol = {date(year, 1, 1), e - _td(days=2), e + _td(days=1), date(year, 5, 1),
-           e + _td(days=39), e + _td(days=50), date(year, 10, 3), date(year, 10, 31),
-           date(year, 12, 25), date(year, 12, 26)}
-    d = date(year, 11, 23)                    # Buß- und Bettag (Sachsen): Mi vor 23.11.
-    while d.weekday() != 2:
-        d -= _td(days=1)
-    hol.add(d)
-    return hol
-
-
-def _is_feiertag(d):
-    return d in _de_holidays(d.year)
-
-
 def _billing_month(iso):
     """Abrechnungsmonat: Tage ab dem 19. zählen zum Folgemonat (Meldung zum 19.)."""
     d = date.fromisoformat(iso[:10])
@@ -294,19 +269,53 @@ def _hours_num(minutes):
     return s[:-2] if s.endswith(",0") else s
 
 
+def _eur(betrag):
+    """1234.5 -> '1.234,50 €'"""
+    return f"{betrag:,.2f}".replace(",", "#").replace(".", ",").replace("#", ".") + " €"
+
+
+def _rate_defaults():
+    """Globale Vorgabe-Stundensätze aus den Einstellungen."""
+    return {"stundensatz_werktag": CFG.get("stundensatz_werktag", ""),
+            "stundensatz_wochenende": CFG.get("stundensatz_wochenende", "")}
+
+
+def _zeit_aggregat(rows):
+    """Zeiten je Mitarbeiter nach Tagesart, inkl. Beträgen aus den Stundensätzen."""
+    return timetrack.aggregate(rows, USERS, _rate_defaults())
+
+
+def _has_rates():
+    """Sind überhaupt Stundensätze gepflegt? Sonst Beträge ausblenden."""
+    d = _rate_defaults()
+    if any(str(v).strip() for v in d.values()):
+        return True
+    return any(str(u.get(k, "")).strip()
+               for u in USERS.values()
+               for k in ("stundensatz_werktag", "stundensatz_wochenende"))
+
+
 def _zeit_csv_bytes(rows, show_user):
     import csv
     import io
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     w.writerow((["Mitarbeiter"] if show_user else []) +
-               ["Datum", "Von", "Bis", "Wohnung", "Dauer", "Minuten", "Ort ein"])
+               ["Datum", "Von", "Bis", "Wohnung", "Dauer", "Minuten",
+                "Tagesart", "Anlass", "Stundensatz", "Betrag", "Ort ein"])
+    defaults = _rate_defaults()
     for e in rows:
         mins = timetrack.duration_minutes(e) or 0
+        d = timetrack.entry_date(e)
+        kind = timetrack.kind_of(e)
+        rate = timetrack.rate_for(kind, USERS.get(e["user"]), defaults)
         w.writerow((([e["user"]] if show_user else []) + [
             _d(e["checkin"]), _t(e["checkin"]),
             _t(e["checkout"]) if e.get("checkout") else "",
             e.get("apartment") or "", timetrack.fmt_dur(mins), mins,
+            feiertage.LABELS[kind], feiertage.label_of(d),
+            f"{rate:.2f}".replace(".", ",") if rate else "",
+            f"{timetrack.amount(mins, rate):.2f}".replace(".", ",") if rate else "",
             _presence(e.get("checkin_ort"), e.get("checkin_dist"),
                       e.get("checkin_loc"), e.get("checkin_ip"))]))
     return buf.getvalue().encode("utf-8-sig")
@@ -368,9 +377,14 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
         for e in rows:
             with ui.row().classes("w-full items-center gap-2 no-wrap border-b border-slate-50 py-1"):
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
-                    ui.label(f"{_d(e['checkin'])} · {_t(e['checkin'])}–"
-                             + (_t(e['checkout']) if e.get('checkout') else '…')) \
-                        .classes("text-sm text-slate-700 truncate")
+                    with ui.row().classes("items-center gap-1 no-wrap"):
+                        ui.label(f"{_d(e['checkin'])} · {_t(e['checkin'])}–"
+                                 + (_t(e['checkout']) if e.get('checkout') else '…')) \
+                            .classes("text-sm text-slate-700 truncate")
+                        if timetrack.kind_of(e) == feiertage.WOCHENENDE:
+                            ui.chip(feiertage.label_of(timetrack.entry_date(e))) \
+                                .props("color=amber-7 text-color=white dense square") \
+                                .classes("text-[10px] shrink-0")
                     sub = []
                     if show_user:
                         sub.append(staff.get(e["user"], e["user"]))
@@ -391,32 +405,38 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
 
 
 def _stb_email_body(ym, rows, staff):
-    """Vorlagenbasierten Text für den Steuerberater bauen (mit Werktags/Feiertag-Split
-    und Meldung ‘bis 18.’)."""
-    from collections import defaultdict
+    """Vorlagenbasierten Text für den Steuerberater bauen: je Mitarbeiter Stunden
+    getrennt nach Werktag und Wochenende/Feiertag, mit Beträgen aus den
+    hinterlegten Stundensätzen. Meldezeitraum endet am 18."""
     start, end = _billing_period(ym)
     monat = _MONATE[int(ym[5:7]) - 1]
     anrede = CFG.get("steuerberater_anrede") or "Sehr geehrte Damen und Herren,"
     intro = (CFG.get("steuerberater_intro") or "anbei die Stunden für {monat}.") \
         .replace("{monat}", monat).replace("{jahr}", ym[:4])
     gruss = CFG.get("steuerberater_gruss") or "Mit freundlichen Grüßen"
-    tot, feier = defaultdict(int), defaultdict(int)
-    for e in rows:
-        mins = timetrack.duration_minutes(e) or 0
-        tot[e["user"]] += mins
-        if _is_feiertag(date.fromisoformat(e["checkin"][:10])):
-            feier[e["user"]] += mins
+    agg = _zeit_aggregat(rows)
+    money = _has_rates()
     bis = end.strftime("%d.%m.%Y")
+
+    def zeile(text, mins, betrag):
+        s = f"{text}: {_hours_num(mins)} Stunden"
+        return s + (f" = {_eur(betrag)}" if money and betrag else "")
+
     blocks = []
-    for u in sorted(tot, key=lambda x: -tot[x]):
-        name = staff.get(u, u)
-        werk = tot[u] - feier[u]
-        lines = [f"{name}:"]
-        if feier[u] > 0:
-            lines.append(f"Werktags: {_hours_num(werk)} Stunden")
-            lines.append(f"Feiertag: {_hours_num(feier[u])} Stunden")
+    for u in sorted(agg, key=lambda x: -agg[x]["total_minutes"]):
+        a = agg[u]
+        lines = [f"{staff.get(u, u)}:"]
+        wt = a["minutes"][feiertage.WERKTAG]
+        we = a["minutes"][feiertage.WOCHENENDE]
+        if we > 0:
+            lines.append(zeile("Werktags", wt, a["amount"][feiertage.WERKTAG]))
+            lines.append(zeile("Wochenende/Feiertag", we, a["amount"][feiertage.WOCHENENDE]))
+            lines.append(f"Gesamt: {_hours_num(a['total_minutes'])} Stunden (bis {bis})"
+                         + (f" = {_eur(a['total_amount'])}" if money and a["total_amount"] else ""))
         else:
-            lines.append(f"{_hours_num(tot[u])} Stunden (bis {bis})")
+            lines.append(f"{_hours_num(wt)} Stunden (bis {bis})"
+                         + (f" = {_eur(a['amount'][feiertage.WERKTAG])}"
+                            if money and a["amount"][feiertage.WERKTAG] else ""))
         note = (USERS.get(u, {}) or {}).get("steuer_notiz", "").strip()
         if note:
             lines.append(note)
@@ -425,7 +445,6 @@ def _stb_email_body(ym, rows, staff):
 
 
 def _admin_zeiten(apts, staff, on_change):
-    from collections import defaultdict
     all_entries = [e for e in timetrack.entries() if e.get("checkout")]
     months = sorted({_billing_month(e["checkin"]) for e in all_entries}, reverse=True) \
         or [_billing_month(date.today().isoformat())]
@@ -451,25 +470,27 @@ def _admin_zeiten(apts, staff, on_change):
             rows = [e for e in all_entries
                     if _billing_month(e["checkin"]) == state["month"]
                     and (state["user"] is None or e["user"] == state["user"])]
-            agg, feier = defaultdict(int), defaultdict(int)
-            for e in rows:
-                mins = timetrack.duration_minutes(e) or 0
-                agg[e["user"]] += mins
-                if _is_feiertag(date.fromisoformat(e["checkin"][:10])):
-                    feier[e["user"]] += mins
-            total = sum(agg.values())
-            ui.label(f"{_month_label(state['month'])} · Summe {_hours_num(total)} Stunden") \
+            agg = _zeit_aggregat(rows)
+            money = _has_rates()
+            total = sum(a["total_minutes"] for a in agg.values())
+            total_eur = round(sum(a["total_amount"] for a in agg.values()), 2)
+            ui.label(f"{_month_label(state['month'])} · Summe {_hours_num(total)} Stunden"
+                     + (f" · {_eur(total_eur)}" if money and total_eur else "")) \
                 .classes("font-semibold mt-1")
-            for u, mins in sorted(agg.items(), key=lambda x: -x[1]):
+            for u, a in sorted(agg.items(), key=lambda x: -x[1]["total_minutes"]):
+                we = a["minutes"][feiertage.WOCHENENDE]
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.icon("person").classes("text-primary")
                     with ui.column().classes("gap-0 flex-grow min-w-0"):
                         ui.label(staff.get(u, u)).classes("truncate")
-                        if feier[u] > 0:
-                            ui.label(f"Werktags {_hours_num(mins - feier[u])} · "
-                                     f"Feiertag {_hours_num(feier[u])} Std") \
+                        if we > 0:
+                            ui.label(f"Werktags {_hours_num(a['minutes'][feiertage.WERKTAG])} · "
+                                     f"Wochenende/Feiertag {_hours_num(we)} Std") \
                                 .classes("text-xs text-gray-400")
-                    ui.label(f"{_hours_num(mins)} Std").classes("font-medium shrink-0")
+                    with ui.column().classes("gap-0 items-end shrink-0"):
+                        ui.label(f"{_hours_num(a['total_minutes'])} Std").classes("font-medium")
+                        if money and a["total_amount"]:
+                            ui.label(_eur(a["total_amount"])).classes("text-xs text-gray-500")
 
             def send_stb():
                 stb = (CFG.get("steuerberater_email") or "").strip()
@@ -759,6 +780,47 @@ def open_reset_pw(username):
 
 
 # ---------------------------------------------------------------- Benutzer (Admin)
+def _user_saetze(uname, u):
+    """Stundensätze eines Mitarbeiters: Werktag immer, Wochenende/Feiertag nur
+    wenn dafür ein abweichender Satz aktiviert ist."""
+    def _save_rate(key, field):
+        def h(e):
+            raw = (str(field.value or "")).strip().replace(",", ".")
+            if raw:
+                try:
+                    USERS[uname][key] = round(float(raw), 2)
+                except ValueError:
+                    ui.notify("Bitte eine Zahl eingeben (z. B. 15,50).", type="warning")
+                    return
+            else:
+                USERS[uname].pop(key, None)
+            data.save_config()
+        return h
+
+    with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+        w = ui.number("Stundensatz Werktag (€)", value=u.get("stundensatz_werktag"),
+                      format="%.2f", step=0.5, min=0) \
+            .props("dense outlined suffix=€").classes("w-[190px]")
+        w.on("blur", _save_rate("stundensatz_werktag", w))
+        sw = ui.switch("Abweichender Satz an Wochenende/Feiertagen",
+                       value=bool(u.get("wochenendsatz_aktiv"))).props("dense")
+
+        def _toggle(e):
+            USERS[uname]["wochenendsatz_aktiv"] = bool(e.value)
+            data.save_config()
+        sw.on_value_change(_toggle)
+        # Feld nur bei aktiviertem Schalter zeigen – ohne die Liste neu zu bauen
+        f = ui.number("Stundensatz Wochenende/Feiertag (€)",
+                      value=u.get("stundensatz_wochenende"),
+                      format="%.2f", step=0.5, min=0) \
+            .props("dense outlined suffix=€").classes("w-[250px]")
+        f.on("blur", _save_rate("stundensatz_wochenende", f))
+        f.bind_visibility_from(sw, "value")
+    ui.label("Leer lassen = globaler Vorgabewert aus Einstellungen → Steuerberater. "
+             "Wochenende/Feiertag umfasst Sa, So und die sächsischen Feiertage.") \
+        .classes("text-[11px] text-gray-400")
+
+
 def open_users():
     if not _is_admin():
         ui.notify("Nur für Administratoren.", type="negative"); return
@@ -826,6 +888,7 @@ def open_users():
                                     data.save_config()
                                 return h
                             sn.on("blur", _note_handler(uname, sn))
+                        _user_saetze(uname, u)
         render()
 
         ui.separator()
@@ -1139,12 +1202,30 @@ def open_settings():
                                         value=CFG.get("steuerberater_gruss", "")
                                         or "Vielen Dank im Voraus.\n\nMit freundlichen Grüßen\nDaniel Steinhauß") \
                     .props("outlined autogrow").classes("w-full max-w-[420px]")
+                ui.separator().classes("my-2")
+                ui.label("Stundensätze (Vorgabe)").classes("font-medium")
+                ui.label("Gelten für alle Mitarbeiter ohne eigenen Satz. Der Satz für "
+                         "Wochenende/Feiertag greift nur bei Mitarbeitern, bei denen er in "
+                         "der Benutzerverwaltung aktiviert ist. Wochenende/Feiertag = Sa, So "
+                         "und die gesetzlichen Feiertage in Sachsen.") \
+                    .classes("text-xs text-gray-500")
+                with ui.row().classes("items-center gap-2 flex-wrap"):
+                    satz_wt = ui.number("Werktag", value=CFG.get("stundensatz_werktag") or None,
+                                        format="%.2f", step=0.5, min=0) \
+                        .props("outlined dense suffix=€").classes("w-[160px]")
+                    satz_we = ui.number("Wochenende/Feiertag",
+                                        value=CFG.get("stundensatz_wochenende") or None,
+                                        format="%.2f", step=0.5, min=0) \
+                        .props("outlined dense suffix=€").classes("w-[200px]")
 
         def save():
             CFG["steuerberater_email"] = (stb.value or "").strip()
             CFG["steuerberater_anrede"] = (stb_anrede.value or "").strip()
             CFG["steuerberater_intro"] = (stb_intro.value or "").strip()
             CFG["steuerberater_gruss"] = stb_gruss.value or ""
+            for key, fld in (("stundensatz_werktag", satz_wt),
+                             ("stundensatz_wochenende", satz_we)):
+                CFG[key] = round(float(fld.value), 2) if fld.value else ""
             for key in inputs:
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
