@@ -34,6 +34,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/mailer.py` | E-Mail-Versand über Gmail (Vorlagen) |
 | `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
+| `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
@@ -103,6 +104,29 @@ freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.
+
+## Sprache (Deutsch / Englisch)
+
+Die **Mitarbeiterbereiche** – Login, Mein Konto, Buchungen, Reinigungs-
+Checklisten, Belege, Zeiterfassung – gibt es auf Deutsch und Englisch. Der
+**Verwaltungsteil** (Beherbergungssteuer, Auswertung, Einstellungen,
+Benutzerverwaltung) ist bewusst nur deutsch: Steuerbegriffe haben keine
+belastbare englische Entsprechung, und diese Bereiche bedient nur der Betreiber.
+Ebenfalls deutsch bleiben das **amtliche PDF** und die **Mail an den
+Steuerberater** – beides geht an deutsche Empfänger.
+
+Umschalten: **Mein Konto → Sprache** (gilt sofort und wird im Profil
+gespeichert) oder als Admin je Mitarbeiter in der **Benutzerverwaltung**. Auf
+der Login-Seite lässt sich die Sprache ebenfalls wählen; nach dem Anmelden
+gewinnt die im Profil hinterlegte.
+
+Technik: `app/i18n.py` mit `t("deutscher Text")`. **Der deutsche Text ist
+zugleich der Schlüssel** – fehlt eine Übersetzung, erscheint unverändert das
+Deutsche, eine Lücke kann die Oberfläche also nie leeren. Neue Sprache =
+weiteres Wörterbuch in `TRANSLATIONS`.
+
+Nicht übersetzt werden **Inhalte aus den Datendateien** (Checklisten-Punkte,
+Wohnungsnamen, Notizen, Inventar) – sie erscheinen so, wie sie angelegt wurden.
 
 > Ausgesperrt? In `config.json` `auth.users` auf `{}` setzen – beim nächsten
 > Aufruf legst du den Admin neu an. `config.json` ist gitignored.

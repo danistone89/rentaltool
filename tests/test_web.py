@@ -182,17 +182,23 @@ async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
     await user.should_see("revisionssicher abgelegte")
 
 
-async def test_stundensaetze_in_benutzerverwaltung(user: User, mock_backend):
-    """Neue Satz-Felder rendern (u. a. suffix=€ in props) und der Schalter
-    blendet das Wochenend-Feld ein."""
+async def test_satzfelder_ohne_wochenendsatz(user: User, mock_backend):
+    """Werktagsfeld und Schalter rendern; das Wochenend-Feld bleibt verborgen,
+    solange der Schalter aus ist."""
     await _login(user)
     user.find("Benutzer").click()
     await user.should_see("Stundensatz Werktag")
     await user.should_see("Abweichender Satz an Wochenende/Feiertagen")
     await user.should_not_see("Stundensatz Wochenende/Feiertag")
-    user.find("Abweichender Satz an Wochenende/Feiertagen").click()
+
+
+async def test_satzfelder_mit_aktiviertem_wochenendsatz(user: User, mock_backend, monkeypatch):
+    """Ist der Satz beim Mitarbeiter aktiviert, ist das zweite Feld sichtbar."""
+    monkeypatch.setitem(web.USERS["test"], "wochenendsatz_aktiv", True)
+    await _login(user)
+    user.find("Benutzer").click()
+    await user.should_see("Stundensatz Werktag")
     await user.should_see("Stundensatz Wochenende/Feiertag")
-    assert web.USERS["test"]["wochenendsatz_aktiv"] is True
 
 
 async def test_vorgabesaetze_in_einstellungen(user: User, mock_backend):
@@ -230,3 +236,44 @@ async def test_auswertung_zeigt_split_und_betraege(
     user.find("Auswertung").click()
     await user.should_see("Werktags 4 · Wochenende/Feiertag 3 Std")
     await user.should_see("120,00 €")     # 4h*15 + 3h*20
+
+
+async def test_oberflaeche_auf_englisch(user: User, mock_backend, monkeypatch, tmp_path):
+    """Mit Profilsprache 'en' erscheinen die Mitarbeiterbereiche englisch."""
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setitem(web.USERS["test"], "lang", "en")
+    await _login(user)
+    await user.should_see("Sections")          # Navigations-Überschrift
+    await user.should_see("Bookings")          # Bereichsname
+    await user.should_see("My account")
+    await user.should_see("Cleanings")         # Tab in Buchungen
+    await user.should_not_see("Reinigungen")
+
+
+async def test_oberflaeche_bleibt_deutsch_ohne_profilsprache(user: User, mock_backend):
+    await _login(user)
+    await user.should_see("Bereiche")
+    await user.should_see("Buchungen")
+    await user.should_not_see("Sections")
+
+
+async def test_sprachwahl_im_konto_dialog(user: User, mock_backend):
+    await _login(user)
+    user.find("Mein Konto").click()
+    await user.should_see("Sprache")
+    await user.should_see("Angemeldet als test")
+
+
+async def test_zeiterfassung_englisch(user: User, mock_backend, monkeypatch, tmp_path):
+    from datetime import datetime
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.USERS["test"], "lang", "en")
+    timetrack.add_manual("test", datetime(2026, 5, 1, 8), datetime(2026, 5, 1, 12))  # Feiertag
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Time tracking")
+    await user.should_see("Labour Day")        # Feiertagsname uebersetzt

@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""Mehrsprachige Oberfläche (Deutsch / Englisch).
+
+Übersetzt sind die **Mitarbeiterbereiche** – Login, Mein Konto, Buchungen,
+Reinigungs-Checklisten, Belege und Zeiterfassung. Der Verwaltungsteil
+(Beherbergungssteuer, Auswertung, Einstellungen, Benutzerverwaltung) bleibt
+bewusst deutsch: Steuerbegriffe wie „Beherbergungssteuer" oder „Buß- und
+Bettag" haben keine belastbare englische Entsprechung, und diese Bereiche
+bedient nur der Betreiber.
+
+Der **deutsche Text ist zugleich der Schlüssel**. Fehlt eine Übersetzung,
+kommt unverändert das Deutsche zurück – eine Lücke kann die Oberfläche also
+nie leeren oder zerstören.
+
+    t("Anmelden")                 -> "Sign in"   (en)  /  "Anmelden" (de)
+    t("{n} von {m}", n=1, m=3)    -> "1 of 3"    (en)
+
+Inhalte aus den Datendateien (Checklisten-Punkte, Wohnungsnamen, Notizen,
+Inventar) werden NICHT übersetzt – sie erscheinen so, wie sie angelegt wurden.
+"""
+
+DEFAULT = "de"
+LANGUAGES = {"de": "Deutsch", "en": "English"}
+
+# de -> en. Schlüssel ist exakt der deutsche Quelltext.
+_EN = {
+    # ---------------------------------------------------------------- Login
+    "Anmelden": "Sign in",
+    "Benutzername": "Username",
+    "Passwort": "Password",
+    "Passwort wiederholen": "Repeat password",
+    "Neues Passwort": "New password",
+    "6-stelliger Code (falls 2FA aktiv)": "6-digit code (if 2FA is enabled)",
+    "Benutzername oder Passwort falsch.": "Incorrect username or password.",
+    "Code fehlt oder ist falsch.": "Code missing or incorrect.",
+    "Benutzername fehlt.": "Username is missing.",
+    "Passwort mindestens 6 Zeichen.": "Password must be at least 6 characters.",
+    "Passwörter stimmen nicht überein.": "Passwords do not match.",
+    "Erst-Einrichtung – Administrator anlegen": "Initial setup – create administrator",
+    "Anlegen & anmelden": "Create & sign in",
+    "Sprache": "Language",
+
+    # ------------------------------------------------------------ Mein Konto
+    "Mein Konto": "My account",
+    "Angemeldet als {user} · {rolle}": "Signed in as {user} · {rolle}",
+    "E-Mail (für Benachrichtigungen)": "Email (for notifications)",
+    "Neues Passwort (leer = unverändert)": "New password (blank = unchanged)",
+    "Passwort zu kurz (min. 6).": "Password too short (min. 6).",
+    "Gespeichert.": "Saved.",
+    "Gespeichert ✓": "Saved ✓",
+    "Abmelden": "Sign out",
+    "2FA aktiv": "2FA enabled",
+    "2FA aktivieren": "Enable 2FA",
+    "2FA deaktivieren": "Disable 2FA",
+    "2FA aktiviert.": "2FA enabled.",
+    "2FA deaktiviert.": "2FA disabled.",
+    "🔐 Google Authenticator einrichten": "🔐 Set up Google Authenticator",
+    "1. QR-Code in der Authenticator-App scannen:":
+        "1. Scan the QR code in your authenticator app:",
+    "oder Secret manuell eintippen:": "or enter the secret manually:",
+    "2. Zur Bestätigung den aktuellen 6-stelligen Code eingeben:":
+        "2. Enter the current 6-digit code to confirm:",
+    "Code": "Code",
+    "Code stimmt nicht – bitte erneut versuchen.": "Incorrect code – please try again.",
+    "Kein angemeldeter Benutzer.": "No user signed in.",
+    "Aktivieren": "Enable",
+
+    # ------------------------------------------------------------- Allgemein
+    "Bereiche": "Sections",
+    "Speichern": "Save",
+    "Abbrechen": "Cancel",
+    "Schließen": "Close",
+    "Löschen": "Delete",
+    "Bearbeiten": "Edit",
+    "Öffnen": "Open",
+    "Zurück": "Back",
+    "Weiter": "Next",
+    "Ja": "Yes",
+    "Nein": "No",
+    "Administrator": "Administrator",
+    "Manager": "Manager",
+    "Putzkraft": "Cleaner",
+    "Gast": "Guest",
+    "keine": "none",
+    "Noch keine Einträge.": "No entries yet.",
+
+    # ------------------------------------------------------------- Buchungen
+    "Buchungen": "Bookings",
+    "An- und Abreisen, Wechseltage und Reinigungen": "Arrivals, departures, turnovers and cleanings",
+    "Anreise": "Arrival",
+    "Abreise": "Departure",
+    "Anreise vorbereiten für": "Prepare arrival for",
+    "Es reist ab": "Departing",
+    "keine Folgebuchung": "no follow-up booking",
+    "Wechseltag": "Turnover day",
+    "Nächste Anreise: ": "Next arrival: ",
+    "Personen": "Guests",
+    "Buchungskanal": "Booking channel",
+    "Name": "Name",
+    "E-Mail": "Email",
+    "Telefon": "Phone",
+    "Notizen": "Notes",
+    "Protokoll": "Log",
+    "Buchung": "Booking",
+    "Nachrichten": "Messages",
+    "Interne Notiz": "Internal note",
+    "Buchungsdetails (Smoobu)": "Booking details (Smoobu)",
+    "Ich übernehme": "I'll take it",
+    "nicht zugewiesen": "unassigned",
+    "Nicht zugewiesen": "Unassigned",
+    "Zugewiesen": "Assigned",
+    "In Arbeit": "In progress",
+    "Fertig": "Done",
+    "Überfällig": "Overdue",
+    "Nächte": "Nights",
+    "1 Erwachsener": "1 adult",
+    "{n} Erwachsene": "{n} adults",
+    "1 Kind": "1 child",
+    "{n} Kinder": "{n} children",
+    "keine Kinder": "no children",
+    "{n} Pers.": "{n} people",
+
+    # ------------------------------------------------------------- Reinigung
+    "Checkliste": "Checklist",
+    "Weiter zur Checkliste": "Continue to checklist",
+    "{done}/{total} erledigt": "{done}/{total} done",
+    "Alle Aufgaben abgeschlossen": "All tasks completed",
+    "Nächste Schritte": "Next steps",
+    "Reinigung": "Cleaning",
+    "Soll": "Target",
+    "Ist": "Actual",
+    "Heute fällig (nach Abreise):": "Due today (after departure):",
+    "Apartment wählen:": "Choose apartment:",
+    "Apartment": "Apartment",
+    "Reinigung starten": "Start cleaning",
+    "Bitte Apartment wählen.": "Please choose an apartment.",
+    "Fortschritt": "Progress",
+    "Räume & Aufgaben": "Rooms & tasks",
+    "Nach Raum gruppieren": "Group by room",
+    "Alle Aufgaben anzeigen": "Show all tasks",
+    "Alle einklappen": "Collapse all",
+    "Checkliste abgeschlossen ✓": "Checklist completed ✓",
+    "Checkliste abschließen": "Complete checklist",
+
+    # --------------------------------------------------------- Zeiterfassung
+    "Zeiterfassung": "Time tracking",
+    "Start/Stop, manuell erfassen & bearbeiten": "Start/stop, add and edit entries",
+    "Arbeitszeit läuft": "Work timer running",
+    "Arbeitszeit starten": "Start work timer",
+    "Arbeitszeit beenden": "Stop work timer",
+    "Arbeitszeit gestartet ✓": "Work timer started ✓",
+    "Arbeitszeit beendet ✓": "Work timer stopped ✓",
+    "Beenden": "Stop",
+    "Erfasst {dauer}": "Logged {dauer}",
+    "Du bist bereits an einem anderen Ort eingecheckt.":
+        "You are already checked in at another location.",
+    "Standort wird geprüft …": "Checking location …",
+    "Zeit manuell erfassen": "Add time manually",
+    "Zeit bearbeiten": "Edit time entry",
+    "Datum": "Date",
+    "Von": "From",
+    "Bis": "To",
+    "Wohnung": "Apartment",
+    "— keine Wohnung —": "— no apartment —",
+    "Mitarbeiter": "Employee",
+    "Ende muss nach Beginn liegen.": "End must be after start.",
+    "Eintrag gelöscht.": "Entry deleted.",
+    "Meine Zeiten": "My hours",
+    "läuft…": "running…",
+    "Werktag": "Weekday",
+    "Wochenende/Feiertag": "Weekend/holiday",
+    "Samstag": "Saturday",
+    "Sonntag": "Sunday",
+    "manuell": "manual",
+
+    # ----------------------------------------------------------- Feiertage
+    "Neujahr": "New Year's Day",
+    "Karfreitag": "Good Friday",
+    "Ostermontag": "Easter Monday",
+    "Tag der Arbeit": "Labour Day",
+    "Christi Himmelfahrt": "Ascension Day",
+    "Pfingstmontag": "Whit Monday",
+    "Tag der Deutschen Einheit": "German Unity Day",
+    "Reformationstag": "Reformation Day",
+    "Buß- und Bettag": "Day of Repentance and Prayer",
+    "1. Weihnachtsfeiertag": "Christmas Day",
+    "2. Weihnachtsfeiertag": "Boxing Day",
+
+    # ---------------------------------------------------------------- Belege
+    "Belege": "Receipts",
+    "Rechnungen scannen, ablegen & per OCR auslesen":
+        "Scan, file and read invoices via OCR",
+    "Neuen Beleg hinzufügen": "Add new receipt",
+    "Beleg scannen": "Scan receipt",
+    "Scannen": "Scan",
+    "Foto / Datei": "Photo / file",
+    "Für welche Wohnung?": "For which apartment?",
+    "Händler": "Merchant",
+    "Notiz (z. B. wofür)": "Note (e.g. what for)",
+    "Betrag": "Amount",
+    "Beschreibung": "Description",
+    "Kategorie": "Category",
+    "Foto": "Photo",
+    "Hochladen": "Upload",
+    "Live scannen (Rand wird erkannt) oder Foto/Datei wählen. "
+    "Das Dokument wird als PDF abgelegt und per OCR ausgelesen.":
+        "Scan live (edges are detected) or pick a photo/file. The document is "
+        "filed as a PDF and read via OCR.",
+    "Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
+    "Belege werden gespeichert, aber nicht automatisch ausgelesen.":
+        "Note: OCR (Tesseract) is not installed on the server – receipts are "
+        "stored but not read automatically.",
+    "Kein Beleg erkannt – bitte neu ausrichten.":
+        "No receipt detected – please reposition.",
+    "Scan konnte nicht verarbeitet werden.": "Scan could not be processed.",
+    "Beleg wird verarbeitet (PDF, OCR) …": "Processing receipt (PDF, OCR) …",
+    "Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …":
+        "Processing receipt (crop, PDF, OCR) …",
+    "Beleg gescannt ✓": "Receipt scanned ✓",
+    "Beleg erfasst ✓": "Receipt saved ✓",
+    " (als PDF)": " (as PDF)",
+    "Beleg wirklich löschen?": "Really delete this receipt?",
+    "Beleg gelöscht.": "Receipt deleted.",
+    "Noch keine Belege abgelegt.": "No receipts filed yet.",
+    "Upload fehlgeschlagen: {fehler}": "Upload failed: {fehler}",
+
+    # --------------------------------------------------- Buchungen, Kalender
+    "Reinigungs-Übersicht & Buchungskalender": "Cleaning overview & booking calendar",
+    "Reinigungen": "Cleanings",
+    "Kalender": "Calendar",
+    "Aktualisieren": "Refresh",
+    "Alle Wohnungen": "All apartments",
+    "Einzeln": "Single",
+    "Heute": "Today",
+    "Keine Wohnung gewählt.": "No apartment selected.",
+    "Keine Wohnungen geladen.": "No apartments loaded.",
+    "Keine anstehenden Reinigungen.": "No upcoming cleanings.",
+    "Heute keine Reinigungen. 🎉": "No cleanings today. 🎉",
+    "Check-in": "Check-in",
+    "Check-out": "Check-out",
+    "Ab": "Out",
+    "An": "In",
+    "Aktionen": "Actions",
+    "Für diese Buchung wurde noch nichts erfasst.":
+        "Nothing has been recorded for this booking yet.",
+
+    # ------------------------------------------------- Schäden & Nachschub
+    "Was ist beschädigt?": "What is damaged?",
+    "Bitte Beschreibung angeben.": "Please enter a description.",
+    "Schaden gemeldet – Danke!": "Damage reported – thank you!",
+    "Melden": "Report",
+    "melden": "report",
+    "Was muss nachgekauft werden?": "What needs restocking?",
+    "Menge": "Quantity",
+    "{name} gemeldet ✓": "{name} reported ✓",
+    "Foto gespeichert ✓": "Photo saved ✓",
+    "Bitte Datum und Uhrzeiten prüfen.": "Please check the date and times.",
+}
+
+TRANSLATIONS = {"en": _EN}
+
+
+def _default_resolver():
+    return DEFAULT
+
+
+_resolver = _default_resolver
+
+
+def set_resolver(fn):
+    """Callable registrieren, das die Sprache des aktuellen Benutzers liefert.
+
+    Wird von web.py auf die NiceGUI-Session gesetzt; als Modul bleibt i18n
+    dadurch frei von UI-Abhängigkeiten und in Tests direkt steuerbar.
+    """
+    global _resolver
+    _resolver = fn or _default_resolver
+
+
+def lang():
+    try:
+        code = _resolver()
+    except Exception:
+        code = DEFAULT
+    return code if code in LANGUAGES else DEFAULT
+
+
+def t(text, **kwargs):
+    """Übersetzten Text liefern; ohne Treffer den deutschen Ausgangstext."""
+    out = TRANSLATIONS.get(lang(), {}).get(text, text)
+    if kwargs:
+        try:
+            return out.format(**kwargs)
+        except (KeyError, IndexError):
+            return out
+    return out
+
+
+def missing(code="en"):
+    """Schlüssel ohne Übersetzung – für Tests und Pflege."""
+    return sorted(k for k in _EN if not TRANSLATIONS.get(code, {}).get(k))
