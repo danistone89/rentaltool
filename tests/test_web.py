@@ -277,3 +277,57 @@ async def test_zeiterfassung_englisch(user: User, mock_backend, monkeypatch, tmp
     user.find(marker="nav-zeiterfassung").click()
     await user.should_see("Time tracking")
     await user.should_see("Labour Day")        # Feiertagsname uebersetzt
+
+
+def _mock_booking(monkeypatch):
+    """Eine reale Buchung mit Folgebuchung in den Buchungs-Hub schieben."""
+    from app import data as _data
+    raw = [{"id": 111, "apartment": {"id": 2748963, "name": "Cottaer Straße"},
+            "arrival": "2026-07-20", "departure": "2026-07-25",
+            "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 1,
+            "guest-name": "Max Mustermann", "type": "reservation",
+            "channel": {"name": "Direct"}, "is-blocked-booking": False},
+           {"id": 112, "apartment": {"id": 2748963, "name": "Cottaer Straße"},
+            "arrival": "2026-07-25", "departure": "2026-07-28",
+            "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 0,
+            "guest-name": "Erika Musterfrau", "type": "reservation",
+            "channel": {"name": "Airbnb"}, "is-blocked-booking": False}]
+    monkeypatch.setattr(_data, "_reservations", lambda *a, **k: raw)
+
+
+async def test_buchungsaktionen_englisch(user: User, mock_backend, monkeypatch, tmp_path):
+    """Die Aktionsliste einer Buchung erscheint vollständig englisch."""
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    _mock_booking(monkeypatch)
+    monkeypatch.setitem(web.USERS["test"], "lang", "en")
+    await _login(user)
+    user.find(marker="booking-details").click()
+    await user.should_see("Actions")
+    await user.should_see("I'll take this job")
+    await user.should_see("Swap / assign")
+    await user.should_see("Add time entry")
+    await user.should_see("Add note")
+    await user.should_see("Supplies / laundry")
+    await user.should_see("Report damage")
+    await user.should_see("Checklist & photos")
+    await user.should_not_see("Zeit nachtragen")
+
+
+async def test_buchungsaktionen_deutsch(user: User, mock_backend, monkeypatch, tmp_path):
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    _mock_booking(monkeypatch)
+    await _login(user)
+    user.find(marker="booking-details").click()
+    await user.should_see("Aktionen")
+    await user.should_see("Zeit nachtragen")
+    await user.should_not_see("Add time entry")

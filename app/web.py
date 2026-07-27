@@ -434,10 +434,10 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                     .classes("text-sm font-medium shrink-0")
                 ui.button(icon="edit", on_click=lambda ev=e:
                           _time_edit_dialog(ev["user"], apts, admin, staff, entry=ev, on_saved=on_change)) \
-                    .props("flat round dense").tooltip("Bearbeiten")
+                    .props("flat round dense").tooltip(t("Bearbeiten"))
                 ui.button(icon="delete", on_click=lambda ev=e:
                           (timetrack.delete_entry(ev["id"]), ui.notify(t("Eintrag gelöscht."), type="warning"),
-                           on_change())).props("flat round dense color=negative").tooltip("Löschen")
+                           on_change())).props("flat round dense color=negative").tooltip(t("Löschen"))
 
 
 def _stb_email_body(ym, rows, staff):
@@ -643,7 +643,7 @@ def _load_apartments():
             for a in data.get_apartments():
                 _APARTMENTS[a["id"]] = a["name"]
         except smoobu.SmoobuError as ex:
-            ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+            ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
     return _APARTMENTS
 
 
@@ -926,7 +926,7 @@ def open_users():
                                     USERS.pop(un, None); data.save_config()
                                     ui.notify(f"{un} gelöscht.", type="warning"); render()
                                 ui.button(icon="delete", on_click=_del) \
-                                    .props("flat dense round color=negative").tooltip("Löschen")
+                                    .props("flat dense round color=negative").tooltip(t("Löschen"))
                         with ui.row().classes("w-full items-center gap-2 no-wrap"):
                             em = ui.input("E-Mail (für Benachrichtigungen)",
                                           value=u.get("email", "")).props("dense outlined") \
@@ -1599,7 +1599,7 @@ def _photo_button(label, kind, on_saved, icon="photo_camera"):
             data, name = await _read_upload(e)
             rel = _save_bytes(data, name, kind)
         except Exception as ex:
-            ui.notify(f"Foto konnte nicht gespeichert werden: {ex}", type="negative")
+            ui.notify(t("Foto konnte nicht gespeichert werden: {fehler}", fehler=ex), type="negative")
             return
         ui.notify(t("Foto gespeichert ✓"), type="positive")
         on_saved(rel)
@@ -1650,7 +1650,7 @@ def _notify_damage(d):
 def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None, booking_id=None):
     photo = {"rel": None}
     with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-2"):
-        ui.label(f"Schaden melden – {apt_name}").classes("text-lg font-bold")
+        ui.label(t("Schaden melden – {wohnung}", wohnung=apt_name)).classes("text-lg font-bold")
         room = ui.input("Raum/Bereich").props("dense outlined").classes("w-full")
         desc = ui.textarea(t("Was ist beschädigt?")).props("outlined").classes("w-full")
         urg = ui.select(["niedrig", "mittel", "hoch"], value="mittel",
@@ -2211,7 +2211,7 @@ def _events_between(d_from, d_to):
     try:
         raw = data._reservations(d_from, d_to)
     except smoobu.SmoobuError as ex:
-        ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         return []
     evs = []
     for b in raw:
@@ -2251,7 +2251,7 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
     try:
         raw = data._reservations(d_from, look_to)
     except smoobu.SmoobuError as ex:
-        ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         return []
     norm = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
     by_apt = {}
@@ -2424,7 +2424,7 @@ def _timeline(state, user, admin, staff, activate, rerender):
     try:
         raw = data._reservations(gs, ge)
     except smoobu.SmoobuError as ex:
-        ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         raw = []
     by_apt = {}
     for b in raw:
@@ -2495,7 +2495,7 @@ def _timeline(state, user, admin, staff, activate, rerender):
                                 "shadow-sm hover:brightness-110").style(
                                 f"left:{a_idx * CELL + 3}px; width:{w}px; top:8px; height:28px; "
                                 f"line-height:28px; background:{hexc}") \
-                                .tooltip("Reinigung übernommen" if taken else "")
+                                .tooltip(t("Reinigung übernommen") if taken else "")
                             bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
             if not apts:
                 ui.label(t("Keine Wohnungen geladen.")).classes("text-gray-500 p-4")
@@ -2521,7 +2521,7 @@ def _single_month(state, user, admin, staff, activate, rerender):
     try:
         raw = data._reservations(gs, ge)
     except smoobu.SmoobuError as ex:
-        ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         raw = []
     bks = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
     bks = [b for b in bks if b["apartment_id"] == aid and b["arrival"] and b["departure"]]
@@ -2606,12 +2606,12 @@ def _render_cleaning(user, admin, staff, activate):
 
     # Überfällig – volle Karten
     if overdue:
-        ui.label(f"Überfällig ({len(overdue)})").classes("text-sm font-semibold text-red-600 mt-2")
+        ui.label(t("Überfällig ({n})", n=len(overdue))).classes("text-sm font-semibold text-red-600 mt-2")
         for j in overdue:
             _cleaning_card(j, user, admin, staff, activate)
     # Heute – volle Karten
     if todayj:
-        ui.label(f"Heute ({len(todayj)})").classes("text-sm font-semibold text-primary mt-3")
+        ui.label(t("Heute ({n})", n=len(todayj))).classes("text-sm font-semibold text-primary mt-3")
         for j in todayj:
             _cleaning_card(j, user, admin, staff, activate)
     if not overdue and not todayj:
@@ -2637,12 +2637,12 @@ def _add_time_dialog(job, user, on_saved=None):
     """Arbeitszeit für diese Buchung manuell nachtragen."""
     from datetime import datetime
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
-        ui.label(f"Arbeitszeit nachtragen – {job['apartment_name']}").classes("text-lg font-bold")
-        d = ui.input("Datum", value=job["departure"]).props("type=date outlined dense").classes("w-full")
+        ui.label(t("Arbeitszeit nachtragen – {wohnung}", wohnung=job["apartment_name"])).classes("text-lg font-bold")
+        d = ui.input(t("Datum"), value=job["departure"]).props("type=date outlined dense").classes("w-full")
         with ui.row().classes("w-full gap-2"):
-            t1 = ui.input("Von", value=(job.get("checkout_time") or "10:00")) \
+            t1 = ui.input(t("Von"), value=(job.get("checkout_time") or "10:00")) \
                 .props("type=time outlined dense").classes("flex-grow")
-            t2 = ui.input("Bis", value="12:00").props("type=time outlined dense").classes("flex-grow")
+            t2 = ui.input(t("Bis"), value="12:00").props("type=time outlined dense").classes("flex-grow")
 
         def save():
             try:
@@ -2653,7 +2653,8 @@ def _add_time_dialog(job, user, on_saved=None):
             if co <= ci:
                 ui.notify(t("Ende muss nach Beginn liegen."), type="warning"); return
             timetrack.add_manual(user, ci, co, booking_id=job["id"], apartment=job["apartment_name"])
-            ui.notify(f"Arbeitszeit nachgetragen: {timetrack.fmt_dur(int((co - ci).total_seconds() // 60))}",
+            ui.notify(t("Arbeitszeit nachgetragen: {dauer}",
+                        dauer=timetrack.fmt_dur(int((co - ci).total_seconds() // 60))),
                       type="positive")
             dlg.close()
             if on_saved:
@@ -2693,12 +2694,12 @@ def _step_button(label, icon, cb):
 def _note_dialog(job, on_saved=None):
     rec = bookings.get_record(job["id"])
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
-        ui.label(f"Notiz – {job['apartment_name']}").classes("text-lg font-bold")
-        ta = ui.textarea("Notiz", value=rec.get("note", "")).props("outlined autogrow").classes("w-full")
+        ui.label(t("Notiz – {wohnung}", wohnung=job["apartment_name"])).classes("text-lg font-bold")
+        ta = ui.textarea(t("Notiz"), value=rec.get("note", "")).props("outlined autogrow").classes("w-full")
 
         def save():
             bookings.set_field(job["id"], note=(ta.value or "").strip())
-            ui.notify("Notiz gespeichert ✓", type="positive"); dlg.close()
+            ui.notify(t("Notiz gespeichert ✓"), type="positive"); dlg.close()
             if on_saved:
                 on_saved()
         with ui.row().classes("w-full justify-end gap-2"):
@@ -2709,7 +2710,7 @@ def _note_dialog(job, on_saved=None):
 
 def _restock_dialog(job, user, on_close=None):
     with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
-        ui.label(f"Verbrauch / Wäsche – {job['apartment_name']}").classes("text-lg font-bold")
+        ui.label(t("Verbrauch / Wäsche – {wohnung}", wohnung=job["apartment_name"])).classes("text-lg font-bold")
         ui.label(t("Was muss nachgekauft werden?")).classes("text-sm text-gray-500")
         for it in housekeeping.get_inventory(job["apartment_id"]):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
@@ -2723,7 +2724,7 @@ def _restock_dialog(job, user, on_close=None):
                     ui.notify(t("{name} gemeldet ✓", name=name), type="positive")
                 ui.button(t("melden"), icon="add_shopping_cart", on_click=melden).props("flat dense no-caps")
         with ui.row().classes("w-full justify-end"):
-            ui.button("Schließen", on_click=lambda: (dlg.close(), on_close() if on_close else None)).props("flat")
+            ui.button(t("Schließen"), on_click=lambda: (dlg.close(), on_close() if on_close else None)).props("flat")
     dlg.open()
 
 
@@ -2856,10 +2857,11 @@ def _cleaning_card(job, user, admin, staff, activate):
                     dprog, tprog = _checklist_progress(job, user)
                     with ui.row().classes("w-full items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2"):
                         ui.icon("check_circle")
-                        ui.label(f"Fertig · {timetrack.fmt_dur(total_min)} · {dprog}/{tprog} erledigt")
+                        ui.label(t("Fertig · {dauer} · {done}/{total} erledigt",
+                                    dauer=timetrack.fmt_dur(total_min), done=dprog, total=tprog))
                 else:
                     if total_min:
-                        ui.label(f"Erfasst {timetrack.fmt_dur(total_min)}").classes("text-xs text-gray-500")
+                        ui.label(t("Erfasst {dauer}", dauer=timetrack.fmt_dur(total_min))).classes("text-xs text-gray-500")
                     ui.button(t("Arbeitszeit starten"), icon="play_arrow", on_click=_do_in) \
                         .props("unelevated no-caps size=lg").classes("w-full")
     render()
@@ -2927,7 +2929,8 @@ def _assign(bk, assignee, by, staff, after, note=""):
     bookings.set_assignment(bk["id"], assignee, by, note)
     if assignee != by:   # jemandem anderen zugewiesen → benachrichtigen
         _notify_assignee(bk, assignee, by, staff)
-    ui.notify(f"{bk['apartment_name']} → {staff.get(assignee, assignee)} zugewiesen ✓",
+    ui.notify(t("{wohnung} → {name} zugewiesen ✓", wohnung=bk["apartment_name"],
+                name=staff.get(assignee, assignee)),
               type="positive")
     if after:
         after()
@@ -2936,8 +2939,10 @@ def _assign(bk, assignee, by, staff, after, note=""):
 def _notify_assignee(bk, assignee, by, staff):
     to = _user_email(assignee)
     if not to:
-        ui.notify(f"Hinweis: {staff.get(assignee, assignee)} hat keine E-Mail hinterlegt "
-                  "(Benutzerverwaltung).", type="warning", timeout=8000)
+        ui.notify(t("Hinweis: {name} hat keine E-Mail hinterlegt – "
+                    "keine Benachrichtigung verschickt.",
+                    name=staff.get(assignee, assignee)),
+                  type="warning", timeout=8000)
         return
     body = (f"Hallo {staff.get(assignee, assignee)},\n\n"
             f"dir wurde eine Reinigung zugewiesen:\n\n"
@@ -2985,40 +2990,40 @@ def _open_swap(bk, user, staff, on_saved):
     who = bookings.assignee_of(bk["id"])
     others = {u: n for u, n in staff.items() if u != who}
     with ui.dialog() as dlg, ui.card().classes("w-[360px] max-w-full gap-2"):
-        ui.label(f"Zuweisen / Tauschen – {bk['apartment_name']}").classes("font-bold")
+        ui.label(t("Zuweisen / Tauschen – {wohnung}", wohnung=bk["apartment_name"])).classes("font-bold")
         if not others:
-            ui.label("Keine weiteren Mitarbeiter.").classes("text-sm text-gray-500")
-        sel = ui.select(others, label="Mitarbeiter").props("dense outlined").classes("w-full")
+            ui.label(t("Keine weiteren Mitarbeiter.")).classes("text-sm text-gray-500")
+        sel = ui.select(others, label=t("Mitarbeiter")).props("dense outlined").classes("w-full")
 
         def go():
             if not sel.value:
-                ui.notify("Bitte Mitarbeiter wählen.", type="warning"); return
+                ui.notify(t("Bitte Mitarbeiter wählen."), type="warning"); return
             dlg.close()
             _assign(bk, sel.value, user, staff, on_saved)
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
-            ui.button("Zuweisen", icon="check", on_click=go).props("unelevated")
+            ui.button(t("Zuweisen"), icon="check", on_click=go).props("unelevated")
     dlg.open()
 
 
 def _reset_dialog(bk, user, admin, staff, activate):
     """Admin: Auftrag zurücksetzen (Zuweisung, Checkliste, erfasste Zeiten)."""
     with ui.dialog() as dlg, ui.card().classes("w-[400px] max-w-full gap-2"):
-        ui.label(f"Auftrag zurücksetzen – {bk['apartment_name']}").classes("font-bold")
-        ui.label("Setzt Zuweisung und Checklisten-Abschluss zurück und entfernt die für "
-                 "diese Buchung erfassten Arbeitszeiten. Status wird wieder Nicht "
-                 "zugewiesen. Die interne Notiz bleibt erhalten.") \
+        ui.label(t("Auftrag zurücksetzen – {wohnung}", wohnung=bk["apartment_name"])).classes("font-bold")
+        ui.label(t("Setzt Zuweisung und Checklisten-Abschluss zurück und entfernt die für "
+                   "diese Buchung erfassten Arbeitszeiten. Status wird wieder Nicht "
+                   "zugewiesen. Die interne Notiz bleibt erhalten.")) \
             .classes("text-sm text-gray-500")
 
         def do():
             bookings.reset(bk["id"])
             n = timetrack.delete_for_booking(bk["id"])
             dlg.close()
-            ui.notify(f"Auftrag zurückgesetzt (entfernte Zeiteinträge: {n}).", type="warning")
+            ui.notify(t("Auftrag zurückgesetzt (entfernte Zeiteinträge: {n}).", n=n), type="warning")
             open_booking_dialog(bk, user, admin, staff, activate)
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
-            ui.button("Zurücksetzen", icon="restart_alt", on_click=do).props("unelevated color=negative")
+            ui.button(t("Zurücksetzen"), icon="restart_alt", on_click=do).props("unelevated color=negative")
     dlg.open()
 
 
@@ -3045,19 +3050,21 @@ def _booking_log(bk):
     # Arbeitszeit
     with ui.row().classes("w-full items-center gap-2"):
         ui.icon("schedule").classes("text-primary")
-        ui.label(f"Arbeitszeit: {timetrack.fmt_dur(total_min) if total_min else '0:00 h'}"
-                 + (f" ({len(entries)} Einträge)" if entries else "")).classes("text-sm font-medium")
+        ui.label(t("Arbeitszeit: {dauer}",
+                   dauer=timetrack.fmt_dur(total_min) if total_min else "0:00 h")
+                 + (t(" ({n} Einträge)", n=len(entries)) if entries else "")).classes("text-sm font-medium")
     for e in entries:
         ui.label(f"· {_d(e['checkin'])} {_t(e['checkin'])}–{_t(e['checkout'])}"
-                 + (" (nachgetragen)" if e.get("manual") else "")).classes("text-xs text-gray-500 pl-6")
+                 + (t(" (nachgetragen)") if e.get("manual") else "")).classes("text-xs text-gray-500 pl-6")
     # Checkliste
     with ui.row().classes("w-full items-center gap-2 mt-1"):
         ui.icon("checklist").classes("text-primary")
-        ui.label(f"Checkliste: {dprog}/{tprog} erledigt · {photos} Foto(s)").classes("text-sm font-medium")
+        ui.label(t("Checkliste: {done}/{total} erledigt · {fotos} Foto(s)",
+                   done=dprog, total=tprog, fotos=photos)).classes("text-sm font-medium")
     # Schäden
     with ui.row().classes("w-full items-center gap-2 mt-1"):
         ui.icon("report_problem").classes("text-red-600")
-        ui.label(f"Schäden gemeldet: {len(dmgs)}").classes("text-sm font-medium")
+        ui.label(t("Schäden gemeldet: {n}", n=len(dmgs))).classes("text-sm font-medium")
     for d in dmgs:
         with ui.row().classes("w-full items-start gap-2 pl-6 no-wrap"):
             if d.get("photo"):
@@ -3067,7 +3074,7 @@ def _booking_log(bk):
     # Verbrauch / Wäsche
     with ui.row().classes("w-full items-center gap-2 mt-1"):
         ui.icon("inventory_2").classes("text-primary")
-        ui.label(f"Nachbestellt: {len(rst)}").classes("text-sm font-medium")
+        ui.label(t("Nachbestellt: {n}", n=len(rst))).classes("text-sm font-medium")
     for r in rst:
         ui.label(f"· {r['menge']}× {r['item']}" + ("" if r["status"] == "offen" else " ✓")) \
             .classes("text-xs text-gray-600 pl-6")
@@ -3090,35 +3097,35 @@ def _confirm_send_guest(bk, textarea, reload_cb):
     """Bestätigungsdialog vor dem Live-Versand einer Gast-Antwort über Smoobu."""
     text = (textarea.value or "").strip()
     if not text:
-        ui.notify("Bitte zuerst eine Antwort eingeben.", type="warning")
+        ui.notify(t("Bitte zuerst eine Antwort eingeben."), type="warning")
         return
     with ui.dialog() as cd, ui.card().classes("w-[420px] max-w-full gap-2"):
-        ui.label("Nachricht an den Gast senden?").classes("text-lg font-bold")
-        ui.label(f"Gast: {bk.get('guest') or '—'}").classes("text-sm text-gray-500")
+        ui.label(t("Nachricht an den Gast senden?")).classes("text-lg font-bold")
+        ui.label(t("Gast: {name}", name=bk.get("guest") or "—")).classes("text-sm text-gray-500")
         with ui.column().classes("w-full bg-gray-50 rounded p-2 max-h-[30vh] overflow-auto"):
             ui.label(text).classes("text-sm whitespace-pre-wrap")
-        ui.label("Die Nachricht wird sofort über Smoobu an den Gast zugestellt.") \
+        ui.label(t("Die Nachricht wird sofort über Smoobu an den Gast zugestellt.")) \
             .classes("text-xs text-amber-700")
 
         async def _do():
             from nicegui import run
             api_key = (CFG.get("smoobu_api_key") or "").strip()
             if not api_key:
-                ui.notify("Kein Smoobu-API-Key konfiguriert.", type="negative")
+                ui.notify(t("Kein Smoobu-API-Key konfiguriert."), type="negative")
                 return
             try:
                 await run.io_bound(smoobu.send_message, api_key, bk["id"], text)
             except Exception as ex:
-                ui.notify(f"Senden fehlgeschlagen: {ex}", type="negative")
+                ui.notify(t("Senden fehlgeschlagen: {fehler}", fehler=ex), type="negative")
                 return
             cd.close()
             textarea.value = ""
-            ui.notify("Nachricht an den Gast gesendet.", type="positive")
+            ui.notify(t("Nachricht an den Gast gesendet."), type="positive")
             await reload_cb(True)
 
         with ui.row().classes("w-full justify-end gap-2"):
-            ui.button("Abbrechen", on_click=cd.close).props("flat no-caps")
-            ui.button("Senden", icon="send", on_click=_do).props("unelevated no-caps color=primary")
+            ui.button(t("Abbrechen"), on_click=cd.close).props("flat no-caps")
+            ui.button(t("Senden"), icon="send", on_click=_do).props("unelevated no-caps color=primary")
     cd.open()
 
 
@@ -3131,10 +3138,10 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
     with box:
         # --- Kopf (fix) -----------------------------------------------------
         with ui.row().classes("w-full items-center shrink-0 pb-1"):
-            ui.label("Gästekommunikation").classes("text-xs font-semibold text-gray-400")
+            ui.label(t("Gästekommunikation")).classes("text-xs font-semibold text-gray-400")
             ui.space()
             ui.button(icon="refresh", on_click=lambda: reload_cb(True)) \
-                .props("flat round dense size=sm").tooltip("Aktualisieren")
+                .props("flat round dense size=sm").tooltip(t("Aktualisieren"))
         # --- Verlauf (scrollt) ---------------------------------------------
         thread = ui.column().classes(
             "w-full gap-2 flex-grow overflow-auto min-h-0 py-1 pr-1")
@@ -3142,10 +3149,10 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
             if err:
                 with ui.row().classes("w-full items-center gap-2 bg-red-50 rounded p-2"):
                     ui.icon("error_outline").classes("text-red-500")
-                    ui.label(f"Nachrichten konnten nicht geladen werden: {err}") \
+                    ui.label(t("Nachrichten konnten nicht geladen werden: {fehler}", fehler=err)) \
                         .classes("text-xs text-red-700")
             elif not msgs:
-                ui.label("Noch keine Nachrichten zu dieser Buchung.") \
+                ui.label(t("Noch keine Nachrichten zu dieser Buchung.")) \
                     .classes("text-sm text-gray-400 m-auto")
             for m in msgs:
                 mine = m.get("type") == 2
@@ -3174,13 +3181,13 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
         # --- Antwortfeld (fix, unten) --------------------------------------
         if not err:
             with ui.column().classes("w-full gap-1 shrink-0 pt-2 border-t border-gray-100"):
-                ta = ui.textarea(placeholder="Antwort an den Gast …") \
+                ta = ui.textarea(placeholder=t("Antwort an den Gast …")) \
                     .props("outlined autogrow dense").classes("w-full") \
                     .style("max-height:96px;overflow-y:auto")
                 with ui.row().classes("w-full items-center gap-2"):
-                    ui.label("Wird direkt über Smoobu an den Gast gesendet.") \
+                    ui.label(t("Wird direkt über Smoobu an den Gast gesendet.")) \
                         .classes("text-[11px] text-gray-400 flex-grow")
-                    ui.button("Senden", icon="send",
+                    ui.button(t("Senden"), icon="send",
                               on_click=lambda: _confirm_send_guest(bk, ta, reload_cb)) \
                         .props("unelevated no-caps")
 
@@ -3228,8 +3235,9 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                             "text-xs " + ("text-red-500" if same_day else "text-gray-500"))
                         ui.label(_guest_persons(nxt, True)).classes(
                             "text-sm font-semibold " + ("text-red-700" if same_day else "text-green-700"))
-                        ui.label(f"Nächste Anreise: {_dfmt(nxt['arrival'])} · {nxt['checkin_time'] or ''}"
-                                 + (" (Wechseltag)" if same_day else "")).classes("text-xs text-gray-500")
+                        ui.label(t("Nächste Anreise: {datum} · {zeit}",
+                                    datum=_dfmt(nxt["arrival"]), zeit=nxt["checkin_time"] or "")
+                                 + (f" ({t('Wechseltag')})" if same_day else "")).classes("text-xs text-gray-500")
             with ui.tab_panel(t_log):
                 _booking_log(bk)
             with ui.tab_panel(t_g):
@@ -3279,7 +3287,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
         footer_box = ui.column().classes("w-full gap-0 p-0")
         with footer_box:
             ui.separator()
-            ui.label("Aktionen").classes("text-xs font-semibold text-gray-400 px-3 pt-1")
+            ui.label(t("Aktionen")).classes("text-xs font-semibold text-gray-400 px-3 pt-1")
 
             def action(label, icon, cb, color="primary"):
                 b = ui.button(on_click=cb).props("flat no-caps align=left").classes("w-full")
@@ -3289,23 +3297,23 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                         ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
                         ui.icon("chevron_right").classes("text-gray-300")
             if who != user:
-                action("Ich übernehme diesen Auftrag", "how_to_reg",
+                action(t("Ich übernehme diesen Auftrag"), "how_to_reg",
                        lambda: (dlg.close(), _assign(bk, user, user, staff, reopen)))
-            action("Tauschen / Zuweisen", "swap_horiz",
+            action(t("Tauschen / Zuweisen"), "swap_horiz",
                    lambda: (dlg.close(), _open_swap(bk, user, staff, reopen)))
-            action("Zeit nachtragen", "more_time",
+            action(t("Zeit nachtragen"), "more_time",
                    lambda: (dlg.close(), _add_time_dialog(bk, user, on_saved=reopen)))
-            action("Notiz hinzufügen", "sticky_note_2",
+            action(t("Notiz hinzufügen"), "sticky_note_2",
                    lambda: (dlg.close(), _note_dialog(bk, on_saved=reopen)))
-            action("Verbrauch / Wäsche", "inventory_2",
+            action(t("Verbrauch / Wäsche"), "inventory_2",
                    lambda: (dlg.close(), _restock_dialog(bk, user, on_close=reopen)))
-            action("Schaden melden", "report_problem",
+            action(t("Schaden melden"), "report_problem",
                    lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
                    color="negative")
-            action("Checkliste & Fotos", "checklist",
+            action(t("Checkliste & Fotos"), "checklist",
                    lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
             if admin:
-                action("Zurücksetzen (Admin)", "restart_alt",
+                action(t("Zurücksetzen (Admin)"), "restart_alt",
                        lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
 
         if mgr:
@@ -3391,8 +3399,8 @@ def render_belege():
     with ui.row().classes("w-full items-center gap-3"):
         ui.icon("receipt").classes("text-3xl text-primary")
         with ui.column().classes("gap-0"):
-            ui.label("Belege").classes("text-2xl font-bold text-slate-800 leading-tight")
-            ui.label("Rechnungen scannen, ablegen & per OCR auslesen") \
+            ui.label(t("Belege")).classes("text-2xl font-bold text-slate-800 leading-tight")
+            ui.label(t("Rechnungen scannen, ablegen & per OCR auslesen")) \
                 .classes("text-sm text-gray-500")
 
     apts = _apts()
@@ -3541,12 +3549,12 @@ def _beleg_card(r, apts, user, admin, rerender):
                 if r.get("pdf"):
                     ui.button(icon="picture_as_pdf",
                               on_click=lambda p=r["pdf"]: ui.navigate.to(f"/media/{p}", new_tab=True)) \
-                        .props("flat round dense color=primary").tooltip("PDF öffnen")
+                        .props("flat round dense color=primary").tooltip(t("PDF öffnen"))
                 if admin:
                     ui.button(icon="delete", on_click=lambda i=r["id"]: _del_beleg(i, rerender)) \
-                        .props("flat round dense color=negative").tooltip("Beleg löschen")
+                        .props("flat round dense color=negative").tooltip(t("Beleg löschen"))
         if r.get("ocr_text"):
-            with ui.expansion("Erkannter Text (OCR)", icon="document_scanner").classes("w-full"):
+            with ui.expansion(t("Erkannter Text (OCR)"), icon="document_scanner").classes("w-full"):
                 ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-gray-600")
 
 
@@ -3555,7 +3563,7 @@ def _del_beleg(receipt_id, rerender):
         ui.label(t("Beleg wirklich löschen?")).classes("font-medium")
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
-            ui.button("Löschen", on_click=lambda: (receipts.delete_receipt(receipt_id),
+            ui.button(t("Löschen"), on_click=lambda: (receipts.delete_receipt(receipt_id),
                                                    dlg.close(),
                                                    ui.notify(t("Beleg gelöscht."), type="warning"),
                                                    rerender())) \
@@ -3660,7 +3668,7 @@ def main_page():
                     airbnb_override=int(airbnb.value) if airbnb.value not in (None, "") else None,
                     befreit=float(befreit.value or 0))
             except smoobu.SmoobuError as ex:
-                ui.notify(f"Smoobu: {ex}", type="negative", timeout=8000)
+                ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
                 return
             if data.LAST_FETCH:
                 status.text = f"Daten zuletzt von Smoobu geladen: {data.LAST_FETCH.strftime('%H:%M:%S')} (Cache 5 Min.)"
@@ -3677,7 +3685,7 @@ def main_page():
         body = ui.column().classes("w-full gap-4")
 
         async def _presence_now():
-            ui.notify("Standort wird geprüft …", type="info", timeout=2000)
+            ui.notify(t("Standort wird geprüft …"), type="info", timeout=2000)
             loc = await get_location()
             ip = await get_ip()
             gps = None if loc.get("error") else loc
@@ -3687,24 +3695,24 @@ def main_page():
         async def do_checkin():
             gps, ip, ort, dist = await _presence_now()
             if timetrack.check_in(user, gps, ip, ort, dist) is None:
-                ui.notify("Du bist bereits eingecheckt.", type="warning")
+                ui.notify(t("Du bist bereits eingecheckt."), type="warning")
             elif ort:
-                ui.notify(f"Eingecheckt ✓ · {ort} ({dist} m)", type="positive")
+                ui.notify(t("Eingecheckt ✓ · {ort} ({dist} m)", ort=ort, dist=dist), type="positive")
             elif gps:
-                ui.notify(f"Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)",
+                ui.notify(t("Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)", dist=dist),
                           type="warning", timeout=9000)
             else:
-                ui.notify("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung aktivieren.",
+                ui.notify(t("Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung aktivieren."),
                           type="warning", timeout=10000)
             render()
 
         async def do_checkout():
             gps, ip, ort, dist = await _presence_now()
             if timetrack.check_out(user, gps, ip, ort, dist) is None:
-                ui.notify("Kein offener Check-in.", type="warning")
+                ui.notify(t("Kein offener Check-in."), type="warning")
             else:
-                ui.notify(f"Ausgecheckt ✓ · {ort} ({dist} m)" if ort else "Ausgecheckt ✓",
-                          type="positive")
+                ui.notify(t("Ausgecheckt ✓ · {ort} ({dist} m)", ort=ort, dist=dist) if ort
+                          else t("Ausgecheckt ✓"), type="positive")
             render()
 
         def render():
@@ -3713,21 +3721,21 @@ def main_page():
                 with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
                     oe = timetrack.get_open(user)
                     if oe:
-                        ui.label(f"Eingecheckt seit {_t(oe['checkin'])} Uhr") \
+                        ui.label(t("Eingecheckt seit {zeit} Uhr", zeit=_t(oe["checkin"]))) \
                             .classes("text-lg font-medium text-green-700")
-                        ui.label("Nachweis: " + _presence(oe.get("checkin_ort"),
+                        ui.label(t("Nachweis: ") + _presence(oe.get("checkin_ort"),
                                  oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
                             .classes("text-xs text-gray-500")
-                        ui.button("Check-out", icon="logout", on_click=do_checkout) \
+                        ui.button(t("Check-out"), icon="logout", on_click=do_checkout) \
                             .props("unelevated size=lg color=negative")
                     else:
-                        ui.label("Nicht eingecheckt").classes("text-gray-500")
-                        ui.button("Check-in", icon="login", on_click=do_checkin) \
+                        ui.label(t("Nicht eingecheckt")).classes("text-gray-500")
+                        ui.button(t("Check-in"), icon="login", on_click=do_checkin) \
                             .props("unelevated size=lg")
-                ui.button("Zeit manuell erfassen", icon="add",
+                ui.button(t("Zeit manuell erfassen"), icon="add",
                           on_click=lambda: _time_edit_dialog(user, apts, admin, staff, on_saved=render)) \
                     .props("outline no-caps")
-                _zeit_list(timetrack.entries(user), apts, admin, staff, render, "Meine Zeiten", False)
+                _zeit_list(timetrack.entries(user), apts, admin, staff, render, t("Meine Zeiten"), False)
                 if admin:
                     ui.separator()
                     ui.label("Auswertung (Admin)").classes("text-lg font-semibold")
@@ -3778,8 +3786,8 @@ def main_page():
         with content:
             with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):
                 ui.icon("lock").classes("text-5xl text-gray-300")
-                ui.label(f"Willkommen, {_cur_user()}!").classes("text-lg font-medium text-slate-700")
-                ui.label("Für deinen Zugang sind noch keine Bereiche freigeschaltet.") \
+                ui.label(t("Willkommen, {name}!", name=_cur_user())).classes("text-lg font-medium text-slate-700")
+                ui.label(t("Für deinen Zugang sind noch keine Bereiche freigeschaltet.")) \
                     .classes("text-gray-500")
 
 

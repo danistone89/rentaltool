@@ -93,7 +93,7 @@ _EN = {
     "Es reist ab": "Departing",
     "keine Folgebuchung": "no follow-up booking",
     "Wechseltag": "Turnover day",
-    "Nächste Anreise: ": "Next arrival: ",
+    "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Personen": "Guests",
     "Buchungskanal": "Booking channel",
     "Name": "Name",
@@ -255,6 +255,103 @@ _EN = {
     "{name} gemeldet ✓": "{name} reported ✓",
     "Foto gespeichert ✓": "Photo saved ✓",
     "Bitte Datum und Uhrzeiten prüfen.": "Please check the date and times.",
+
+    # ------------------------------------------- Aktionen in einer Buchung
+    "Ich übernehme diesen Auftrag": "I'll take this job",
+    "Tauschen / Zuweisen": "Swap / assign",
+    "Zeit nachtragen": "Add time entry",
+    "Notiz hinzufügen": "Add note",
+    "Verbrauch / Wäsche": "Supplies / laundry",
+    "Schaden melden": "Report damage",
+    "Checkliste & Fotos": "Checklist & photos",
+    "Zurücksetzen (Admin)": "Reset (admin)",
+    "Zuweisen": "Assign",
+    "Zurücksetzen": "Reset",
+    "Senden": "Send",
+    "Notiz": "Note",
+
+    "Arbeitszeit nachtragen – {wohnung}": "Add work time – {wohnung}",
+    "Arbeitszeit nachgetragen: {dauer}": "Work time added: {dauer}",
+    "Notiz – {wohnung}": "Note – {wohnung}",
+    "Notiz gespeichert ✓": "Note saved ✓",
+    "Verbrauch / Wäsche – {wohnung}": "Supplies / laundry – {wohnung}",
+    "Schaden melden – {wohnung}": "Report damage – {wohnung}",
+    "Zuweisen / Tauschen – {wohnung}": "Assign / swap – {wohnung}",
+    "Keine weiteren Mitarbeiter.": "No other employees.",
+    "Bitte Mitarbeiter wählen.": "Please select an employee.",
+    "{wohnung} → {name} zugewiesen ✓": "{wohnung} → assigned to {name} ✓",
+    "Auftrag zurücksetzen – {wohnung}": "Reset job – {wohnung}",
+    "Setzt Zuweisung und Checklisten-Abschluss zurück und entfernt die für "
+    "diese Buchung erfassten Arbeitszeiten. Status wird wieder Nicht "
+    "zugewiesen. Die interne Notiz bleibt erhalten.":
+        "Resets the assignment and checklist completion and removes the work "
+        "time logged for this booking. The status returns to Unassigned. The "
+        "internal note is kept.",
+    "Auftrag zurückgesetzt (entfernte Zeiteinträge: {n}).":
+        "Job reset (time entries removed: {n}).",
+
+    # ------------------------------------------------- Protokoll (Buchung)
+    "Arbeitszeit: {dauer}": "Work time: {dauer}",
+    " ({n} Einträge)": " ({n} entries)",
+    " (nachgetragen)": " (added manually)",
+    "Checkliste: {done}/{total} erledigt · {fotos} Foto(s)":
+        "Checklist: {done}/{total} done · {fotos} photo(s)",
+    "Schäden gemeldet: {n}": "Damage reports: {n}",
+    "Nachbestellt: {n}": "Restock requests: {n}",
+
+    # ------------------------------------------------ Nachricht an den Gast
+    "Bitte zuerst eine Antwort eingeben.": "Please enter a reply first.",
+    "Nachricht an den Gast senden?": "Send message to the guest?",
+    "Gast: {name}": "Guest: {name}",
+    "Die Nachricht wird sofort über Smoobu an den Gast zugestellt.":
+        "The message is delivered to the guest immediately via Smoobu.",
+    "Kein Smoobu-API-Key konfiguriert.": "No Smoobu API key configured.",
+    "Senden fehlgeschlagen: {fehler}": "Sending failed: {fehler}",
+    "Nachricht an den Gast gesendet.": "Message sent to the guest.",
+
+    # ------------------------------------------ Zeiterfassung: Check-in/out
+    "Du bist bereits eingecheckt.": "You are already checked in.",
+    "Eingecheckt ✓ · {ort} ({dist} m)": "Checked in ✓ · {ort} ({dist} m)",
+    "Eingecheckt ✓ · ⚠️ nicht am Objekt (nächstes {dist} m)":
+        "Checked in ✓ · ⚠️ not at the property (nearest {dist} m)",
+    "Eingecheckt ✓ · ⚠️ kein Standort – bitte Ortung aktivieren.":
+        "Checked in ✓ · ⚠️ no location – please enable location services.",
+    "Kein offener Check-in.": "No open check-in.",
+    "Ausgecheckt ✓ · {ort} ({dist} m)": "Checked out ✓ · {ort} ({dist} m)",
+    "Ausgecheckt ✓": "Checked out ✓",
+    "Eingecheckt seit {zeit} Uhr": "Checked in since {zeit}",
+    "Nachweis: ": "Evidence: ",
+    "Nicht eingecheckt": "Not checked in",
+    "Fertig · {dauer} · {done}/{total} erledigt": "Done · {dauer} · {done}/{total} completed",
+
+    # ------------------------------------------------------ Reinigungsliste
+    "Überfällig ({n})": "Overdue ({n})",
+    "Heute ({n})": "Today ({n})",
+    "Reinigung übernommen": "Cleaning taken on",
+    "Foto konnte nicht gespeichert werden: {fehler}": "Photo could not be saved: {fehler}",
+    "Hinweis: {name} hat keine E-Mail hinterlegt – "
+    "keine Benachrichtigung verschickt.":
+        "Note: {name} has no email address – no notification sent.",
+    "Smoobu: {fehler}": "Smoobu: {fehler}",
+
+    # ------------------------------------------------------- Beleg-Karte
+    "PDF öffnen": "Open PDF",
+    "Beleg löschen": "Delete receipt",
+    "Erkannter Text (OCR)": "Recognised text (OCR)",
+
+    # ------------------------------------------------- Gästekommunikation
+    "Gästekommunikation": "Guest communication",
+    "Nachrichten konnten nicht geladen werden: {fehler}":
+        "Messages could not be loaded: {fehler}",
+    "Noch keine Nachrichten zu dieser Buchung.": "No messages for this booking yet.",
+    "Antwort an den Gast …": "Reply to the guest …",
+    "Wird direkt über Smoobu an den Gast gesendet.":
+        "Sent to the guest directly via Smoobu.",
+
+    # ------------------------------------------------------------ Sonstiges
+    "Willkommen, {name}!": "Welcome, {name}!",
+    "Für deinen Zugang sind noch keine Bereiche freigeschaltet.":
+        "No sections have been enabled for your account yet.",
 }
 
 TRANSLATIONS = {"en": _EN}
