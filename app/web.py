@@ -2043,14 +2043,23 @@ def _dfmt(iso):
         return iso or ""
 
 
-def _persons_text(nb):
+def _persons_text(nb, explicit_children=False):
+    """'2 Erwachsene · 1 Kind'. Mit explicit_children auch 'keine Kinder',
+    damit im Wechsel klar ist, dass wirklich keine gebucht sind."""
     a, c = nb.get("adults") or 0, nb.get("children") or 0
     parts = []
     if a:
         parts.append("1 Erwachsener" if a == 1 else f"{a} Erwachsene")
     if c:
         parts.append("1 Kind" if c == 1 else f"{c} Kinder")
+    elif explicit_children and a:
+        parts.append("keine Kinder")
     return " · ".join(parts) or f"{nb.get('persons', 0)} Pers."
+
+
+def _guest_persons(nb, explicit_children=False):
+    """'Max Mustermann · 2 Erwachsene · 1 Kind'"""
+    return f"{nb.get('guest') or 'Gast'} · {_persons_text(nb, explicit_children)}"
 
 
 def _events_between(d_from, d_to):
@@ -2634,15 +2643,29 @@ def _cleaning_card(job, user, admin, staff, activate):
                         ui.icon("arrow_forward").classes("text-gray-400 text-sm")
                         ui.icon("login").classes("text-green-700 text-base")
                         ui.label(f"Check-in {nxt['checkin_time'] if nxt else '—'}")
-                    with ui.row().classes("w-full items-center gap-1 text-sm no-wrap"):
-                        ui.icon("person").classes("text-gray-400 text-base")
-                        ui.label(f"{job['guest'] or 'Gast'} · {_persons_text(job)}") \
-                            .classes("text-slate-700 truncate")
-                    ui.label("Anreise vorbereiten für").classes(
-                        "text-xs mt-1 " + ("text-red-500" if same_day else "text-gray-400"))
-                    ui.label(_persons_text(nxt) if nxt else "keine Folgebuchung").classes(
-                        "text-sm font-semibold " + ("text-red-700" if same_day
-                        else ("text-green-700" if nxt else "text-gray-500")))
+                    with ui.row().classes("w-full items-start gap-1 text-sm no-wrap"):
+                        ui.icon("logout").classes("text-deep-orange text-base mt-0.5 shrink-0")
+                        with ui.column().classes("gap-0 min-w-0"):
+                            ui.label("Es reist ab").classes("text-xs text-gray-400 leading-tight")
+                            ui.label(_guest_persons(job, True)) \
+                                .classes("text-slate-700 truncate leading-tight")
+                    with ui.row().classes("w-full items-start gap-1 text-sm no-wrap mt-1"):
+                        ui.icon("login").classes(
+                            ("text-red-500" if same_day else "text-green-700")
+                            + " text-base mt-0.5 shrink-0")
+                        with ui.column().classes("gap-0 min-w-0"):
+                            ui.label("Anreise vorbereiten für").classes(
+                                "text-xs leading-tight "
+                                + ("text-red-500" if same_day else "text-gray-400"))
+                            ui.label(_guest_persons(nxt, True) if nxt else "keine Folgebuchung") \
+                                .classes("font-semibold truncate leading-tight "
+                                         + ("text-red-700" if same_day
+                                            else ("text-green-700" if nxt else "text-gray-500")))
+                            if nxt:
+                                ui.label(f"Anreise {_dfmt(nxt['arrival'])} · "
+                                         f"{nxt['checkin_time'] or '—'}"
+                                         + (" · Wechseltag" if same_day else "")) \
+                                    .classes("text-xs text-gray-500 leading-tight")
 
                 if open_here:
                     checkin_dt = datetime.fromisoformat(oe["checkin"])
@@ -2710,8 +2733,10 @@ def _cleaning_compact(job, user, admin, staff, activate):
                 ui.label(f"Check-out {job['checkout_time'] or '—'} → "
                          f"Check-in {nxt['checkin_time'] if nxt else '—'}") \
                     .classes("text-xs text-gray-500")
-                ui.label(_persons_text(nxt) if nxt else _persons_text(job)) \
-                    .classes("text-xs text-gray-500")
+                ui.label(f"Ab: {_guest_persons(job, True)}") \
+                    .classes("text-xs text-gray-500 truncate")
+                ui.label(f"An: {_guest_persons(nxt, True)}" if nxt else "keine Folgebuchung") \
+                    .classes("text-xs truncate " + ("text-green-700" if nxt else "text-gray-400"))
             _status_chip(job)
             ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
@@ -2743,7 +2768,7 @@ def _event_card(ev, user, admin, staff, activate):
                     ui.chip("nicht zugewiesen", icon="person_off").props("color=grey-4 dense")
         with ui.row().classes("w-full items-center gap-2 flex-wrap text-sm text-gray-500"):
             ui.label(f"{ev['guest'] or 'Gast'} · {ev['channel']}")
-            ui.label(_persons_text(ev))
+            ui.label(_persons_text(ev, True))
         with ui.row().classes("w-full items-center gap-2 flex-wrap mt-1"):
             ui.button("Öffnen", icon="open_in_full",
                       on_click=lambda e=ev: open_booking_dialog(e, user, admin, staff, activate)) \
@@ -3047,7 +3072,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                     ui.label("Abreise").classes("text-gray-500")
                     ui.label(f"{_dfmt(bk['departure'])} · {bk['checkout_time'] or '—'}")
                     ui.label("Personen").classes("text-gray-500")
-                    ui.label(_persons_text(bk))
+                    ui.label(_persons_text(bk, True))
                     ui.label("Gast").classes("text-gray-500")
                     ui.label(bk["guest"] or "—")
                     ui.label("Buchungskanal").classes("text-gray-500")
@@ -3057,7 +3082,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                                              + ("bg-red-50" if same_day else "bg-green-50")):
                         ui.label("Anreise vorbereiten für").classes(
                             "text-xs " + ("text-red-500" if same_day else "text-gray-500"))
-                        ui.label(_persons_text(nxt)).classes(
+                        ui.label(_guest_persons(nxt, True)).classes(
                             "text-sm font-semibold " + ("text-red-700" if same_day else "text-green-700"))
                         ui.label(f"Nächste Anreise: {_dfmt(nxt['arrival'])} · {nxt['checkin_time'] or ''}"
                                  + (" (Wechseltag)" if same_day else "")).classes("text-xs text-gray-500")
