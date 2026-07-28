@@ -785,6 +785,12 @@ _RESET_THROTTLE = {}
 _RESET_WAIT = 120        # Sekunden
 
 
+def _log(msg):
+    """Serverseitige Spur (journalctl -u rentaltool). Der Besucher bekommt beim
+    Zurücksetzen bewusst nie zu sehen, ob und warum etwas schiefging."""
+    print(f"[zugang] {msg}", flush=True)
+
+
 def _find_by_kennung(kennung):
     """Benutzer über Benutzername ODER hinterlegte E-Mail finden."""
     k = (kennung or "").strip().lower()
@@ -810,10 +816,18 @@ def open_forgot_password(vorbelegt=""):
             .classes("w-full").mark("forgot-input")
 
         def anfordern():
-            name = _find_by_kennung(feld.value)
-            if name and (USERS[name].get("email") or "").strip():
+            kennung = (feld.value or "").strip()
+            name = _find_by_kennung(kennung)
+            if not name:
+                _log(f"Reset angefragt für '{kennung}' – kein Konto gefunden")
+            elif not (USERS[name].get("email") or "").strip():
+                _log(f"Reset für '{name}' nicht möglich – keine E-Mail-Adresse am Konto")
+            else:
                 letzte = _RESET_THROTTLE.get(name, 0)
-                if _time.time() - letzte >= _RESET_WAIT:
+                wartet = _RESET_WAIT - (_time.time() - letzte)
+                if wartet > 0:
+                    _log(f"Reset für '{name}' gebremst – noch {int(wartet)}s")
+                else:
                     _RESET_THROTTLE[name] = _time.time()
                     # Ergebnis absichtlich nicht anzeigen: kein Link, kein
                     # Hinweis darauf, ob es das Konto gibt.
@@ -1074,12 +1088,15 @@ def _issue_invite(username, zweck="einladung"):
     ablauf = _time.strftime("%d.%m.%Y", _time.localtime(rec["expires"]))
     empfaenger = (u.get("email") or "").strip()
     if not empfaenger:
+        _log(f"{zweck} für '{username}': keine E-Mail-Adresse hinterlegt")
         return link, ablauf, "", "Keine E-Mail-Adresse hinterlegt."
     betreff, text = _invite_mail(username, u, link, zweck, ablauf)
     try:
         mailer.send_notify(CFG, empfaenger, betreff, text)
     except mailer.MailError as ex:
+        _log(f"{zweck} für '{username}': Versand fehlgeschlagen – {ex}")
         return link, ablauf, empfaenger, f"E-Mail nicht gesendet: {ex}"
+    _log(f"{zweck} für '{username}' verschickt, Link gültig bis {ablauf}")
     return link, ablauf, empfaenger, None
 
 
