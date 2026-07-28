@@ -35,8 +35,6 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
-| `static/jscanify.js` | Dokument-Randerkennung im Browser (MIT, mitgeliefert) |
-| `tools/fetch_opencv.sh` | holt OpenCV.js nach `static/` (optional, sonst CDN) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
@@ -109,25 +107,31 @@ Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort *
 
 ## Belegscanner
 
-**Belege → „Beleg scannen"** öffnet die Kamera. Das Dokument wird laufend
-erkannt und **grün umrahmt**; steht der Rahmen rund eine Sekunde ruhig, löst der
-Scanner **von selbst aus** (abschaltbar über „Automatisch auslösen", daneben gibt
-es „Jetzt aufnehmen"). Das Dokument wird perspektivisch entzerrt und als
-**A4-PDF** abgelegt, danach per OCR ausgelesen.
+**Belege → „Beleg scannen"** in zwei Schritten:
 
-Randerkennung läuft im Browser über **OpenCV.js + jscanify**. `jscanify` liegt
-unter `static/` im Repo — der zuvor genutzte CDN-Pfad
-(`dist/jscanify.min.js`) lieferte **404**, wodurch der Scanner nie laden konnte.
-OpenCV.js (~10 MB) wird zuerst unter `/static/opencv.js` gesucht und sonst vom
-offiziellen CDN geladen; mit `./tools/fetch_opencv.sh` legt man es lokal ab
-(schneller, kein Fremd-CDN).
+1. **Foto aufnehmen** – Kamera öffnet, der Beleg wird mitsamt Rändern
+   fotografiert (alternativ ein vorhandenes Foto wählen).
+2. **Ecken ziehen** – vier Punkte liegen auf dem eingefrorenen Bild und werden
+   per Finger/Maus auf die Belegkanten gezogen. Eine Lupe zeigt den Bereich
+   unter dem Finger, der Rest wird abgedunkelt. „Zuschneiden & speichern"
+   entzerrt perspektivisch und legt eine **A4-PDF** ab, danach OCR.
+
+Bewusst **ohne automatische Kantenerkennung**: der frühere Versuch mit
+OpenCV.js + jscanify traf Belege zu unzuverlässig (Kassenbons auf hellem
+Untergrund liefern kaum Kanten) und lud 10 MB WebAssembly. Der Scanner braucht
+jetzt **keine Fremdbibliothek** – reines Canvas.
+
+Entzerrt wird **serverseitig** (`receipts.crop_quad`, OpenCV + numpy). Fehlen
+die, wird auf einen achsenparallelen Zuschnitt auf das umgebende Rechteck
+zurückgefallen (PyMuPDF) – schräg fotografiert bleibt es dann schief, aber der
+Rand ist weg.
 
 Wichtig: Das `ui.html` des Scanners muss **`sanitize=False`** setzen, sonst
-entfernt NiceGUI `<video>`/`<canvas>` und die Vorschau bleibt schwarz.
+entfernt NiceGUI `<video>`/`<canvas>` und die Vorschau bleibt schwarz. Kamera
+gibt es nur über **HTTPS**.
 
-Der Weg über **„Foto / Datei"** bleibt als Rückfall bestehen; dort schneidet der
-Server zu (`receipts.autocrop`, benötigt `opencv-python` + `numpy`, sonst wird
-das Bild ungeschnitten übernommen).
+Der Weg über **„Foto / Datei"** neben dem Scanner bleibt bestehen; dort schneidet
+der Server automatisch zu (`receipts.autocrop`).
 
 ## Standorterfassung (abschaltbar)
 

@@ -213,20 +213,22 @@ _EN = {
     "Kein Beleg erkannt – bitte neu ausrichten.":
         "No receipt detected – please reposition.",
     "Kamera wird gestartet …": "Starting camera …",
-    "Kamera nicht verfügbar. Nutze „Foto / Datei“.":
-        "Camera unavailable. Use “Photo / file”.",
-    "Scanner wird geladen …": "Loading scanner …",
-    "Beleg vollständig ins Bild halten …": "Hold the whole receipt in view …",
-    "Dokument erkannt – bitte still halten …": "Document detected – hold still …",
-    "Kein Dokument erkannt.": "No document detected.",
-    "Aufgenommen ✓": "Captured ✓",
-    "Scanner konnte nicht laden. Nutze „Foto / Datei“.":
-        "Scanner failed to load. Use “Photo / file”.",
-    "Automatisch auslösen": "Capture automatically",
-    "Jetzt aufnehmen": "Capture now",
-    "Der Rahmen zeigt das erkannte Dokument. Es wird entzerrt "
-    "und als PDF abgelegt.":
-        "The frame shows the detected document. It is de-skewed and filed as a PDF.",
+    "Kamera nicht verfügbar – wähle ein Foto aus.":
+        "Camera unavailable – pick a photo instead.",
+    "Beleg fotografieren – Ränder müssen mit aufs Bild.":
+        "Photograph the receipt – include its edges.",
+    "Ecken auf die Belegkanten ziehen.": "Drag the corners onto the receipt edges.",
+    "Kamerabild noch nicht bereit – kurz warten.":
+        "Camera image not ready yet – please wait.",
+    "Foto aufnehmen": "Take photo",
+    "Vorhandenes Foto wählen": "Choose an existing photo",
+    "Neu aufnehmen": "Retake",
+    "Ecken zurücksetzen": "Reset corners",
+    "Zuschneiden & speichern": "Crop & save",
+    "Ziehe die vier Punkte auf die Ecken des Belegs. Der Bereich "
+    "wird geradegezogen und als PDF gespeichert.":
+        "Drag the four points onto the corners of the receipt. The area is "
+        "de-skewed and saved as a PDF.",
     "Scan konnte nicht verarbeitet werden.": "Scan could not be processed.",
     "Beleg wird verarbeitet (PDF, OCR) …": "Processing receipt (PDF, OCR) …",
     "Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …":

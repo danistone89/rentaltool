@@ -188,6 +188,70 @@ def autocrop(src_path, dst_path):
     return True
 
 
+def crop_quad(src_path, dst_path, corners):
+    """Vier vom Nutzer gesetzte Ecken -> entzerrtes Dokument.
+
+    corners: [(x, y), ...] als **Anteile 0..1** der Bildbreite/-höhe, Reihenfolge
+    oben-links, oben-rechts, unten-rechts, unten-links. Anteile statt Pixel,
+    damit die Anzeigegröße im Browser keine Rolle spielt.
+
+    Mit OpenCV wird perspektivisch entzerrt. Fehlt OpenCV, wird auf einen
+    achsenparallelen Zuschnitt auf das umgebende Rechteck zurückgefallen –
+    schräg fotografiert bleibt das Bild dann schief, aber der Rand ist weg.
+    """
+    if not corners or len(corners) != 4:
+        return False
+    try:
+        pts = [(float(x), float(y)) for x, y in corners]
+    except (TypeError, ValueError):
+        return False
+    if not all(-0.05 <= v <= 1.05 for p in pts for v in p):
+        return False
+
+    try:
+        import cv2
+        import numpy as np
+    except Exception:
+        return _crop_bbox(src_path, dst_path, pts)
+
+    img = cv2.imread(src_path)
+    if img is None:
+        return False
+    h, w = img.shape[:2]
+    src = np.array([[min(max(x, 0.0), 1.0) * w, min(max(y, 0.0), 1.0) * h]
+                    for x, y in pts], dtype="float32")
+    (tl, tr, br, bl) = src
+    maxW = int(round(max(np.linalg.norm(br - bl), np.linalg.norm(tr - tl))))
+    maxH = int(round(max(np.linalg.norm(tr - br), np.linalg.norm(tl - bl))))
+    if maxW < 80 or maxH < 80:
+        return False
+    dst = np.array([[0, 0], [maxW - 1, 0], [maxW - 1, maxH - 1], [0, maxH - 1]],
+                   dtype="float32")
+    warped = cv2.warpPerspective(img, cv2.getPerspectiveTransform(src, dst), (maxW, maxH))
+    return bool(cv2.imwrite(dst_path, warped))
+
+
+def _crop_bbox(src_path, dst_path, pts):
+    """Rückfall ohne OpenCV: auf das umgebende Rechteck zuschneiden (PyMuPDF)."""
+    try:
+        import fitz
+        doc = fitz.open(src_path)
+        page = doc[0]
+        r = page.rect
+        xs = [min(max(x, 0.0), 1.0) * r.width for x, _ in pts]
+        ys = [min(max(y, 0.0), 1.0) * r.height for _, y in pts]
+        clip = fitz.Rect(min(xs), min(ys), max(xs), max(ys))
+        if clip.width < 20 or clip.height < 20:
+            doc.close(); return False
+        # 2x rendern, damit der Zuschnitt nicht an Auflösung verliert
+        pix = page.get_pixmap(clip=clip, matrix=fitz.Matrix(2, 2))
+        pix.save(dst_path)
+        doc.close()
+        return True
+    except Exception:
+        return False
+
+
 def image_to_pdf(img_path, pdf_path, page="a4"):
     """Bild -> PDF (PyMuPDF). True bei Erfolg.
 
@@ -236,9 +300,11 @@ def image_to_pdf(img_path, pdf_path, page="a4"):
             return False
 
 
-def save_document(data, ext, mirror_dir=None, crop=True):
-    """Beleg-Bytes speichern, Dokument (optional) automatisch zuschneiden und als PDF
-    ablegen. crop=False, wenn der Client (Scanner) bereits zugeschnitten hat.
+def save_document(data, ext, mirror_dir=None, crop=True, corners=None):
+    """Beleg-Bytes speichern, zuschneiden und als PDF ablegen.
+
+    corners: vom Nutzer im Scanner gesetzte Ecken (Anteile 0..1) – hat Vorrang
+    vor der automatischen Erkennung. crop=False lässt das Bild unverändert.
     Gibt {'photo': rel_jpg, 'pdf': rel_pdf|None} zurück (+ Spiegelung nach mirror_dir)."""
     uid = housekeeping._uid()
     base = os.path.join(housekeeping.MEDIA_DIR, "beleg")
@@ -249,9 +315,15 @@ def save_document(data, ext, mirror_dir=None, crop=True):
         f.write(data)
 
     img_rel = orig_rel
-    if crop:
-        crop_rel = f"beleg/{uid}_doc.jpg"
-        crop_path = os.path.join(housekeeping.MEDIA_DIR, crop_rel)
+    crop_rel = f"beleg/{uid}_doc.jpg"
+    crop_path = os.path.join(housekeeping.MEDIA_DIR, crop_rel)
+    if corners:
+        try:
+            if crop_quad(orig_path, crop_path, corners):
+                img_rel = crop_rel
+        except Exception:
+            pass
+    elif crop:
         try:
             if autocrop(orig_path, crop_path):
                 img_rel = crop_rel

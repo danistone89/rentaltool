@@ -36,12 +36,6 @@ except Exception:  # PyMuPDF optional
 os.makedirs(housekeeping.MEDIA_DIR, exist_ok=True)
 app.add_static_files("/media", housekeeping.MEDIA_DIR)
 
-# Mitgelieferte Client-Bibliotheken (Dokumentenscanner). Lokal ausgeliefert statt
-# per CDN – ein toter CDN-Pfad hatte den Scanner zuvor komplett lahmgelegt.
-STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
-os.makedirs(STATIC_DIR, exist_ok=True)
-app.add_static_files("/static", STATIC_DIR)
-
 CFG = data.CONFIG
 AUTH = CFG.setdefault("auth", {})
 _new_secret = not AUTH.get("storage_secret")
@@ -604,12 +598,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # /media = in der UI eingebettete Fotos (zufällige UUID-Dateinamen);
             # app.storage.user ist bei Static-Requests nicht verlässlich verfügbar,
             # daher hier durchlassen statt auf /login umzuleiten.
-            # /static = mitgelieferte Client-Bibliotheken (Scanner), keine Daten.
-            # Wie bei /media ist app.storage.user bei solchen Requests nicht
-            # verlaesslich verfuegbar – daher durchlassen statt umzuleiten.
             if not (path in _UNRESTRICTED or path.startswith("/_nicegui")
-                    or path.startswith("/api/") or path.startswith("/media/")
-                    or path.startswith("/static/")):
+                    or path.startswith("/api/") or path.startswith("/media/")):
                 app.storage.user["referrer"] = path
                 return RedirectResponse("/login")
         return await call_next(request)
@@ -3373,16 +3363,19 @@ def _beleg_mirror():
     return CFG.get("belege_ordner") or None
 
 
-# Client-Scanner: Live-Kamera + Dokument-Randerkennung (OpenCV.js + jscanify).
-# jscanify liegt lokal unter /static – der frühere CDN-Pfad lieferte 404, der
-# Scanner konnte dadurch nie laden und fiel immer auf "Foto / Datei" zurück.
-# OpenCV.js wird lokal versucht und sonst vom offiziellen CDN geladen.
+# Client-Scanner: Foto aufnehmen, dann Ecken von Hand ziehen.
 #
-# Ablauf: Kamera öffnen -> laufende Randerkennung, das erkannte Dokument wird
-# grün umrahmt -> bleibt der Rahmen rund eine Sekunde ruhig, löst der Scanner
-# selbst aus. Das entzerrte Dokument geht als Data-URL an Python, das daraus
-# die PDF baut. Das Ergebnis wird per emitEvent('beleg_scan') aktiv an Python
-# geschickt – so kommt auch die automatische Auslösung ohne Nutzerklick an.
+# Die automatische Kantenerkennung (OpenCV.js + jscanify) traf Belege zu
+# unzuverlässig – Kassenbons auf hellem Untergrund liefern kaum Kanten. Der
+# Ablauf ist deshalb zweistufig und kommt ohne Fremdbibliothek aus:
+#
+#   1. Kamera -> "Foto aufnehmen" friert das Bild ein
+#   2. Vier Eckpunkte liegen als Rechteck auf dem Bild und lassen sich per
+#      Finger/Maus ziehen; eine Lupe zeigt den Bereich unter dem Finger
+#   3. Beim Speichern gehen Bild + Ecken (als Anteile 0..1) an Python, das
+#      serverseitig perspektivisch entzerrt und die A4-PDF baut
+#
+# Kein OpenCV.js (10 MB) und kein jscanify mehr – reines Canvas.
 _SCAN_JS = r"""
 (function(){
   let tries=0;
@@ -3392,25 +3385,21 @@ _SCAN_JS = r"""
     if(wrap.dataset.init) return; wrap.dataset.init='1';
 
     const video=wrap.querySelector('video');
-    const overlay=wrap.querySelector('canvas.ovl');
+    const cv2=wrap.querySelector('canvas.edit');      // Bearbeitungsflaeche
     const status=wrap.querySelector('.scan-status');
-    const work=document.createElement('canvas');
-    const octx=overlay.getContext('2d');
+    const ctx=cv2.getContext('2d');
     const M=k=>wrap.dataset[k]||'';
 
-    let scanner=null, stream=null, running=true, ready=false;
-    let shootNow=false, autoOn=true, sent=false;
-    let stable=0, lastPts=null;
-    const NEEDED=6, FPS=8;
+    const shot=document.createElement('canvas');      // Originalaufloesung
+    let stream=null, img=null, pts=null, drag=-1, dpr=window.devicePixelRatio||1;
 
     function setStatus(t){ if(status) status.textContent=t; }
-    function load(src){return new Promise((res,rej)=>{
-      const s=document.createElement('script'); s.src=src;
-      s.onload=()=>res(); s.onerror=()=>rej(new Error(src));
-      document.head.appendChild(s);});}
-    async function loadFirst(list){
-      for(const src of list){ try{ await load(src); return true; }catch(e){} }
-      return false;
+    function phase(p){
+      wrap.dataset.phase=p;
+      video.style.display   = p==='cam'  ? 'block':'none';
+      cv2.style.display     = p==='edit' ? 'block':'none';
+      document.querySelectorAll('.beleg-cam').forEach(e=>e.style.display = p==='cam' ?'':'none');
+      document.querySelectorAll('.beleg-edit').forEach(e=>e.style.display = p==='edit'?'':'none');
     }
 
     async function init(){
@@ -3418,123 +3407,151 @@ _SCAN_JS = r"""
         setStatus(M('msgCam'));
         stream=await navigator.mediaDevices.getUserMedia(
           {video:{facingMode:{ideal:'environment'},
-                  width:{ideal:1920},height:{ideal:1080}},audio:false});
+                  width:{ideal:2560},height:{ideal:1440}},audio:false});
         video.srcObject=stream; await video.play();
+        phase('cam'); setStatus(M('msgAim'));
       }catch(err){
-        setStatus(M('msgNoCam')+' ('+((err&&err.message)||err)+')'); return;
+        phase('cam');
+        setStatus(M('msgNoCam')+' ('+((err&&err.message)||err)+')');
       }
-      try{
-        setStatus(M('msgLoad'));
-        if(typeof cv==='undefined'){
-          if(!await loadFirst(['/static/opencv.js',
-                               'https://docs.opencv.org/4.8.0/opencv.js']))
-            throw new Error('opencv.js');
-        }
-        await new Promise((res,rej)=>{
-          const to=setTimeout(()=>rej(new Error('timeout')),60000);
-          if(window.cv&&cv.Mat){ clearTimeout(to); res(); }
-          else { cv['onRuntimeInitialized']=()=>{ clearTimeout(to); res(); }; }
-        });
-        if(typeof jscanify==='undefined'){
-          if(!await loadFirst(['/static/jscanify.js',
-                               'https://cdn.jsdelivr.net/npm/jscanify@1.4.3/src/jscanify.js']))
-            throw new Error('jscanify');
-        }
-        scanner=new jscanify();
-        ready=true;
-        setStatus(M('msgAim'));
-        tick();
-      }catch(e){ setStatus(M('msgFail')+' '+((e&&e.message)||'')); }
     }
 
-    function detect(){
-      const w=video.videoWidth,h=video.videoHeight;
-      if(!w||!h) return null;
-      work.width=w; work.height=h;
-      work.getContext('2d').drawImage(video,0,0,w,h);
-      let img=null,c=null;
-      try{
-        img=cv.imread(work);
-        const cont=scanner.findPaperContour(img);
-        if(!cont) return null;
-        c=scanner.getCornerPoints(cont,img);
-      }catch(e){ c=null; }
-      finally{ if(img){ try{img.delete();}catch(e){} } }   // sonst laeuft der WASM-Heap voll
-      if(!c) return null;
-      const pts=[c.topLeftCorner,c.topRightCorner,c.bottomRightCorner,c.bottomLeftCorner];
-      if(pts.some(p=>!p||typeof p.x!=='number'||typeof p.y!=='number')) return null;
-      let a=0;                                   // Gaussche Trapezformel
-      for(let i=0;i<4;i++){ const p=pts[i],q=pts[(i+1)%4]; a+=p.x*q.y-q.x*p.y; }
-      if(Math.abs(a/2) < 0.12*w*h) return null;  // zu kleiner Fund -> verwerfen
-      return {c:c,pts:pts,w:w,h:h};
-    }
-
-    function draw(f){
-      const w=video.videoWidth||1, h=video.videoHeight||1;
-      if(overlay.width!==w||overlay.height!==h){ overlay.width=w; overlay.height=h; }
-      octx.clearRect(0,0,w,h);
-      if(!f) return;
-      octx.lineWidth=Math.max(3,w/220);
-      octx.strokeStyle='#16a34a';
-      octx.fillStyle='rgba(22,163,74,.14)';
-      octx.beginPath(); octx.moveTo(f.pts[0].x,f.pts[0].y);
-      for(let i=1;i<4;i++) octx.lineTo(f.pts[i].x,f.pts[i].y);
-      octx.closePath(); octx.fill(); octx.stroke();
-      octx.fillStyle='#16a34a';
-      const r=Math.max(5,w/130);
-      f.pts.forEach(p=>{ octx.beginPath(); octx.arc(p.x,p.y,r,0,6.2832); octx.fill(); });
-    }
-
-    function moved(a,b){
-      if(!a||!b) return 1e9;
-      let d=0; for(let i=0;i<4;i++) d+=Math.hypot(a[i].x-b[i].x,a[i].y-b[i].y);
-      return d/4;
-    }
-
-    function shoot(f){
-      try{
-        const tw=Math.min(1600,f.w);
-        const paper=scanner.extractPaper(work,tw,Math.round(tw*1.414),f.c);
-        if(!paper) return false;
-        if(sent) return true;
-        sent=true;
-        setStatus(M('msgDone'));
-        stop();
-        // Ergebnis aktiv an Python schicken – auch die automatische Ausloesung
-        emitEvent('beleg_scan', paper.toDataURL('image/jpeg',0.92));
-        return true;
-      }catch(e){ return false; }
-    }
-
-    function tick(){
-      if(!running) return;
-      if(ready){
-        const f=detect();
-        draw(f);
-        if(f){
-          const tol=Math.hypot(f.w,f.h)*0.012;
-          stable = moved(lastPts,f.pts)<tol ? stable+1 : 0;
-          lastPts=f.pts;
-          if(shootNow){ shootNow=false; if(shoot(f)) return; }
-          else if(autoOn&&stable>=NEEDED){ if(shoot(f)) return; }
-          else setStatus(M('msgHold'));
-        } else {
-          stable=0; lastPts=null;
-          if(shootNow){ shootNow=false; setStatus(M('msgNone')); }
-          else setStatus(M('msgAim'));
-        }
-      }
-      setTimeout(tick,1000/FPS);
-    }
-
-    function stop(){
-      running=false;
+    function stopCam(){
       if(stream){ try{stream.getTracks().forEach(t=>t.stop());}catch(e){} stream=null; }
     }
 
-    window.__belegStop=stop;
-    window.__belegShoot=function(){ shootNow=true; };
-    window.__belegAuto=function(on){ autoOn=!!on; stable=0; };
+    // ---- Schritt 1: Foto einfrieren -------------------------------------
+    function capture(){
+      const w=video.videoWidth,h=video.videoHeight;
+      if(!w||!h){ setStatus(M('msgNoFrame')); return; }
+      shot.width=w; shot.height=h;
+      shot.getContext('2d').drawImage(video,0,0,w,h);
+      stopCam();
+      img=new Image();
+      img.onload=()=>{ resetPts(); layout(); phase('edit'); setStatus(M('msgDrag')); };
+      img.src=shot.toDataURL('image/jpeg',0.95);
+    }
+
+    // Startrechteck mit 8 % Rand – bewusst grosszuegig, damit alle vier
+    // Griffe sichtbar im Bild liegen und nicht am Rand kleben.
+    function resetPts(){ const a=0.08,b=1-a; pts=[[a,a],[b,a],[b,b],[a,b]]; }
+
+    function layout(){
+      const maxW=wrap.clientWidth||360, maxH=Math.round(window.innerHeight*0.52);
+      const s=Math.min(maxW/img.width, maxH/img.height);
+      const w=Math.round(img.width*s), h=Math.round(img.height*s);
+      cv2.style.width=w+'px'; cv2.style.height=h+'px';
+      cv2.width=Math.round(w*dpr); cv2.height=Math.round(h*dpr);
+      draw();
+    }
+
+    function P(i){ return [pts[i][0]*cv2.width, pts[i][1]*cv2.height]; }
+
+    function draw(){
+      if(!img) return;
+      ctx.clearRect(0,0,cv2.width,cv2.height);
+      ctx.drawImage(img,0,0,cv2.width,cv2.height);
+      // Bereich ausserhalb der Auswahl abdunkeln
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0,0,cv2.width,cv2.height);
+      ctx.moveTo(...P(0)); for(let i=3;i>=1;i--) ctx.lineTo(...P(i));
+      ctx.closePath();
+      ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fill('evenodd');
+      ctx.restore();
+      // Auswahlkanten
+      ctx.beginPath(); ctx.moveTo(...P(0));
+      for(let i=1;i<4;i++) ctx.lineTo(...P(i));
+      ctx.closePath();
+      ctx.lineWidth=Math.max(2,cv2.width/300); ctx.strokeStyle='#16a34a'; ctx.stroke();
+      // Griffe
+      const r=Math.max(10,cv2.width/45);
+      for(let i=0;i<4;i++){
+        const [x,y]=P(i);
+        ctx.beginPath(); ctx.arc(x,y,r,0,6.2832);
+        ctx.fillStyle= drag===i ? 'rgba(22,163,74,.95)' : 'rgba(255,255,255,.9)';
+        ctx.fill(); ctx.lineWidth=Math.max(2,r/5); ctx.strokeStyle='#16a34a'; ctx.stroke();
+      }
+      if(drag>=0) magnifier(P(drag));
+    }
+
+    // Lupe: der Finger verdeckt die Ecke, deshalb den Ausschnitt daneben zeigen
+    function magnifier(p){
+      const R=Math.min(cv2.width,cv2.height)*0.16, Z=2.5;
+      const cx = p[0] < cv2.width/2 ? cv2.width-R-8 : R+8;
+      const cy = R+8;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,6.2832); ctx.clip();
+      ctx.fillStyle='#000'; ctx.fillRect(cx-R,cy-R,2*R,2*R);
+      ctx.drawImage(img, 0,0, img.width,img.height,
+                    cx-p[0]*Z, cy-p[1]*Z, cv2.width*Z, cv2.height*Z);
+      ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy);
+      ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R);
+      ctx.strokeStyle='rgba(22,163,74,.9)'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,6.2832);
+      ctx.strokeStyle='#16a34a'; ctx.lineWidth=2; ctx.stroke();
+    }
+
+    function pos(ev){
+      const r=cv2.getBoundingClientRect();
+      const t=(ev.touches&&ev.touches[0])||ev;
+      return [(t.clientX-r.left)/r.width, (t.clientY-r.top)/r.height];
+    }
+    function nearest(q){
+      let best=-1,bd=1e9;
+      for(let i=0;i<4;i++){
+        const d=Math.hypot(pts[i][0]-q[0], pts[i][1]-q[1]);
+        if(d<bd){ bd=d; best=i; }
+      }
+      return bd<0.12 ? best : -1;          // nur greifen, wenn nah genug
+    }
+    function down(ev){ if(!img) return; drag=nearest(pos(ev)); if(drag>=0){ ev.preventDefault(); draw(); } }
+    function move(ev){
+      if(drag<0) return;
+      ev.preventDefault();
+      const q=pos(ev);
+      pts[drag]=[Math.min(1,Math.max(0,q[0])), Math.min(1,Math.max(0,q[1]))];
+      draw();
+    }
+    function up(){ if(drag>=0){ drag=-1; draw(); } }
+
+    cv2.addEventListener('mousedown',down);   cv2.addEventListener('touchstart',down,{passive:false});
+    window.addEventListener('mousemove',move); cv2.addEventListener('touchmove',move,{passive:false});
+    window.addEventListener('mouseup',up);     cv2.addEventListener('touchend',up);
+    window.addEventListener('resize',()=>{ if(img) layout(); });
+
+    // ---- Schritt 2: Datei waehlen statt Kamera --------------------------
+    function fromFile(file){
+      if(!file) return;
+      const fr=new FileReader();
+      fr.onload=()=>{
+        stopCam();
+        img=new Image();
+        img.onload=()=>{
+          shot.width=img.width; shot.height=img.height;
+          shot.getContext('2d').drawImage(img,0,0);
+          resetPts(); layout(); phase('edit'); setStatus(M('msgDrag'));
+        };
+        img.src=fr.result;
+      };
+      fr.readAsDataURL(file);
+    }
+
+    window.__belegCapture=capture;
+    window.__belegRetake=function(){ img=null; phase('cam'); init(); };
+    window.__belegReset=function(){ if(img){ resetPts(); draw(); } };
+    window.__belegFile=function(){
+      const inp=document.createElement('input');
+      inp.type='file'; inp.accept='image/*';
+      inp.onchange=()=>fromFile(inp.files&&inp.files[0]);
+      inp.click();
+    };
+    window.__belegStop=stopCam;
+    window.__belegSave=function(){
+      if(!img||!pts) return;
+      setStatus(M('msgWork'));
+      emitEvent('beleg_scan', {image: shot.toDataURL('image/jpeg',0.92), corners: pts});
+    };
     init();
   }
   start();
@@ -3555,9 +3572,12 @@ def render_belege():
     apts = _apts()
     sc = {"apt": None, "dlg": None}
 
-    def _process_and_add(data, ext, crop):
-        """Beleg-Bytes -> Dokument/PDF + OCR + Datensatz (blockierender Teil)."""
-        doc = receipts.save_document(data, ext, _beleg_mirror(), crop)
+    def _process_and_add(data, ext, crop, corners=None):
+        """Beleg-Bytes -> Dokument/PDF + OCR + Datensatz (blockierender Teil).
+
+        corners: die im Scanner gesetzten Ecken (Anteile 0..1); sie haben
+        Vorrang vor der automatischen Erkennung."""
+        doc = receipts.save_document(data, ext, _beleg_mirror(), crop, corners)
         try:
             text = receipts.ocr_image(os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
         except Exception:
@@ -3570,81 +3590,91 @@ def render_belege():
         return doc
 
     def _open_scanner():
-        """Kamera-Dialog: erkennt das Dokument laufend, rahmt es ein und loest
-        selbst aus, sobald der Rahmen ruhig steht."""
+        """Zweistufig: erst Foto aufnehmen, dann die vier Ecken von Hand ziehen.
+        Die automatische Kantenerkennung war auf Belegen zu unzuverlaessig."""
         state = {"busy": False}
 
-        def _js_stop():
-            ui.run_javascript("window.__belegStop&&window.__belegStop()")
+        def js(code):
+            ui.run_javascript(code)
 
         with ui.dialog().props("persistent") as dlg, \
-                ui.card().classes("w-[520px] max-w-full gap-2").mark("scan-dialog"):
+                ui.card().classes("w-[560px] max-w-full gap-2").mark("scan-dialog"):
             with ui.row().classes("w-full items-center"):
                 ui.label(t("Beleg scannen")).classes("font-bold")
                 ui.space()
-                ui.button(icon="close", on_click=lambda: (_js_stop(), dlg.close())) \
-                    .props("flat round dense")
-            # Statustexte als data-Attribute, damit das JS sie uebersetzt ausgibt
+                ui.button(icon="close",
+                          on_click=lambda: (js("window.__belegStop&&window.__belegStop()"),
+                                            dlg.close())).props("flat round dense")
+
             msgs = {
                 "msg-cam": t("Kamera wird gestartet …"),
-                "msg-no-cam": t("Kamera nicht verfügbar. Nutze „Foto / Datei“."),
-                "msg-load": t("Scanner wird geladen …"),
-                "msg-aim": t("Beleg vollständig ins Bild halten …"),
-                "msg-hold": t("Dokument erkannt – bitte still halten …"),
-                "msg-none": t("Kein Dokument erkannt."),
-                "msg-done": t("Aufgenommen ✓"),
-                "msg-fail": t("Scanner konnte nicht laden. Nutze „Foto / Datei“."),
+                "msg-no-cam": t("Kamera nicht verfügbar – wähle ein Foto aus."),
+                "msg-aim": t("Beleg fotografieren – Ränder müssen mit aufs Bild."),
+                "msg-drag": t("Ecken auf die Belegkanten ziehen."),
+                "msg-no-frame": t("Kamerabild noch nicht bereit – kurz warten."),
+                "msg-work": t("Beleg wird verarbeitet (PDF, OCR) …"),
             }
             attrs = " ".join(f'data-{k}="{_esc_attr(v)}"' for k, v in msgs.items())
             ui.html(
-                f'<div id="beleg-scan" style="position:relative;width:100%" {attrs}>'
+                f'<div id="beleg-scan" style="width:100%" {attrs}>'
                 '<video autoplay playsinline muted '
                 'style="width:100%;border-radius:12px;background:#000;display:block"></video>'
-                '<canvas class="ovl" style="position:absolute;left:0;top:0;width:100%;'
-                'height:100%;pointer-events:none"></canvas>'
-                '<div class="scan-status" style="font-size:12px;color:#6b7280;margin-top:6px;'
-                'text-align:center;min-height:18px"></div></div>',
-                # Inhalt ist vollstaendig selbst erzeugt; die eingesetzten Texte sind
-                # per _esc_attr entschaerft. Ohne sanitize=False entfernt NiceGUI
-                # <video>/<canvas> und der Scanner bleibt schwarz.
+                '<canvas class="edit" style="display:none;border-radius:12px;'
+                'background:#000;margin:0 auto;touch-action:none"></canvas>'
+                '<div class="scan-status" style="font-size:12px;color:#6b7280;'
+                'margin-top:6px;text-align:center;min-height:18px"></div></div>',
+                # Selbst erzeugtes Markup; die Texte sind per _esc_attr entschaerft.
+                # Ohne sanitize=False entfernt NiceGUI <video>/<canvas>.
                 sanitize=False)
 
-            async def _handle(url):
-                """Aufgenommenes Dokument verarbeiten und ablegen."""
-                from nicegui import run
-                try:
-                    raw = base64.b64decode(url.split(",", 1)[1])
-                except Exception:
-                    ui.notify(t("Scan konnte nicht verarbeitet werden."), type="negative")
-                    return
-                dlg.close()
-                ui.notify(t("Beleg wird verarbeitet (PDF, OCR) …"), type="info", timeout=3000)
-                await run.io_bound(_process_and_add, raw, "jpg", False)   # bereits zugeschnitten
-                ui.notify(t("Beleg gescannt ✓"), type="positive")
-                render()
-
             async def _on_scan(e):
-                """Vom Scanner gesendetes Dokument (automatisch oder per Knopf)."""
+                """Bild + Ecken aus dem Browser entgegennehmen."""
                 if state["busy"]:
                     return
                 state["busy"] = True
                 try:
-                    await _handle(e.args)
+                    from nicegui import run
+                    payload = e.args or {}
+                    url = payload.get("image") or ""
+                    corners = payload.get("corners") or None
+                    try:
+                        raw = base64.b64decode(url.split(",", 1)[1])
+                    except Exception:
+                        ui.notify(t("Scan konnte nicht verarbeitet werden."), type="negative")
+                        return
+                    dlg.close()
+                    ui.notify(t("Beleg wird verarbeitet (PDF, OCR) …"), type="info", timeout=3000)
+                    await run.io_bound(_process_and_add, raw, "jpg", False, corners)
+                    ui.notify(t("Beleg gescannt ✓"), type="positive")
+                    render()
                 finally:
                     state["busy"] = False
             ui.on("beleg_scan", _on_scan)
 
-            with ui.row().classes("w-full items-center gap-2"):
-                auto = ui.switch(t("Automatisch auslösen"), value=True).props("dense")
-                auto.on_value_change(lambda e: ui.run_javascript(
-                    f"window.__belegAuto&&window.__belegAuto({str(bool(e.value)).lower()})"))
-                ui.space()
-            ui.button(t("Jetzt aufnehmen"), icon="document_scanner",
-                      on_click=lambda: ui.run_javascript(
-                          "window.__belegShoot&&window.__belegShoot()")) \
-                .props("unelevated no-caps size=lg").classes("w-full")
-            ui.label(t("Der Rahmen zeigt das erkannte Dokument. Es wird entzerrt "
-                       "und als PDF abgelegt.")).classes("text-[11px] text-gray-400 text-center")
+            # --- Schritt 1: Kamera ---
+            with ui.row().classes("w-full items-center gap-2 beleg-cam"):
+                ui.button(t("Foto aufnehmen"), icon="photo_camera",
+                          on_click=lambda: js("window.__belegCapture&&window.__belegCapture()")) \
+                    .props("unelevated no-caps size=lg").classes("flex-grow")
+                ui.button(icon="folder_open",
+                          on_click=lambda: js("window.__belegFile&&window.__belegFile()")) \
+                    .props("outline").tooltip(t("Vorhandenes Foto wählen"))
+
+            # --- Schritt 2: Ecken ziehen ---
+            with ui.column().classes("w-full gap-2 beleg-edit").style("display:none"):
+                ui.label(t("Ziehe die vier Punkte auf die Ecken des Belegs. Der Bereich "
+                           "wird geradegezogen und als PDF gespeichert.")) \
+                    .classes("text-[11px] text-gray-500 text-center")
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.button(t("Neu aufnehmen"), icon="replay",
+                              on_click=lambda: js("window.__belegRetake&&window.__belegRetake()")) \
+                        .props("outline no-caps")
+                    ui.button(t("Ecken zurücksetzen"), icon="crop_free",
+                              on_click=lambda: js("window.__belegReset&&window.__belegReset()")) \
+                        .props("flat no-caps")
+                ui.button(t("Zuschneiden & speichern"), icon="check",
+                          on_click=lambda: js("window.__belegSave&&window.__belegSave()")) \
+                    .props("unelevated no-caps size=lg").classes("w-full")
         sc["dlg"] = dlg
         dlg.open()
         ui.run_javascript(_SCAN_JS)

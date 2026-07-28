@@ -345,8 +345,10 @@ async def test_scanner_dialog_zeigt_neue_bedienung(user: User, mock_backend, tmp
     await user.should_see(marker="scan-open")
     user.find(marker="scan-open").click()
     await user.should_see(marker="scan-dialog")
-    await user.should_see("Automatisch auslösen")
-    await user.should_see("Jetzt aufnehmen")
+    await user.should_see("Foto aufnehmen")              # Schritt 1
+    await user.should_see("Zuschneiden & speichern")     # Schritt 2
+    await user.should_see("Neu aufnehmen")
+    await user.should_see("Ecken zurücksetzen")
 
 
 async def test_standorterfassung_schalter_in_einstellungen(user: User, mock_backend):

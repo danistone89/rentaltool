@@ -10,8 +10,11 @@ pymupdf>=1.24
 # QR-Code für 2FA (Google Authenticator) – reines Python.
 segno>=1.6
 
-# Optional, nur fuer den serverseitigen Belegzuschnitt (receipts.autocrop).
-# Fehlen sie, wird das Bild ungeschnitten als PDF abgelegt – die Client-seitige
-# Randerkennung des Scanners laeuft davon unabhaengig.
+# Empfohlen (auf dem Server installiert): perspektivische Entzerrung der Belege
+# aus den im Scanner gesetzten Ecken (receipts.crop_quad) und die automatische
+# Erkennung beim Datei-Upload (receipts.autocrop). Fehlen sie, wird auf einen
+# achsenparallelen Zuschnitt per PyMuPDF zurueckgefallen – schraeg fotografiert
+# bleibt das Bild dann schief. Nicht hart eingetragen, weil das Rad rund 60 MB
+# gross ist und die App ohne es lauffaehig bleibt.
 # opencv-python-headless
 # numpy
