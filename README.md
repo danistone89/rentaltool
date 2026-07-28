@@ -102,8 +102,15 @@ Passwort und sind danach **direkt angemeldet**. In der Benutzerliste steht
 solange „Einladung offen – Link gültig bis …"; ein Login-Versuch verweist auf die
 Einladungsmail.
 
-Derselbe Weg dient dem **Zurücksetzen**: „Zugang zurücksetzen" schickt einen
-neuen Link. Das **bisherige Passwort bleibt gültig, bis der Link benutzt wird** –
+**Passwort vergessen (ohne Admin):** Auf der Login-Seite fordert sich jeder über
+**„Passwort vergessen?"** selbst einen Link an – mit Benutzername *oder*
+hinterlegter E-Mail. Die Seite antwortet immer gleich („wenn es dazu ein Konto
+gibt …"), verrät also nicht, welche Konten existieren, zeigt nie einen Link an
+und schickt pro Konto höchstens alle zwei Minuten eine Mail. Ohne hinterlegte
+E-Mail-Adresse geht das nicht – dann hilft nur der Admin.
+
+Derselbe Weg dient dem **Zurücksetzen durch den Admin**: „Zugang zurücksetzen"
+schickt einen neuen Link. Das **bisherige Passwort bleibt gültig, bis der Link benutzt wird** –
 so sperrt ein misslungener Mailversand niemanden aus. Wer hart sperren will,
 setzt über **„Passwort"** direkt ein neues (das macht einen offenen Link ungültig).
 

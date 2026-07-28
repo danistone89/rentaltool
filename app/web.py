@@ -743,10 +743,11 @@ def login_page():
                     .props("unelevated").classes("w-full")
             else:
                 ui.label(t("Anmelden")).classes("font-semibold")
-                un = ui.input(t("Benutzername")).classes("w-full")
+                un = ui.input(t("Benutzername")).classes("w-full").mark("login-user")
                 pw = ui.input(t("Passwort"), password=True,
-                              password_toggle_button=True).classes("w-full")
-                code = ui.input(t("6-stelliger Code (falls 2FA aktiv)")).classes("w-full")
+                              password_toggle_button=True).classes("w-full").mark("login-pw")
+                code = ui.input(t("6-stelliger Code (falls 2FA aktiv)")) \
+                    .classes("w-full").mark("login-code")
 
                 def do_login():
                     u = USERS.get((un.value or "").strip())
@@ -766,12 +767,67 @@ def login_page():
                 for f in (un, pw, code):
                     f.on("keydown.enter", lambda: do_login())
                 ui.button(t("Anmelden"), on_click=do_login).props("unelevated").classes("w-full")
+                ui.button(t("Passwort vergessen?"),
+                          on_click=lambda: open_forgot_password(un.value)) \
+                    .props("flat dense no-caps").classes("w-full").mark("forgot-open")
         _lang_select().classes("w-[360px] max-w-full")
 
 
 def logout():
     app.storage.user["authenticated"] = False
     ui.navigate.to("/login")
+
+
+# ------------------------------------------------------- Passwort vergessen
+# Letzter Versand je Konto – bremst wiederholtes Anfordern (auch als Schutz
+# gegen fremde Anfragen, die das Postfach eines Mitarbeiters zumüllen).
+_RESET_THROTTLE = {}
+_RESET_WAIT = 120        # Sekunden
+
+
+def _find_by_kennung(kennung):
+    """Benutzer über Benutzername ODER hinterlegte E-Mail finden."""
+    k = (kennung or "").strip().lower()
+    if not k:
+        return None
+    for name, u in USERS.items():
+        if name.lower() == k or (u.get("email") or "").strip().lower() == k:
+            return name
+    return None
+
+
+def open_forgot_password(vorbelegt=""):
+    """Selbstbedienung: Link zum Neusetzen des Passworts anfordern.
+
+    Meldet bewusst IMMER dasselbe zurück – ob es ein Konto gibt, verrät die
+    Seite einem Unbekannten nicht.
+    """
+    with ui.dialog() as dlg, ui.card().classes("w-[380px] max-w-full gap-2"):
+        ui.label(t("Passwort zurücksetzen")).classes("text-lg font-bold")
+        ui.label(t("Wir schicken dir einen Link, mit dem du dir ein neues Passwort "
+                   "setzt.")).classes("text-sm text-gray-500")
+        feld = ui.input(t("Benutzername oder E-Mail"), value=(vorbelegt or "").strip()) \
+            .classes("w-full").mark("forgot-input")
+
+        def anfordern():
+            name = _find_by_kennung(feld.value)
+            if name and (USERS[name].get("email") or "").strip():
+                letzte = _RESET_THROTTLE.get(name, 0)
+                if _time.time() - letzte >= _RESET_WAIT:
+                    _RESET_THROTTLE[name] = _time.time()
+                    # Ergebnis absichtlich nicht anzeigen: kein Link, kein
+                    # Hinweis darauf, ob es das Konto gibt.
+                    _issue_invite(name, "reset")
+            ui.notify(t("Wenn es dazu ein Konto mit E-Mail-Adresse gibt, ist gleich "
+                        "eine E-Mail mit einem Link unterwegs."),
+                      type="positive", timeout=9000)
+            dlg.close()
+        feld.on("keydown.enter", lambda: anfordern())
+        with ui.row().classes("w-full justify-end"):
+            ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
+            ui.button(t("Link anfordern"), on_click=anfordern) \
+                .props("unelevated").mark("forgot-send")
+    dlg.open()
 
 
 # ---------------------------------------------------------------- Einladung
@@ -1002,16 +1058,15 @@ def _confirm_reset(username, on_ok):
     dlg.open()
 
 
-def _send_invite(username, zweck="einladung"):
+def _issue_invite(username, zweck="einladung"):
     """Einmal-Token erzeugen, am Benutzer ablegen und per E-Mail verschicken.
 
-    Klappt der Versand nicht (kein Absender hinterlegt, Gmail streikt), bleibt
-    der Token gültig und der Link wird zum Kopieren angezeigt – so ist niemand
-    ausgesperrt, nur weil die Mail hakt.
+    Reine Fachlogik ohne UI -> (link, ablauf, empfaenger, fehler). `fehler` ist
+    None, wenn die Mail raus ist; der Token gilt in jedem Fall.
     """
     u = USERS.get(username)
     if not u:
-        ui.notify("Benutzer nicht gefunden.", type="negative"); return False
+        return None, None, "", "Benutzer nicht gefunden."
     token, rec = auth.new_invite(zweck)
     u["invite"] = rec
     data.save_config()
@@ -1019,16 +1074,32 @@ def _send_invite(username, zweck="einladung"):
     ablauf = _time.strftime("%d.%m.%Y", _time.localtime(rec["expires"]))
     empfaenger = (u.get("email") or "").strip()
     if not empfaenger:
-        _show_invite_link(username, link, "Keine E-Mail-Adresse hinterlegt – "
-                          "bitte den Link selbst weitergeben.")
-        return True
+        return link, ablauf, "", "Keine E-Mail-Adresse hinterlegt."
     betreff, text = _invite_mail(username, u, link, zweck, ablauf)
     try:
         mailer.send_notify(CFG, empfaenger, betreff, text)
+    except mailer.MailError as ex:
+        return link, ablauf, empfaenger, f"E-Mail nicht gesendet: {ex}"
+    return link, ablauf, empfaenger, None
+
+
+def _send_invite(username, zweck="einladung"):
+    """Admin-Weg: verschicken und Rückmeldung geben.
+
+    Klappt der Versand nicht (kein Absender hinterlegt, Gmail streikt), bleibt
+    der Token gültig und der Link wird zum Kopieren angezeigt – so ist niemand
+    ausgesperrt, nur weil die Mail hakt. Das gibt es bewusst NUR hier, für
+    angemeldete Admins.
+    """
+    link, ablauf, empfaenger, fehler = _issue_invite(username, zweck)
+    if link is None:
+        ui.notify(fehler, type="negative"); return False
+    if fehler:
+        _show_invite_link(username, link, fehler + (" Bitte den Link selbst weitergeben."
+                                                    if not empfaenger else ""))
+    else:
         ui.notify(f"Einladung an {empfaenger} gesendet ✓ (Link gültig bis {ablauf})",
                   type="positive", timeout=8000)
-    except mailer.MailError as ex:
-        _show_invite_link(username, link, f"E-Mail nicht gesendet: {ex}")
     return True
 
 

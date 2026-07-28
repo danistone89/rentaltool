@@ -42,6 +42,17 @@ _EN = {
     "Dein Zugang ist noch nicht aktiviert – bitte den Link aus der Einladungs-E-Mail benutzen.":
         "Your account is not activated yet – please use the link from the invitation email.",
 
+    "Passwort vergessen?": "Forgot your password?",
+    "Passwort zurücksetzen": "Reset password",
+    "Wir schicken dir einen Link, mit dem du dir ein neues Passwort setzt.":
+        "We will send you a link to choose a new password.",
+    "Benutzername oder E-Mail": "Username or email",
+    "Link anfordern": "Request link",
+    "Wenn es dazu ein Konto mit E-Mail-Adresse gibt, ist gleich eine E-Mail mit "
+    "einem Link unterwegs.":
+        "If there is an account with an email address for this, a message with a "
+        "link is on its way.",
+
     # ------------------------------------------------- Einladung / Zugang
     "Zugang einrichten": "Set up your access",
     "Neues Passwort vergeben": "Choose a new password",

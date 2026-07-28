@@ -36,8 +36,8 @@ def mock_backend(monkeypatch):
 
 async def _login(user):
     await user.open("/login")
-    user.find("Benutzername").type("test")
-    user.find("Passwort").type("test")
+    user.find(marker="login-user").type("test")
+    user.find(marker="login-pw").type("test")
     user.find("Anmelden").click()
     await user.open("/")
 
@@ -116,8 +116,8 @@ async def test_putzkraft_bereiche(user: User, mock_backend, tmp_path, monkeypatc
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
     await user.open("/login")
-    user.find("Benutzername").type("putzi")
-    user.find("Passwort").type("putzi")
+    user.find(marker="login-user").type("putzi")
+    user.find(marker="login-pw").type("putzi")
     user.find("Anmelden").click()
     await user.open("/")
     await user.should_see("Buchungen")       # Standard-Bereich der Putzkraft
@@ -137,8 +137,8 @@ async def test_manager_bereiche(user: User, mock_backend, tmp_path, monkeypatch)
         "password_hash": auth.hash_password("mgr"), "role": "manager",
         "totp_secret": "", "name": "mgr"})
     await user.open("/login")
-    user.find("Benutzername").type("mgr")
-    user.find("Passwort").type("mgr")
+    user.find(marker="login-user").type("mgr")
+    user.find(marker="login-pw").type("mgr")
     user.find("Anmelden").click()
     await user.open("/")
     user.find(marker="nav-uebersicht").click()
@@ -409,8 +409,8 @@ async def test_invite_abgelaufen(user: User, mock_backend, monkeypatch):
 async def test_login_eines_eingeladenen_verweist_auf_die_mail(user: User, mock_backend,
                                                               eingeladen):
     await user.open("/login")
-    user.find("Benutzername").type("anna")
-    user.find("Passwort").type("irgendwas")
+    user.find(marker="login-user").type("anna")
+    user.find(marker="login-pw").type("irgendwas")
     user.find("Anmelden").click()
     await user.should_see("Einladungs-E-Mail")
 
@@ -437,3 +437,56 @@ async def test_einladen_verschickt_mail(user: User, mock_backend, monkeypatch):
         assert "bea" in body
     finally:
         web.USERS.pop("bea", None)
+
+
+# --------------------------------------------------- Passwort vergessen
+@pytest.fixture
+def reset_bereit(monkeypatch):
+    """Konto mit E-Mail + gesetztem Passwort; Mailversand wird mitgeschrieben."""
+    monkeypatch.setattr(data, "save_config", lambda: None)
+    monkeypatch.setitem(web.USERS, "carl", {
+        "password_hash": auth.hash_password("altes-pw"), "role": "putzkraft",
+        "totp_secret": "", "name": "Carl", "email": "carl@example.com", "lang": "de"})
+    web._RESET_THROTTLE.pop("carl", None)
+    gesendet = []
+    monkeypatch.setattr(mailer, "send_notify",
+                        lambda cfg, to, subj, body: gesendet.append((to, subj, body)))
+    return gesendet
+
+
+async def _forgot(user, kennung):
+    await user.open("/login")
+    user.find(marker="forgot-open").click()
+    await user.should_see("Passwort zurücksetzen")
+    user.find(marker="forgot-input").type(kennung)
+    user.find(marker="forgot-send").click()
+
+
+async def test_passwort_vergessen_schickt_link(user: User, mock_backend, reset_bereit):
+    await _forgot(user, "carl")
+    await user.should_see("ist gleich eine E-Mail mit einem Link unterwegs")
+    to, subj, body = reset_bereit[-1]
+    assert to == "carl@example.com"
+    assert "/invite?token=" in body
+    assert web.auth.invite_state(web.USERS["carl"]) == "offen"
+    # Altes Passwort gilt weiter, bis der Link benutzt wird
+    assert auth.verify_password("altes-pw", web.USERS["carl"]["password_hash"])
+
+
+async def test_passwort_vergessen_auch_per_email(user: User, mock_backend, reset_bereit):
+    await _forgot(user, "CARL@example.com")     # Groß/klein egal
+    assert reset_bereit and reset_bereit[-1][0] == "carl@example.com"
+
+
+async def test_passwort_vergessen_verraet_keine_konten(user: User, mock_backend,
+                                                       reset_bereit):
+    await _forgot(user, "gibtesnicht")
+    await user.should_see("ist gleich eine E-Mail mit einem Link unterwegs")
+    assert reset_bereit == []      # keine Mail, aber dieselbe Meldung
+
+
+async def test_passwort_vergessen_bremst_wiederholung(user: User, mock_backend,
+                                                      reset_bereit):
+    await _forgot(user, "carl")
+    await _forgot(user, "carl")
+    assert len(reset_bereit) == 1   # zweite Anfrage innerhalb der Sperrzeit: keine Mail
