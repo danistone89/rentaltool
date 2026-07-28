@@ -36,6 +36,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
+| `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
 
 ## Amtliches PDF-Formular
 
@@ -193,8 +194,43 @@ weiteres Wörterbuch in `TRANSLATIONS`.
 Nicht übersetzt werden **Inhalte aus den Datendateien** (Checklisten-Punkte,
 Wohnungsnamen, Notizen, Inventar) – sie erscheinen so, wie sie angelegt wurden.
 
-> Ausgesperrt? In `config.json` `auth.users` auf `{}` setzen – beim nächsten
-> Aufruf legst du den Admin neu an. `config.json` ist gitignored.
+## Benutzer per Kommandozeile (`tools/useradmin.py`)
+
+Für alles, was ohne laufende Oberfläche gehen muss – ausgesperrt, Konto direkt
+auf dem Server anlegen, 2FA entfernen, Zugangslink erzeugen wenn der Mailversand
+hakt. Arbeitet direkt auf `config.json`, legt vorher eine Sicherung an und
+schreibt atomar.
+
+```bash
+python3 tools/useradmin.py liste                     # Konten, Rollen, 2FA, Zustand
+python3 tools/useradmin.py passwort admin --email ich@example.com
+python3 tools/useradmin.py passwort bea --rolle manager   # legt das Konto an
+python3 tools/useradmin.py link admin                # Einmal-Link OHNE E-Mail
+python3 tools/useradmin.py rolle anna manager
+python3 tools/useradmin.py 2fa-aus admin
+python3 tools/useradmin.py loeschen anna
+```
+
+Ohne `--passwort` wird verdeckt abgefragt (nichts landet in der Shell-History).
+`liste` gibt weder Hashes noch TOTP-Secrets aus. Den letzten Administrator
+löscht das Werkzeug nicht.
+
+**Auf dem Server** (`/opt/rentaltool`, Dienst `rentaltool.service`) muss die App
+danach neu starten – sie hält die Konfiguration im Speicher und würde die
+Änderung sonst beim nächsten Speichern überschreiben:
+
+```bash
+cd /opt/rentaltool
+.venv/bin/python tools/useradmin.py passwort admin --neustart
+```
+
+`link` ist der Rettungsweg, wenn keine Mail rausgeht: Der ausgegebene Link führt
+direkt auf `/invite`, dort setzt man sein Passwort selbst. Er ersetzt einen
+vorher erzeugten Link, ist einmal verwendbar und 7 Tage gültig.
+
+> Ganz ausgesperrt und kein Werkzeug zur Hand? In `config.json` `auth.users` auf
+> `{}` setzen – beim nächsten Aufruf legst du den Admin neu an, **verlierst aber
+> alle Mitarbeiterkonten**. `config.json` ist gitignored.
 
 ## E-Mail-Versand (Gmail)
 
