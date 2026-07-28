@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Login + optionale 2FA (TOTP / Google Authenticator).
+"""Login + optionale 2FA (TOTP / Google Authenticator) + Einladungs-Links.
 
 Single-User: ein Passwort (PBKDF2-gehasht) in config.auth. Optional ein
 TOTP-Secret für den zweiten Faktor. QR-Code via segno.
@@ -74,6 +74,41 @@ def provisioning_uri(secret, account, issuer="Beherbergungssteuer"):
 
 def qr_data_uri(uri, scale=5):
     return segno.make(uri).png_data_uri(scale=scale)
+
+
+# ------------------------------------------------------------------ Einladung
+# Einmal-Link, mit dem sich ein Mitarbeiter selbst ein Passwort vergibt
+# (Erstzugang oder vom Admin zurückgesetzter Zugang). Gespeichert wird nur der
+# SHA-256-Hash des Tokens – wer die config.json liest, kommt damit nicht in die
+# App. Der Klartext existiert nur im Moment des Erzeugens (Mail/Link-Dialog).
+INVITE_TTL_H = 24 * 7          # 7 Tage
+
+
+def new_invite(zweck="einladung", ttl_h=INVITE_TTL_H):
+    """(token, record) – Record wird am Benutzer gespeichert, Token verschickt."""
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    return token, {"hash": hashlib.sha256(token.encode()).hexdigest(),
+                   "created": now, "expires": now + ttl_h * 3600,
+                   "zweck": zweck}
+
+
+def invite_valid(rec, token):
+    """Passt der Token zum Record und ist er noch gültig?"""
+    if not (rec and token):
+        return False
+    if time.time() > float(rec.get("expires") or 0):
+        return False
+    return hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(),
+                               rec.get("hash", ""))
+
+
+def invite_state(user):
+    """'aktiv' (Passwort gesetzt, keine offene Einladung) | 'offen' | 'abgelaufen'."""
+    rec = (user or {}).get("invite")
+    if not rec:
+        return "aktiv"
+    return "offen" if time.time() <= float(rec.get("expires") or 0) else "abgelaufen"
 
 
 # ------------------------------------------------------------------ Helpers

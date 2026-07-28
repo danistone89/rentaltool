@@ -39,6 +39,40 @@ _EN = {
     "Erst-Einrichtung – Administrator anlegen": "Initial setup – create administrator",
     "Anlegen & anmelden": "Create & sign in",
     "Sprache": "Language",
+    "Dein Zugang ist noch nicht aktiviert – bitte den Link aus der Einladungs-E-Mail benutzen.":
+        "Your account is not activated yet – please use the link from the invitation email.",
+
+    # ------------------------------------------------- Einladung / Zugang
+    "Zugang einrichten": "Set up your access",
+    "Neues Passwort vergeben": "Choose a new password",
+    "Vergib hier dein Passwort – danach bist du direkt angemeldet.":
+        "Choose your password here – you will be signed in right away.",
+    "Konto: {benutzer}": "Account: {benutzer}",
+    "Passwort speichern & anmelden": "Save password & sign in",
+    "Link ungültig oder abgelaufen.": "Link invalid or expired.",
+    "Bitte fordere bei deinem Administrator eine neue Einladung an.":
+        "Please ask your administrator for a new invitation.",
+    "Zur Anmeldung": "Go to sign-in",
+    "Passwort gesetzt – willkommen!": "Password set – welcome!",
+    # … Text der Einladungs-E-Mail
+    "Dein Zugang zur LIVARO-App": "Your access to the LIVARO app",
+    "Neues Passwort für die LIVARO-App": "New password for the LIVARO app",
+    "Hallo {name},": "Hello {name},",
+    "für dich wurde ein Zugang zur LIVARO-App angelegt.":
+        "an account has been created for you in the LIVARO app.",
+    "für deinen Zugang zur LIVARO-App wurde ein neues Passwort angefordert.":
+        "a new password has been requested for your LIVARO app account.",
+    "Dein Benutzername: {benutzer}": "Your username: {benutzer}",
+    "Über diesen Link vergibst du dein Passwort (nur einmal verwendbar):":
+        "Use this link to choose your password (can only be used once):",
+    "Der Link ist bis zum {datum} gültig.": "The link is valid until {datum}.",
+    "Danach meldest du dich jederzeit unter {url} mit deinem Benutzernamen und "
+    "deinem Passwort an.":
+        "After that you can sign in any time at {url} with your username and "
+        "your password.",
+    "Viele Grüße": "Best regards",
+    "Diese E-Mail wurde automatisch von der LIVARO-App verschickt.":
+        "This email was sent automatically by the LIVARO app.",
 
     # ------------------------------------------------------------ Mein Konto
     "Mein Konto": "My account",
@@ -400,15 +434,25 @@ def lang():
     return code if code in LANGUAGES else DEFAULT
 
 
-def t(text, **kwargs):
-    """Übersetzten Text liefern; ohne Treffer den deutschen Ausgangstext."""
-    out = TRANSLATIONS.get(lang(), {}).get(text, text)
+def tl(code, text, **kwargs):
+    """Wie t(), aber mit ausdrücklich angegebener Sprache.
+
+    Für Texte, die NICHT für den gerade angemeldeten Benutzer bestimmt sind –
+    etwa die Einladungs-E-Mail an einen Mitarbeiter (dessen Profilsprache).
+    """
+    code = code if code in LANGUAGES else DEFAULT
+    out = TRANSLATIONS.get(code, {}).get(text, text)
     if kwargs:
         try:
             return out.format(**kwargs)
         except (KeyError, IndexError):
             return out
     return out
+
+
+def t(text, **kwargs):
+    """Übersetzten Text liefern; ohne Treffer den deutschen Ausgangstext."""
+    return tl(lang(), text, **kwargs)
 
 
 def missing(code="en"):

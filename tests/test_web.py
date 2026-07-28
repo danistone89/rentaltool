@@ -100,7 +100,7 @@ async def test_benutzerverwaltung_admin(user: User, mock_backend):
     await _login(user)
     user.find("Benutzer").click()
     await user.should_see("Benutzer verwalten")
-    await user.should_see("Neuen Benutzer anlegen")
+    await user.should_see("Neuen Benutzer einladen")
 
 
 async def test_mein_konto(user: User, mock_backend):
@@ -357,3 +357,83 @@ async def test_standorterfassung_schalter_in_einstellungen(user: User, mock_back
     user.find("Standorte").click()
     await user.should_see("Standort bei der Zeiterfassung erfassen")
     await user.should_see("Wirkt erst, wenn die Standorterfassung oben eingeschaltet ist.")
+
+
+# ----------------------------------------------------------------- Einladung
+@pytest.fixture
+def eingeladen(monkeypatch):
+    """Benutzer 'anna' mit offener Einladung; Config wird nicht auf Platte geschrieben."""
+    monkeypatch.setattr(data, "save_config", lambda: None)
+    token, rec = auth.new_invite("einladung")
+    monkeypatch.setitem(web.USERS, "anna", {
+        "password_hash": "", "role": "putzkraft", "totp_secret": "",
+        "name": "Anna", "email": "anna@example.com", "lang": "de", "invite": rec})
+    return token
+
+
+async def test_invite_ohne_token_zeigt_hinweis(user: User, mock_backend):
+    await user.open("/invite")
+    await user.should_see("Link ungültig oder abgelaufen.")
+    await user.should_see("Zur Anmeldung")
+
+
+async def test_invite_setzt_passwort_und_meldet_an(user: User, mock_backend, eingeladen,
+                                                   tmp_path, monkeypatch):
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    await user.open(f"/invite?token={eingeladen}")
+    await user.should_see("Zugang einrichten")
+    await user.should_see("Konto: anna")
+    user.find(marker="invite-pw1").type("geheim123")
+    user.find(marker="invite-pw2").type("geheim123")
+    user.find(marker="invite-save").click()
+    await user.should_see("Buchungen")            # direkt angemeldet
+    assert auth.verify_password("geheim123", web.USERS["anna"]["password_hash"])
+    assert "invite" not in web.USERS["anna"]      # Link verbraucht
+
+
+async def test_invite_link_nur_einmal(user: User, mock_backend, eingeladen):
+    web.USERS["anna"].pop("invite")               # bereits eingelöst
+    await user.open(f"/invite?token={eingeladen}")
+    await user.should_see("Link ungültig oder abgelaufen.")
+
+
+async def test_invite_abgelaufen(user: User, mock_backend, monkeypatch):
+    monkeypatch.setattr(data, "save_config", lambda: None)
+    token, rec = auth.new_invite(ttl_h=-1)
+    monkeypatch.setitem(web.USERS, "alt", {
+        "password_hash": "", "role": "putzkraft", "totp_secret": "", "invite": rec})
+    await user.open(f"/invite?token={token}")
+    await user.should_see("Link ungültig oder abgelaufen.")
+
+
+async def test_login_eines_eingeladenen_verweist_auf_die_mail(user: User, mock_backend,
+                                                              eingeladen):
+    await user.open("/login")
+    user.find("Benutzername").type("anna")
+    user.find("Passwort").type("irgendwas")
+    user.find("Anmelden").click()
+    await user.should_see("Einladungs-E-Mail")
+
+
+async def test_einladen_verschickt_mail(user: User, mock_backend, monkeypatch):
+    """Anlegen legt den Benutzer ohne Passwort an und schickt den Link."""
+    monkeypatch.setattr(data, "save_config", lambda: None)
+    gesendet = []
+    monkeypatch.setattr(mailer, "send_notify",
+                        lambda cfg, to, subj, body: gesendet.append((to, subj, body)))
+    await _login(user)
+    user.find("Benutzer").click()
+    await user.should_see("Neuen Benutzer einladen")
+    user.find(marker="new-user").type("bea")
+    user.find(marker="new-user-mail").type("bea@example.com")
+    user.find(marker="new-user-invite").click()
+    await user.should_see("Einladung an bea@example.com gesendet")
+    try:
+        assert web.USERS["bea"]["password_hash"] == ""
+        assert auth.invite_state(web.USERS["bea"]) == "offen"
+        to, subj, body = gesendet[-1]
+        assert to == "bea@example.com"
+        assert "/invite?token=" in body
+        assert "bea" in body
+    finally:
+        web.USERS.pop("bea", None)

@@ -63,6 +63,17 @@ def test_resolver_der_wirft_bricht_nicht():
     assert i18n.t("Anmelden") == "Anmelden"
 
 
+def test_tl_ignoriert_den_resolver():
+    """Für Mails an andere Benutzer zählt deren Profilsprache, nicht die Session."""
+    _use("de")
+    assert i18n.tl("en", "Anmelden") == "Sign in"
+    assert i18n.tl("en", "Dein Benutzername: {benutzer}", benutzer="anna") \
+        == "Your username: anna"
+    _use("en")
+    assert i18n.tl("de", "Anmelden") == "Anmelden"
+    assert i18n.tl("kl", "Anmelden") == "Anmelden"      # unbekannt -> Default
+
+
 def test_keine_leeren_uebersetzungen():
     assert i18n.missing("en") == []
 

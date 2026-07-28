@@ -20,6 +20,33 @@ def test_totp_roundtrip():
     assert not auth.verify_totp(secret, "")
 
 
+def test_einladung_token_gueltig_und_einmalig():
+    token, rec = auth.new_invite("einladung")
+    assert rec["zweck"] == "einladung"
+    assert token not in str(rec)              # gespeichert wird nur der Hash
+    assert auth.invite_valid(rec, token)
+    assert not auth.invite_valid(rec, "falscher-token")
+    assert not auth.invite_valid(rec, "")
+    assert not auth.invite_valid(None, token)
+    # Einlösen = Record löschen -> derselbe Link zieht nicht mehr
+    user = {"invite": rec}
+    user.pop("invite")
+    assert not auth.invite_valid(user.get("invite"), token)
+
+
+def test_einladung_laeuft_ab():
+    token, rec = auth.new_invite(ttl_h=-1)    # bereits abgelaufen
+    assert not auth.invite_valid(rec, token)
+    assert auth.invite_state({"invite": rec}) == "abgelaufen"
+
+
+def test_invite_state():
+    assert auth.invite_state({}) == "aktiv"
+    assert auth.invite_state(None) == "aktiv"
+    _, rec = auth.new_invite()
+    assert auth.invite_state({"invite": rec}) == "offen"
+
+
 def test_storage_secret_persistiert():
     cfg = {}
     s1 = auth.ensure_storage_secret(cfg)

@@ -84,6 +84,14 @@ def _lang_select(**kwargs):
         .props("outlined dense")
 
 
+DEFAULT_APP_URL = "https://app.ds-apartments.de"
+
+
+def _app_url():
+    """Öffentliche Adresse der App – für Links in E-Mails (Einladung, Hinweise)."""
+    return (CFG.get("app_url") or DEFAULT_APP_URL).rstrip("/")
+
+
 ROLES = {"admin": "Administrator", "manager": "Manager", "putzkraft": "Putzkraft"}
 
 
@@ -587,8 +595,9 @@ def _admin_zeiten(apts, staff, on_change):
     render()
 
 
-# Pfade ohne Login-Zwang: Login-Seite, Smoobu-Webhook, NiceGUI-Interna.
-_UNRESTRICTED = {"/login"}
+# Pfade ohne Login-Zwang: Login-Seite, Einladungs-Link, Smoobu-Webhook,
+# NiceGUI-Interna.
+_UNRESTRICTED = {"/login", "/invite"}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -684,6 +693,18 @@ def whoami(request: Request):
 
 
 # ---------------------------------------------------------------- Login
+def _finish_login(username, role):
+    """Session anlegen und zur Startseite (bzw. zur ursprünglich gewünschten Seite)."""
+    app.storage.user["authenticated"] = True
+    app.storage.user["user"] = username
+    app.storage.user["role"] = role
+    # Profilsprache schlägt die am Login-Schirm gewählte Sprache
+    profil = (USERS.get(username, {}) or {}).get("lang")
+    if profil:
+        app.storage.user["lang"] = profil
+    ui.navigate.to(app.storage.user.get("referrer") or "/")
+
+
 @ui.page("/login")
 def login_page():
     ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
@@ -693,15 +714,7 @@ def login_page():
         ui.navigate.to("/")
         return
 
-    def finish2(username, role):
-        app.storage.user["authenticated"] = True
-        app.storage.user["user"] = username
-        app.storage.user["role"] = role
-        # Profilsprache schlägt die am Login-Schirm gewählte Sprache
-        profil = (USERS.get(username, {}) or {}).get("lang")
-        if profil:
-            app.storage.user["lang"] = profil
-        ui.navigate.to(app.storage.user.get("referrer") or "/")
+    finish2 = _finish_login
 
     with ui.column().classes("absolute-center items-center gap-4"):
         logo(60)
@@ -737,6 +750,14 @@ def login_page():
 
                 def do_login():
                     u = USERS.get((un.value or "").strip())
+                    if u and not u.get("password_hash"):
+                        # Eingeladen, aber noch kein Passwort gesetzt
+                        ui.notify(t("Dein Zugang ist noch nicht aktiviert – bitte den Link "
+                                    "aus der Einladungs-E-Mail benutzen.")
+                                  if auth.invite_state(u) == "offen"
+                                  else t("Bitte fordere bei deinem Administrator eine neue "
+                                         "Einladung an."),
+                                  type="warning", timeout=9000); return
                     if not u or not auth.verify_password(pw.value or "", u.get("password_hash", "")):
                         ui.notify(t("Benutzername oder Passwort falsch."), type="negative"); return
                     if u.get("totp_secret") and not auth.verify_totp(u["totp_secret"], code.value or ""):
@@ -751,6 +772,74 @@ def login_page():
 def logout():
     app.storage.user["authenticated"] = False
     ui.navigate.to("/login")
+
+
+# ---------------------------------------------------------------- Einladung
+def _find_invite(token):
+    """Benutzer zum Einladungs-Token suchen -> (name, user) oder (None, None)."""
+    if not token:
+        return None, None
+    for name, u in USERS.items():
+        if auth.invite_valid(u.get("invite"), token):
+            return name, u
+    return None, None
+
+
+@ui.page("/invite")
+def invite_page(token: str = ""):
+    """Einmal-Link aus der Einladungs-/Zurücksetzen-Mail: Passwort selbst vergeben."""
+    ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
+              positive="#16a34a", negative="#dc2626")
+    ui.query("body").classes("bg-[#F5F2EB]")
+
+    username, u = _find_invite(token)
+    if u:   # Seite in der Sprache des Eingeladenen zeigen
+        app.storage.user["lang"] = u.get("lang") or i18n.DEFAULT
+
+    with ui.column().classes("absolute-center items-center gap-4"):
+        logo(60)
+        with ui.card().classes("w-[360px] max-w-full gap-2 rounded-xl shadow-md"):
+            if not u:
+                ui.label(t("Link ungültig oder abgelaufen.")).classes("font-semibold")
+                ui.label(t("Bitte fordere bei deinem Administrator eine neue Einladung an.")) \
+                    .classes("text-sm text-gray-500")
+                ui.button(t("Zur Anmeldung"), on_click=lambda: ui.navigate.to("/login")) \
+                    .props("unelevated").classes("w-full")
+                _lang_select().classes("w-full")
+                return
+
+            reset = (u.get("invite", {}) or {}).get("zweck") == "reset"
+            ui.label(t("Neues Passwort vergeben") if reset else t("Zugang einrichten")) \
+                .classes("font-semibold")
+            ui.label(t("Konto: {benutzer}", benutzer=username)).classes("text-sm text-gray-500")
+            ui.label(t("Vergib hier dein Passwort – danach bist du direkt angemeldet.")) \
+                .classes("text-xs text-gray-400")
+            p1 = ui.input(t("Passwort"), password=True,
+                          password_toggle_button=True).classes("w-full").mark("invite-pw1")
+            p2 = ui.input(t("Passwort wiederholen"), password=True) \
+                .classes("w-full").mark("invite-pw2")
+
+            def save():
+                # Token erneut prüfen – zwischen Aufruf und Klick kann er ablaufen
+                # oder (zweiter Browser) schon eingelöst worden sein.
+                name, user = _find_invite(token)
+                if not user:
+                    ui.notify(t("Link ungültig oder abgelaufen."), type="negative")
+                    ui.navigate.reload(); return
+                if len(p1.value or "") < 6:
+                    ui.notify(t("Passwort mindestens 6 Zeichen."), type="warning"); return
+                if p1.value != p2.value:
+                    ui.notify(t("Passwörter stimmen nicht überein."), type="negative"); return
+                user["password_hash"] = auth.hash_password(p1.value)
+                user.pop("invite", None)       # Einmal-Link verbraucht
+                data.save_config()
+                ui.notify(t("Passwort gesetzt – willkommen!"), type="positive")
+                _finish_login(name, user.get("role", "putzkraft"))
+            for f in (p1, p2):
+                f.on("keydown.enter", lambda: save())
+            ui.button(t("Passwort speichern & anmelden"), on_click=save) \
+                .props("unelevated").classes("w-full").mark("invite-save")
+        _lang_select().classes("w-[360px] max-w-full")
 
 
 # ---------------------------------------------------------------- 2FA-Einrichtung
@@ -836,12 +925,111 @@ def open_reset_pw(username):
             if len(p.value or "") < 6:
                 ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
             USERS[username]["password_hash"] = auth.hash_password(p.value)
+            USERS[username].pop("invite", None)   # offener Einmal-Link wird ungültig
             data.save_config()
             ui.notify(f"Passwort für {username} gesetzt.", type="positive"); dlg.close()
         with ui.row().classes("w-full justify-end"):
             ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
             ui.button("Setzen", on_click=save).props("unelevated")
     dlg.open()
+
+
+# ---------------------------------------------------------------- Einladung (Admin)
+def _invite_link(token):
+    return f"{_app_url()}/invite?token={token}"
+
+
+def _show_invite_link(username, link, hinweis=""):
+    """Einmal-Link zum Kopieren zeigen – der Klartext existiert nur jetzt
+    (gespeichert wird nur sein Hash), z. B. wenn die Mail nicht rausging."""
+    with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+        ui.label(f"Zugangslink für {username}").classes("text-lg font-bold")
+        if hinweis:
+            ui.label(hinweis).classes("text-sm text-amber-700")
+        ui.label("Nur einmal verwendbar, 7 Tage gültig. Dieser Link ist danach nicht "
+                 "mehr abrufbar – bei Bedarf einfach neu einladen.") \
+            .classes("text-xs text-gray-500")
+        ui.label(link).classes("text-xs font-mono break-all bg-gray-100 p-2 rounded")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Kopieren", icon="content_copy",
+                      on_click=lambda: (ui.clipboard.write(link),
+                                        ui.notify("Link kopiert.", type="positive"))) \
+                .props("outline no-caps")
+            ui.button("Schließen", on_click=dlg.close).props("flat")
+    dlg.open()
+
+
+def _invite_mail(username, u, link, zweck, ablauf):
+    """Betreff + Text der Einladungsmail in der Profilsprache des Mitarbeiters."""
+    lang = u.get("lang") or i18n.DEFAULT
+    tl = i18n.tl
+    reset = zweck == "reset"
+    betreff = tl(lang, "Neues Passwort für die LIVARO-App" if reset
+                 else "Dein Zugang zur LIVARO-App")
+    text = "\n".join([
+        tl(lang, "Hallo {name},", name=u.get("name") or username),
+        "",
+        tl(lang, "für deinen Zugang zur LIVARO-App wurde ein neues Passwort angefordert."
+           if reset else "für dich wurde ein Zugang zur LIVARO-App angelegt."),
+        "",
+        tl(lang, "Dein Benutzername: {benutzer}", benutzer=username),
+        "",
+        tl(lang, "Über diesen Link vergibst du dein Passwort (nur einmal verwendbar):"),
+        link,
+        "",
+        tl(lang, "Der Link ist bis zum {datum} gültig.", datum=ablauf),
+        tl(lang, "Danach meldest du dich jederzeit unter {url} mit deinem Benutzernamen "
+           "und deinem Passwort an.", url=_app_url()),
+        "",
+        tl(lang, "Viele Grüße"),
+        "",
+        tl(lang, "Diese E-Mail wurde automatisch von der LIVARO-App verschickt."),
+    ])
+    return betreff, text
+
+
+def _confirm_reset(username, on_ok):
+    with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
+        ui.label(f"Zugang von {username} zurücksetzen?").classes("text-lg font-bold")
+        ui.label("Der Mitarbeiter bekommt eine E-Mail mit einem Einmal-Link und setzt "
+                 "sich damit selbst ein neues Passwort. Das bisherige Passwort bleibt "
+                 "gültig, bis der Link benutzt wird.").classes("text-sm text-gray-500")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat")
+            ui.button("Link senden", icon="mail",
+                      on_click=lambda: (dlg.close(), on_ok(username, "reset"))) \
+                .props("unelevated no-caps")
+    dlg.open()
+
+
+def _send_invite(username, zweck="einladung"):
+    """Einmal-Token erzeugen, am Benutzer ablegen und per E-Mail verschicken.
+
+    Klappt der Versand nicht (kein Absender hinterlegt, Gmail streikt), bleibt
+    der Token gültig und der Link wird zum Kopieren angezeigt – so ist niemand
+    ausgesperrt, nur weil die Mail hakt.
+    """
+    u = USERS.get(username)
+    if not u:
+        ui.notify("Benutzer nicht gefunden.", type="negative"); return False
+    token, rec = auth.new_invite(zweck)
+    u["invite"] = rec
+    data.save_config()
+    link = _invite_link(token)
+    ablauf = _time.strftime("%d.%m.%Y", _time.localtime(rec["expires"]))
+    empfaenger = (u.get("email") or "").strip()
+    if not empfaenger:
+        _show_invite_link(username, link, "Keine E-Mail-Adresse hinterlegt – "
+                          "bitte den Link selbst weitergeben.")
+        return True
+    betreff, text = _invite_mail(username, u, link, zweck, ablauf)
+    try:
+        mailer.send_notify(CFG, empfaenger, betreff, text)
+        ui.notify(f"Einladung an {empfaenger} gesendet ✓ (Link gültig bis {ablauf})",
+                  type="positive", timeout=8000)
+    except mailer.MailError as ex:
+        _show_invite_link(username, link, f"E-Mail nicht gesendet: {ex}")
+    return True
 
 
 # ---------------------------------------------------------------- Benutzer (Admin)
@@ -905,6 +1093,14 @@ def open_users():
                             ui.label(uname).classes("font-semibold")
                             if u.get("totp_secret"):
                                 ui.label("2FA").classes("text-xs text-green-700")
+                            zustand = auth.invite_state(u)
+                            if zustand == "offen":
+                                bis = _time.strftime("%d.%m.", _time.localtime(
+                                    u["invite"].get("expires", 0)))
+                                ui.label(f"Einladung offen – Link gültig bis {bis}") \
+                                    .classes("text-xs text-amber-700")
+                            elif zustand == "abgelaufen":
+                                ui.label("Einladung abgelaufen").classes("text-xs text-red-600")
                             ui.space()
                             sel = ui.select(ROLES, value=u.get("role", "putzkraft")) \
                                 .props("dense outlined").classes("w-40")
@@ -939,9 +1135,24 @@ def open_users():
                                 return h
                             lsel.on_value_change(_lang_handler(uname))
 
+                            def _invite(un=uname, zw="einladung"):
+                                if _send_invite(un, zw):
+                                    render()
+                            if zustand == "aktiv":
+                                ui.button("Zugang zurücksetzen", icon="mail",
+                                          on_click=lambda un=uname: _confirm_reset(un, _invite)) \
+                                    .props("flat dense no-caps") \
+                                    .tooltip("Schickt einen Link, mit dem sich der Mitarbeiter "
+                                             "selbst ein neues Passwort setzt. Das bisherige "
+                                             "Passwort gilt, bis der Link benutzt wird.")
+                            else:
+                                ui.button("Einladung erneut senden", icon="forward_to_inbox",
+                                          on_click=lambda un=uname: _invite(un, "einladung")) \
+                                    .props("flat dense no-caps")
                             ui.button("Passwort", icon="key",
                                       on_click=lambda un=uname: open_reset_pw(un)) \
-                                .props("flat dense no-caps")
+                                .props("flat dense no-caps") \
+                                .tooltip("Passwort direkt setzen (Notfall, ohne E-Mail)")
                             if uname != _cur_user():
                                 def _del(un=uname):
                                     USERS.pop(un, None); data.save_config()
@@ -974,29 +1185,38 @@ def open_users():
         render()
 
         ui.separator()
-        ui.label("Neuen Benutzer anlegen").classes("font-medium")
+        ui.label("Neuen Benutzer einladen").classes("font-medium")
+        ui.label("Der Mitarbeiter bekommt eine E-Mail mit einem Link (7 Tage gültig) und "
+                 "vergibt sich darüber selbst ein Passwort – du musst keines vorgeben.") \
+            .classes("text-xs text-gray-500")
         with ui.row().classes("w-full items-end gap-2 flex-wrap"):
-            nu = ui.input("Benutzername").props("dense outlined")
-            npw = ui.input("Passwort", password=True).props("dense outlined")
-            nem = ui.input("E-Mail").props("dense outlined").classes("min-w-[200px]")
+            nu = ui.input("Benutzername").props("dense outlined").mark("new-user")
+            nem = ui.input("E-Mail").props("dense outlined") \
+                .classes("min-w-[200px]").mark("new-user-mail")
             nrole = ui.select(ROLES, value="putzkraft", label="Rolle") \
                 .props("dense outlined").classes("w-40")
+            nlang = ui.select(i18n.LANGUAGES, value=i18n.DEFAULT, label="Sprache") \
+                .props("dense outlined").classes("w-32") \
+                .tooltip("Sprache der Oberfläche und der Einladungs-E-Mail")
 
             def add():
                 name = (nu.value or "").strip()
+                mail = (nem.value or "").strip()
                 if not name:
                     ui.notify("Benutzername fehlt.", type="warning"); return
                 if name in USERS:
                     ui.notify("Benutzername existiert bereits.", type="negative"); return
-                if len(npw.value or "") < 6:
-                    ui.notify("Passwort zu kurz (min. 6).", type="warning"); return
-                USERS[name] = {"password_hash": auth.hash_password(npw.value),
-                               "role": nrole.value, "totp_secret": "", "name": name,
-                               "email": (nem.value or "").strip()}
+                if "@" not in mail:
+                    ui.notify("E-Mail-Adresse fehlt – dorthin geht die Einladung.",
+                              type="warning"); return
+                USERS[name] = {"password_hash": "", "role": nrole.value,
+                               "totp_secret": "", "name": name, "email": mail,
+                               "lang": nlang.value}
                 data.save_config()
-                ui.notify(f"Benutzer {name} angelegt.", type="positive")
-                nu.value = ""; npw.value = ""; nem.value = ""; render()
-            ui.button("Anlegen", icon="person_add", on_click=add).props("unelevated no-caps")
+                _send_invite(name, "einladung")
+                nu.value = ""; nem.value = ""; render()
+            ui.button("Einladen", icon="person_add", on_click=add) \
+                .props("unelevated no-caps").mark("new-user-invite")
 
         with ui.row().classes("w-full justify-end"):
             ui.button("Schließen", on_click=dlg.close).props("flat")
@@ -1274,6 +1494,14 @@ def open_settings():
                     ui.button("Test-Benachrichtigung", icon="send", on_click=test_notify).props("outline no-caps")
                     ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-gray-400")
 
+                ui.separator().classes("my-2")
+                ui.label("Adresse der App – wird für Links in E-Mails benutzt "
+                         "(Einladungen, Reinigungs-Hinweise). Muss von außen erreichbar sein.") \
+                    .classes("text-sm text-gray-500")
+                app_url_in = ui.input("Adresse der App", value=CFG.get("app_url", "") or DEFAULT_APP_URL,
+                                      placeholder=DEFAULT_APP_URL) \
+                    .props("outlined dense").classes("w-full max-w-[420px]")
+
             with ui.tab_panel(t_stb):
                 ui.label("Empfänger für den monatlichen Arbeitszeiten-Versand "
                          "(Zeiterfassung → Auswertung → An Steuerberater senden). "
@@ -1352,6 +1580,7 @@ def open_settings():
             if (n_pw.value or "").strip():
                 nb["app_password"] = n_pw.value.strip()
             CFG["notify_email"] = nb
+            CFG["app_url"] = (app_url_in.value or "").strip().rstrip("/") or DEFAULT_APP_URL
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
             dialog.close()
@@ -2984,7 +3213,7 @@ def _notify_assignee(bk, assignee, by, staff):
             f"Anreise nächster Gast: {bk['arrival']}\n"
             f"Personen: {bk['persons']}\n\n"
             f"Zugewiesen von: {staff.get(by, by)}\n\n"
-            f"Bitte in der LIVARO-App bestätigen: https://app.ds-apartments.de\n")
+            f"Bitte in der LIVARO-App bestätigen: {_app_url()}\n")
     try:
         mailer.send_notify(CFG, to, f"Neue Reinigung: {bk['apartment_name']} ({bk['departure']})", body)
         ui.notify(f"{staff.get(assignee, assignee)} per E-Mail benachrichtigt ✓", type="positive")
@@ -3010,7 +3239,7 @@ def _notify_nachtragen(job, staff):
             f"Wohnung: {job['apartment_name']}\n"
             f"Abreise: {job['departure']}, Check-out {job.get('checkout_time') or '—'}\n"
             f"Gast: {job.get('guest') or '—'}\n\n"
-            f"App: https://app.ds-apartments.de  →  Buchungen → Reinigungen\n")
+            f"App: {_app_url()}  →  Buchungen → Reinigungen\n")
     try:
         mailer.send_notify(CFG, to,
                            f"Bitte nachtragen: {job['apartment_name']} ({job['departure']})", body)

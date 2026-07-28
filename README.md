@@ -32,7 +32,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/pdf_form.py` | Amtliches PDF aus Blanko-Vorlage |
 | `app/archive.py` | Revisionssichere Ablage (Hash-Kette, Versionen, Spiegel) |
 | `app/mailer.py` | E-Mail-Versand über Gmail (Vorlagen) |
-| `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
+| `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) + Einladungs-Links |
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
@@ -94,8 +94,29 @@ Die App ist durch einen **Login** geschützt (`app/auth.py`, PBKDF2-Hashes in
 **ersten Administrator** an (Benutzername + Passwort). Ausgenommen vom
 Login-Zwang: Login-Seite, Smoobu-Webhook (`/api/…`), NiceGUI-Interna.
 
+**Einladung statt Startpasswort:** Neue Mitarbeiter legt der Admin unter
+**„Benutzer" → „Neuen Benutzer einladen"** mit Benutzername, E-Mail, Rolle und
+Sprache an – **ohne Passwort**. Sie erhalten eine E-Mail (in ihrer Profilsprache)
+mit einem **Einmal-Link, 7 Tage gültig**, vergeben sich darüber selbst ein
+Passwort und sind danach **direkt angemeldet**. In der Benutzerliste steht
+solange „Einladung offen – Link gültig bis …"; ein Login-Versuch verweist auf die
+Einladungsmail.
+
+Derselbe Weg dient dem **Zurücksetzen**: „Zugang zurücksetzen" schickt einen
+neuen Link. Das **bisherige Passwort bleibt gültig, bis der Link benutzt wird** –
+so sperrt ein misslungener Mailversand niemanden aus. Wer hart sperren will,
+setzt über **„Passwort"** direkt ein neues (das macht einen offenen Link ungültig).
+
+Gespeichert wird nur der **SHA-256-Hash** des Tokens (`auth.new_invite`), der
+Klartext-Link existiert also nur im Moment des Versands. Geht die Mail nicht raus
+(kein Absender hinterlegt, Gmail streikt) oder fehlt die E-Mail-Adresse, zeigt
+die App den Link **einmalig zum Kopieren** an. Die Links zeigen auf die
+**Adresse der App** aus den Einstellungen (E-Mail → „Adresse der App",
+`config.app_url`, Vorgabe `https://app.ds-apartments.de`) – lokal zum Testen auf
+`http://127.0.0.1:3001` stellen.
+
 **Mehrbenutzer & Rollen:** Über **„Benutzer"** (nur Admin) lassen sich weitere
-Konten anlegen, Passwörter zurücksetzen, Rollen ändern oder löschen. Rollen:
+Konten einladen, Zugänge zurücksetzen, Rollen ändern oder löschen. Rollen:
 `admin` (sieht alles, verwaltet Nutzer/Einstellungen) und `putzkraft`. **Welche
 Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/web.py`** (aktuell:
 Admin = alles, Putzkraft = noch nichts – wird später definiert). Nutzer ohne

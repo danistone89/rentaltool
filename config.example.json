@@ -5,6 +5,7 @@
   "port": 3001,
   "steuersatz": 0.06,
   "airbnb_channel_name": "Airbnb",
+  "app_url": "https://app.ds-apartments.de",
   "unterschrift_x": 210,
   "archiv_spiegel": "",
   "archiv_webdav": {
@@ -40,7 +41,7 @@
     "text_vorlage": "Sehr geehrte Damen und Herren,\n\nanbei übersende ich die Steueranmeldung zur Beherbergungssteuer für {monat} {jahr} (Kassenzeichen {kassenzeichen}).\n\nFestgesetzte Beherbergungssteuer: {steuer} €.\n\nMit freundlichen Grüßen\n{name}"
   },
   "auth": {
-    "_hinweis": "users werden von der App verwaltet (Benutzer-Dialog). Ausgesperrt? auth.users auf {} setzen -> beim nächsten Aufruf Admin neu anlegen. Rollen: admin | putzkraft.",
+    "_hinweis": "users werden von der App verwaltet (Benutzer-Dialog): dort Mitarbeiter per E-Mail einladen, sie vergeben sich ueber einen Einmal-Link (7 Tage, app_url) selbst ein Passwort. Ausgesperrt? auth.users auf {} setzen -> beim naechsten Aufruf Admin neu anlegen. Rollen: admin | manager | putzkraft.",
     "storage_secret": "",
     "users": {}
   }
