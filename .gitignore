@@ -42,3 +42,6 @@ assignments.json
 
 # Belege/Rechnungen (betrieblich/personenbezogen)
 receipts.json
+
+# OpenCV.js (~10 MB) wird per tools/fetch_opencv.sh geholt, nicht eingecheckt
+static/opencv.js

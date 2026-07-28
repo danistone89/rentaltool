@@ -188,18 +188,52 @@ def autocrop(src_path, dst_path):
     return True
 
 
-def image_to_pdf(img_path, pdf_path):
-    """Bild -> PDF (PyMuPDF). True bei Erfolg."""
+def image_to_pdf(img_path, pdf_path, page="a4"):
+    """Bild -> PDF (PyMuPDF). True bei Erfolg.
+
+    Das Bild wird seitenverhältnistreu auf eine A4-Seite eingepasst und zentriert,
+    damit das Ergebnis wie ein echter Scan aussieht und sich normal ausdrucken
+    lässt. Schlägt das fehl, wird auf eine Seite in Bildgröße zurückgefallen.
+    """
     try:
         import fitz
-        doc = fitz.open(img_path)
-        pdf_bytes = doc.convert_to_pdf()
-        doc.close()
+    except Exception:
+        return False
+    try:
+        src = fitz.open(img_path)
+        rect = src[0].rect
+        if page and rect.width and rect.height:
+            pw, ph = fitz.paper_size(page)
+            if rect.width > rect.height:      # Querformat -> Seite drehen
+                pw, ph = ph, pw
+            margin = 18                        # ca. 6 mm Rand
+            box = fitz.Rect(margin, margin, pw - margin, ph - margin)
+            scale = min(box.width / rect.width, box.height / rect.height)
+            w, h = rect.width * scale, rect.height * scale
+            x = (pw - w) / 2
+            y = (ph - h) / 2
+            out = fitz.open()
+            out.new_page(width=pw, height=ph).insert_image(
+                fitz.Rect(x, y, x + w, y + h), filename=img_path)
+            out.save(pdf_path)
+            out.close()
+            src.close()
+            return True
+        pdf_bytes = src.convert_to_pdf()
+        src.close()
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
         return True
     except Exception:
-        return False
+        try:                                   # Rückfall: Seite in Bildgröße
+            src = fitz.open(img_path)
+            pdf_bytes = src.convert_to_pdf()
+            src.close()
+            with open(pdf_path, "wb") as f:
+                f.write(pdf_bytes)
+            return True
+        except Exception:
+            return False
 
 
 def save_document(data, ext, mirror_dir=None, crop=True):

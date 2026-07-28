@@ -212,6 +212,21 @@ _EN = {
         "stored but not read automatically.",
     "Kein Beleg erkannt – bitte neu ausrichten.":
         "No receipt detected – please reposition.",
+    "Kamera wird gestartet …": "Starting camera …",
+    "Kamera nicht verfügbar. Nutze „Foto / Datei“.":
+        "Camera unavailable. Use “Photo / file”.",
+    "Scanner wird geladen …": "Loading scanner …",
+    "Beleg vollständig ins Bild halten …": "Hold the whole receipt in view …",
+    "Dokument erkannt – bitte still halten …": "Document detected – hold still …",
+    "Kein Dokument erkannt.": "No document detected.",
+    "Aufgenommen ✓": "Captured ✓",
+    "Scanner konnte nicht laden. Nutze „Foto / Datei“.":
+        "Scanner failed to load. Use “Photo / file”.",
+    "Automatisch auslösen": "Capture automatically",
+    "Jetzt aufnehmen": "Capture now",
+    "Der Rahmen zeigt das erkannte Dokument. Es wird entzerrt "
+    "und als PDF abgelegt.":
+        "The frame shows the detected document. It is de-skewed and filed as a PDF.",
     "Scan konnte nicht verarbeitet werden.": "Scan could not be processed.",
     "Beleg wird verarbeitet (PDF, OCR) …": "Processing receipt (PDF, OCR) …",
     "Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …":
@@ -318,6 +333,7 @@ _EN = {
         "Checked in ✓ · ⚠️ no location – please enable location services.",
     "Kein offener Check-in.": "No open check-in.",
     "Ausgecheckt ✓ · {ort} ({dist} m)": "Checked out ✓ · {ort} ({dist} m)",
+    "Eingecheckt ✓": "Checked in ✓",
     "Ausgecheckt ✓": "Checked out ✓",
     "Eingecheckt seit {zeit} Uhr": "Checked in since {zeit}",
     "Nachweis: ": "Evidence: ",

@@ -35,6 +35,8 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) |
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
+| `static/jscanify.js` | Dokument-Randerkennung im Browser (MIT, mitgeliefert) |
+| `tools/fetch_opencv.sh` | holt OpenCV.js nach `static/` (optional, sonst CDN) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 
 ## Amtliches PDF-Formular
@@ -104,6 +106,37 @@ freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.
+
+## Belegscanner
+
+**Belege → „Beleg scannen"** öffnet die Kamera. Das Dokument wird laufend
+erkannt und **grün umrahmt**; steht der Rahmen rund eine Sekunde ruhig, löst der
+Scanner **von selbst aus** (abschaltbar über „Automatisch auslösen", daneben gibt
+es „Jetzt aufnehmen"). Das Dokument wird perspektivisch entzerrt und als
+**A4-PDF** abgelegt, danach per OCR ausgelesen.
+
+Randerkennung läuft im Browser über **OpenCV.js + jscanify**. `jscanify` liegt
+unter `static/` im Repo — der zuvor genutzte CDN-Pfad
+(`dist/jscanify.min.js`) lieferte **404**, wodurch der Scanner nie laden konnte.
+OpenCV.js (~10 MB) wird zuerst unter `/static/opencv.js` gesucht und sonst vom
+offiziellen CDN geladen; mit `./tools/fetch_opencv.sh` legt man es lokal ab
+(schneller, kein Fremd-CDN).
+
+Wichtig: Das `ui.html` des Scanners muss **`sanitize=False`** setzen, sonst
+entfernt NiceGUI `<video>`/`<canvas>` und die Vorschau bleibt schwarz.
+
+Der Weg über **„Foto / Datei"** bleibt als Rückfall bestehen; dort schneidet der
+Server zu (`receipts.autocrop`, benötigt `opencv-python` + `numpy`, sonst wird
+das Bild ungeschnitten übernommen).
+
+## Standorterfassung (abschaltbar)
+
+**Einstellungen → Standorte → „Standort bei der Zeiterfassung erfassen"**.
+Standard ist **aus**: beim Ein- und Auschecken wird dann weder GPS noch IP
+abgefragt oder gespeichert, und die Mitarbeiter werden nicht nach einer
+Ortungsfreigabe gefragt. Die Geofence-Liste darunter wirkt nur bei
+eingeschaltetem Schalter. Bereits erfasste Standorte älterer Einträge bleiben in
+`worklog.json` erhalten.
 
 ## Sprache (Deutsch / Englisch)
 

@@ -1,8 +1,17 @@
 # Frontend (NiceGUI – reines Python, keine Node-Toolchain).
-nicegui>=2.0
+# Mindestens 3.6: ab dort hat ui.html den Parameter `sanitize`, den der
+# Belegscanner zwingend auf False setzen muss (sonst fliegen <video>/<canvas>
+# aus dem Markup). Unter 4 gepinnt, weil dort Breaking Changes zu erwarten sind.
+nicegui>=3.6,<4
 
 # PDF-Erzeugung (amtliches Formular).
 pymupdf>=1.24
 
 # QR-Code für 2FA (Google Authenticator) – reines Python.
 segno>=1.6
+
+# Optional, nur fuer den serverseitigen Belegzuschnitt (receipts.autocrop).
+# Fehlen sie, wird das Bild ungeschnitten als PDF abgelegt – die Client-seitige
+# Randerkennung des Scanners laeuft davon unabhaengig.
+# opencv-python-headless
+# numpy

@@ -36,6 +36,12 @@ except Exception:  # PyMuPDF optional
 os.makedirs(housekeeping.MEDIA_DIR, exist_ok=True)
 app.add_static_files("/media", housekeeping.MEDIA_DIR)
 
+# Mitgelieferte Client-Bibliotheken (Dokumentenscanner). Lokal ausgeliefert statt
+# per CDN – ein toter CDN-Pfad hatte den Scanner zuvor komplett lahmgelegt.
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
+app.add_static_files("/static", STATIC_DIR)
+
 CFG = data.CONFIG
 AUTH = CFG.setdefault("auth", {})
 _new_secret = not AUTH.get("storage_secret")
@@ -146,7 +152,18 @@ _GEO_JS = (
 )
 
 
+def _geo_enabled():
+    """Standorterfassung der Zeiterfassung aktiv? Standard: aus.
+
+    Steuerbar unter Einstellungen -> Standorte. Ist sie aus, wird beim Ein-/
+    Auschecken weder GPS noch IP abgefragt und nichts davon gespeichert.
+    """
+    return bool(CFG.get("standort_erfassung", False))
+
+
 async def get_location():
+    if not _geo_enabled():
+        return {"error": "deaktiviert"}
     try:
         r = await ui.run_javascript(_GEO_JS, timeout=15.0)
     except Exception as ex:
@@ -156,6 +173,8 @@ async def get_location():
 
 async def get_ip():
     """Öffentliche IP des Clients (Router) über /api/whoami."""
+    if not _geo_enabled():
+        return ""
     try:
         r = await ui.run_javascript("return await (await fetch('/api/whoami')).json();",
                                     timeout=8.0)
@@ -175,7 +194,7 @@ def _haversine_m(lat1, lon1, lat2, lon2):
 
 def _match_geofence(loc):
     """(ort_name, dist_m) wenn innerhalb Radius; sonst (None, nächste_distanz)."""
-    if not loc or loc.get("error"):
+    if not _geo_enabled() or not loc or loc.get("error"):
         return None, None
     best_name, best_dist = None, None
     inside_name, inside_dist = None, None
@@ -212,7 +231,9 @@ def geocode(address):
 
 
 def _presence(ort, dist, loc, ip):
-    """Kurztext für den Anwesenheits-Nachweis."""
+    """Kurztext für den Anwesenheits-Nachweis. Leer, wenn die Erfassung aus ist."""
+    if not _geo_enabled():
+        return ""
     if ort:
         return f"✓ {ort}" + (f" ({dist} m)" if dist is not None else "")
     if loc and not loc.get("error"):
@@ -303,6 +324,12 @@ def _billing_period(ym):
 def _hours_num(minutes):
     s = f"{minutes / 60.0:.1f}".replace(".", ",")
     return s[:-2] if s.endswith(",0") else s
+
+
+def _esc_attr(v):
+    """Text für ein HTML-Attribut entschärfen (ui.html wird roh eingebettet)."""
+    return (str(v).replace("&", "&amp;").replace('"', "&quot;")
+            .replace("<", "&lt;").replace(">", "&gt;"))
 
 
 def _eur(betrag):
@@ -577,8 +604,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # /media = in der UI eingebettete Fotos (zufällige UUID-Dateinamen);
             # app.storage.user ist bei Static-Requests nicht verlässlich verfügbar,
             # daher hier durchlassen statt auf /login umzuleiten.
+            # /static = mitgelieferte Client-Bibliotheken (Scanner), keine Daten.
+            # Wie bei /media ist app.storage.user bei solchen Requests nicht
+            # verlaesslich verfuegbar – daher durchlassen statt umzuleiten.
             if not (path in _UNRESTRICTED or path.startswith("/_nicegui")
-                    or path.startswith("/api/") or path.startswith("/media/")):
+                    or path.startswith("/api/") or path.startswith("/media/")
+                    or path.startswith("/static/")):
                 app.storage.user["referrer"] = path
                 return RedirectResponse("/login")
         return await call_next(request)
@@ -1119,10 +1150,21 @@ def open_settings():
                               on_click=browse_belege).props("outline no-caps")
 
             with ui.tab_panel(t_orte):
+                geo_on = ui.switch("Standort bei der Zeiterfassung erfassen",
+                                   value=_geo_enabled()).props("dense")
+                ui.label("Ist der Schalter aus, wird beim Ein- und Auschecken weder GPS "
+                         "noch IP abgefragt oder gespeichert – die Mitarbeiter werden "
+                         "nicht nach Ortungsfreigabe gefragt. Bereits erfasste Standorte "
+                         "alter Einträge bleiben in worklog.json erhalten.") \
+                    .classes("text-xs text-gray-500")
+                ui.separator().classes("my-2")
                 ui.label("Objekte für die GPS-Standortprüfung der Zeiterfassung. Adresse "
                          "eintragen und Lupe antippen (Koordinaten), Radius in Metern "
                          "(z. B. 150). Check-in außerhalb wird markiert.") \
                     .classes("text-sm text-gray-500")
+                _orte_hint = ui.label("Wirkt erst, wenn die Standorterfassung oben "
+                                      "eingeschaltet ist.").classes("text-xs text-amber-700")
+                _orte_hint.bind_visibility_from(geo_on, "value", lambda v: not v)
                 orte = CFG.setdefault("arbeitsorte", [])
                 orte_box = ui.column().classes("w-full gap-2")
 
@@ -1287,6 +1329,7 @@ def open_settings():
             for key, fld in (("stundensatz_werktag", satz_wt),
                              ("stundensatz_wochenende", satz_we)):
                 CFG[key] = round(float(fld.value), 2) if fld.value else ""
+            CFG["standort_erfassung"] = bool(geo_on.value)
             for key in inputs:
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
@@ -3331,8 +3374,15 @@ def _beleg_mirror():
 
 
 # Client-Scanner: Live-Kamera + Dokument-Randerkennung (OpenCV.js + jscanify).
-# Beim Auslösen (window.__belegCapture) wird das Dokument zugeschnitten/entzerrt und die
-# Data-URL per ui.run_javascript-Rückgabe an Python geliefert.
+# jscanify liegt lokal unter /static – der frühere CDN-Pfad lieferte 404, der
+# Scanner konnte dadurch nie laden und fiel immer auf "Foto / Datei" zurück.
+# OpenCV.js wird lokal versucht und sonst vom offiziellen CDN geladen.
+#
+# Ablauf: Kamera öffnen -> laufende Randerkennung, das erkannte Dokument wird
+# grün umrahmt -> bleibt der Rahmen rund eine Sekunde ruhig, löst der Scanner
+# selbst aus. Das entzerrte Dokument geht als Data-URL an Python, das daraus
+# die PDF baut. Das Ergebnis wird per emitEvent('beleg_scan') aktiv an Python
+# geschickt – so kommt auch die automatische Auslösung ohne Nutzerklick an.
 _SCAN_JS = r"""
 (function(){
   let tries=0;
@@ -3340,52 +3390,151 @@ _SCAN_JS = r"""
     const wrap=document.getElementById('beleg-scan');
     if(!wrap){ if(tries++<30){setTimeout(start,100);} return; }
     if(wrap.dataset.init) return; wrap.dataset.init='1';
+
     const video=wrap.querySelector('video');
     const overlay=wrap.querySelector('canvas.ovl');
     const status=wrap.querySelector('.scan-status');
     const work=document.createElement('canvas');
-    let scanner=null, running=true, stream=null, ready=false;
+    const octx=overlay.getContext('2d');
+    const M=k=>wrap.dataset[k]||'';
+
+    let scanner=null, stream=null, running=true, ready=false;
+    let shootNow=false, autoOn=true, sent=false;
+    let stable=0, lastPts=null;
+    const NEEDED=6, FPS=8;
+
     function setStatus(t){ if(status) status.textContent=t; }
-    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('load fail'));document.head.appendChild(s);});}
+    function load(src){return new Promise((res,rej)=>{
+      const s=document.createElement('script'); s.src=src;
+      s.onload=()=>res(); s.onerror=()=>rej(new Error(src));
+      document.head.appendChild(s);});}
+    async function loadFirst(list){
+      for(const src of list){ try{ await load(src); return true; }catch(e){} }
+      return false;
+    }
+
     async function init(){
       try{
-        setStatus('Kamera wird gestartet …');
-        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        setStatus(M('msgCam'));
+        stream=await navigator.mediaDevices.getUserMedia(
+          {video:{facingMode:{ideal:'environment'},
+                  width:{ideal:1920},height:{ideal:1080}},audio:false});
         video.srcObject=stream; await video.play();
-      }catch(err){ setStatus('Kamera nicht verfügbar ('+(err&&err.message||err)+'). Nutze „Foto / Datei".'); return; }
+      }catch(err){
+        setStatus(M('msgNoCam')+' ('+((err&&err.message)||err)+')'); return;
+      }
       try{
-        setStatus('Scanner wird geladen …');
-        if(typeof cv==='undefined'){ await loadScript('https://docs.opencv.org/4.8.0/opencv.js'); }
-        await new Promise((r)=>{ if(window.cv&&cv.Mat){r();} else { cv['onRuntimeInitialized']=()=>r(); } });
-        if(typeof jscanify==='undefined'){ await loadScript('https://cdn.jsdelivr.net/npm/jscanify@1.2.0/dist/jscanify.min.js'); }
+        setStatus(M('msgLoad'));
+        if(typeof cv==='undefined'){
+          if(!await loadFirst(['/static/opencv.js',
+                               'https://docs.opencv.org/4.8.0/opencv.js']))
+            throw new Error('opencv.js');
+        }
+        await new Promise((res,rej)=>{
+          const to=setTimeout(()=>rej(new Error('timeout')),60000);
+          if(window.cv&&cv.Mat){ clearTimeout(to); res(); }
+          else { cv['onRuntimeInitialized']=()=>{ clearTimeout(to); res(); }; }
+        });
+        if(typeof jscanify==='undefined'){
+          if(!await loadFirst(['/static/jscanify.js',
+                               'https://cdn.jsdelivr.net/npm/jscanify@1.4.3/src/jscanify.js']))
+            throw new Error('jscanify');
+        }
         scanner=new jscanify();
         ready=true;
-        setStatus('Beleg im Rahmen ausrichten und auf „Scannen" tippen.');
-        loop();
-      }catch(e){ setStatus('Scanner konnte nicht laden. Nutze „Foto / Datei".'); }
+        setStatus(M('msgAim'));
+        tick();
+      }catch(e){ setStatus(M('msgFail')+' '+((e&&e.message)||'')); }
     }
-    function loop(){
-      if(!running) return;
+
+    function detect(){
       const w=video.videoWidth,h=video.videoHeight;
-      if(ready&&w&&h){
-        work.width=w; work.height=h; work.getContext('2d').drawImage(video,0,0,w,h);
-        try{ const hl=scanner.highlightPaper(work); overlay.width=w; overlay.height=h; overlay.getContext('2d').drawImage(hl,0,0,w,h); }catch(e){}
-      }
-      requestAnimationFrame(loop);
-    }
-    window.__belegStop=function(){ running=false; if(stream){try{stream.getTracks().forEach(t=>t.stop());}catch(e){}} };
-    window.__belegCapture=function(){
-      if(!ready){ setStatus('Bitte einen Moment warten …'); return null; }
+      if(!w||!h) return null;
+      work.width=w; work.height=h;
+      work.getContext('2d').drawImage(video,0,0,w,h);
+      let img=null,c=null;
       try{
-        const w=video.videoWidth,h=video.videoHeight;
-        work.width=w; work.height=h; work.getContext('2d').drawImage(video,0,0,w,h);
-        const tw=Math.min(1200,w||1000);
-        const paper=scanner.extractPaper(work, tw, Math.round(tw*1.414));
-        const url=paper.toDataURL('image/jpeg',0.92);
-        window.__belegStop();
-        return url;
-      }catch(e){ setStatus('Kein Beleg erkannt – bitte neu ausrichten.'); return null; }
-    };
+        img=cv.imread(work);
+        const cont=scanner.findPaperContour(img);
+        if(!cont) return null;
+        c=scanner.getCornerPoints(cont,img);
+      }catch(e){ c=null; }
+      finally{ if(img){ try{img.delete();}catch(e){} } }   // sonst laeuft der WASM-Heap voll
+      if(!c) return null;
+      const pts=[c.topLeftCorner,c.topRightCorner,c.bottomRightCorner,c.bottomLeftCorner];
+      if(pts.some(p=>!p||typeof p.x!=='number'||typeof p.y!=='number')) return null;
+      let a=0;                                   // Gaussche Trapezformel
+      for(let i=0;i<4;i++){ const p=pts[i],q=pts[(i+1)%4]; a+=p.x*q.y-q.x*p.y; }
+      if(Math.abs(a/2) < 0.12*w*h) return null;  // zu kleiner Fund -> verwerfen
+      return {c:c,pts:pts,w:w,h:h};
+    }
+
+    function draw(f){
+      const w=video.videoWidth||1, h=video.videoHeight||1;
+      if(overlay.width!==w||overlay.height!==h){ overlay.width=w; overlay.height=h; }
+      octx.clearRect(0,0,w,h);
+      if(!f) return;
+      octx.lineWidth=Math.max(3,w/220);
+      octx.strokeStyle='#16a34a';
+      octx.fillStyle='rgba(22,163,74,.14)';
+      octx.beginPath(); octx.moveTo(f.pts[0].x,f.pts[0].y);
+      for(let i=1;i<4;i++) octx.lineTo(f.pts[i].x,f.pts[i].y);
+      octx.closePath(); octx.fill(); octx.stroke();
+      octx.fillStyle='#16a34a';
+      const r=Math.max(5,w/130);
+      f.pts.forEach(p=>{ octx.beginPath(); octx.arc(p.x,p.y,r,0,6.2832); octx.fill(); });
+    }
+
+    function moved(a,b){
+      if(!a||!b) return 1e9;
+      let d=0; for(let i=0;i<4;i++) d+=Math.hypot(a[i].x-b[i].x,a[i].y-b[i].y);
+      return d/4;
+    }
+
+    function shoot(f){
+      try{
+        const tw=Math.min(1600,f.w);
+        const paper=scanner.extractPaper(work,tw,Math.round(tw*1.414),f.c);
+        if(!paper) return false;
+        if(sent) return true;
+        sent=true;
+        setStatus(M('msgDone'));
+        stop();
+        // Ergebnis aktiv an Python schicken – auch die automatische Ausloesung
+        emitEvent('beleg_scan', paper.toDataURL('image/jpeg',0.92));
+        return true;
+      }catch(e){ return false; }
+    }
+
+    function tick(){
+      if(!running) return;
+      if(ready){
+        const f=detect();
+        draw(f);
+        if(f){
+          const tol=Math.hypot(f.w,f.h)*0.012;
+          stable = moved(lastPts,f.pts)<tol ? stable+1 : 0;
+          lastPts=f.pts;
+          if(shootNow){ shootNow=false; if(shoot(f)) return; }
+          else if(autoOn&&stable>=NEEDED){ if(shoot(f)) return; }
+          else setStatus(M('msgHold'));
+        } else {
+          stable=0; lastPts=null;
+          if(shootNow){ shootNow=false; setStatus(M('msgNone')); }
+          else setStatus(M('msgAim'));
+        }
+      }
+      setTimeout(tick,1000/FPS);
+    }
+
+    function stop(){
+      running=false;
+      if(stream){ try{stream.getTracks().forEach(t=>t.stop());}catch(e){} stream=null; }
+    }
+
+    window.__belegStop=stop;
+    window.__belegShoot=function(){ shootNow=true; };
+    window.__belegAuto=function(on){ autoOn=!!on; stable=0; };
     init();
   }
   start();
@@ -3421,39 +3570,81 @@ def render_belege():
         return doc
 
     def _open_scanner():
-        with ui.dialog() as dlg, ui.card().classes("w-[460px] max-w-full gap-2"):
+        """Kamera-Dialog: erkennt das Dokument laufend, rahmt es ein und loest
+        selbst aus, sobald der Rahmen ruhig steht."""
+        state = {"busy": False}
+
+        def _js_stop():
+            ui.run_javascript("window.__belegStop&&window.__belegStop()")
+
+        with ui.dialog().props("persistent") as dlg, \
+                ui.card().classes("w-[520px] max-w-full gap-2").mark("scan-dialog"):
             with ui.row().classes("w-full items-center"):
                 ui.label(t("Beleg scannen")).classes("font-bold")
                 ui.space()
-                ui.button(icon="close", on_click=lambda: (
-                    ui.run_javascript("window.__belegStop&&window.__belegStop()"), dlg.close())) \
+                ui.button(icon="close", on_click=lambda: (_js_stop(), dlg.close())) \
                     .props("flat round dense")
+            # Statustexte als data-Attribute, damit das JS sie uebersetzt ausgibt
+            msgs = {
+                "msg-cam": t("Kamera wird gestartet …"),
+                "msg-no-cam": t("Kamera nicht verfügbar. Nutze „Foto / Datei“."),
+                "msg-load": t("Scanner wird geladen …"),
+                "msg-aim": t("Beleg vollständig ins Bild halten …"),
+                "msg-hold": t("Dokument erkannt – bitte still halten …"),
+                "msg-none": t("Kein Dokument erkannt."),
+                "msg-done": t("Aufgenommen ✓"),
+                "msg-fail": t("Scanner konnte nicht laden. Nutze „Foto / Datei“."),
+            }
+            attrs = " ".join(f'data-{k}="{_esc_attr(v)}"' for k, v in msgs.items())
             ui.html(
-                '<div id="beleg-scan" style="position:relative;width:100%">'
+                f'<div id="beleg-scan" style="position:relative;width:100%" {attrs}>'
                 '<video autoplay playsinline muted '
                 'style="width:100%;border-radius:12px;background:#000;display:block"></video>'
-                '<canvas class="ovl" style="position:absolute;inset:0;width:100%;height:100%;'
-                'pointer-events:none"></canvas>'
+                '<canvas class="ovl" style="position:absolute;left:0;top:0;width:100%;'
+                'height:100%;pointer-events:none"></canvas>'
                 '<div class="scan-status" style="font-size:12px;color:#6b7280;margin-top:6px;'
-                'text-align:center"></div></div>')
+                'text-align:center;min-height:18px"></div></div>',
+                # Inhalt ist vollstaendig selbst erzeugt; die eingesetzten Texte sind
+                # per _esc_attr entschaerft. Ohne sanitize=False entfernt NiceGUI
+                # <video>/<canvas> und der Scanner bleibt schwarz.
+                sanitize=False)
 
-            async def capture():
+            async def _handle(url):
+                """Aufgenommenes Dokument verarbeiten und ablegen."""
                 from nicegui import run
-                url = await ui.run_javascript(
-                    "return (window.__belegCapture ? window.__belegCapture() : null);", timeout=25)
-                if not url:
-                    ui.notify(t("Kein Beleg erkannt – bitte neu ausrichten."), type="warning"); return
-                dlg.close()
                 try:
-                    data = base64.b64decode(url.split(",", 1)[1])
+                    raw = base64.b64decode(url.split(",", 1)[1])
                 except Exception:
-                    ui.notify(t("Scan konnte nicht verarbeitet werden."), type="negative"); return
+                    ui.notify(t("Scan konnte nicht verarbeitet werden."), type="negative")
+                    return
+                dlg.close()
                 ui.notify(t("Beleg wird verarbeitet (PDF, OCR) …"), type="info", timeout=3000)
-                await run.io_bound(_process_and_add, data, "jpg", False)   # schon zugeschnitten
+                await run.io_bound(_process_and_add, raw, "jpg", False)   # bereits zugeschnitten
                 ui.notify(t("Beleg gescannt ✓"), type="positive")
                 render()
-            ui.button(t("Scannen"), icon="document_scanner", on_click=capture) \
+
+            async def _on_scan(e):
+                """Vom Scanner gesendetes Dokument (automatisch oder per Knopf)."""
+                if state["busy"]:
+                    return
+                state["busy"] = True
+                try:
+                    await _handle(e.args)
+                finally:
+                    state["busy"] = False
+            ui.on("beleg_scan", _on_scan)
+
+            with ui.row().classes("w-full items-center gap-2"):
+                auto = ui.switch(t("Automatisch auslösen"), value=True).props("dense")
+                auto.on_value_change(lambda e: ui.run_javascript(
+                    f"window.__belegAuto&&window.__belegAuto({str(bool(e.value)).lower()})"))
+                ui.space()
+            ui.button(t("Jetzt aufnehmen"), icon="document_scanner",
+                      on_click=lambda: ui.run_javascript(
+                          "window.__belegShoot&&window.__belegShoot()")) \
                 .props("unelevated no-caps size=lg").classes("w-full")
+            ui.label(t("Der Rahmen zeigt das erkannte Dokument. Es wird entzerrt "
+                       "und als PDF abgelegt.")).classes("text-[11px] text-gray-400 text-center")
         sc["dlg"] = dlg
         dlg.open()
         ui.run_javascript(_SCAN_JS)
@@ -3489,7 +3680,7 @@ def render_belege():
 
                 with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                     ui.button(t("Beleg scannen"), icon="document_scanner", on_click=_open_scanner) \
-                        .props("unelevated no-caps")
+                        .props("unelevated no-caps").mark("scan-open")
                     ui.upload(auto_upload=True, on_upload=handle, label=t("Foto / Datei")) \
                         .props('accept="image/*"').classes("hk-upload max-w-[220px]")
                 if not receipts.ocr_available():
@@ -3685,6 +3876,9 @@ def main_page():
         body = ui.column().classes("w-full gap-4")
 
         async def _presence_now():
+            """GPS/IP nur abfragen, wenn die Standorterfassung eingeschaltet ist."""
+            if not _geo_enabled():
+                return None, "", None, None
             ui.notify(t("Standort wird geprüft …"), type="info", timeout=2000)
             loc = await get_location()
             ip = await get_ip()
@@ -3696,6 +3890,8 @@ def main_page():
             gps, ip, ort, dist = await _presence_now()
             if timetrack.check_in(user, gps, ip, ort, dist) is None:
                 ui.notify(t("Du bist bereits eingecheckt."), type="warning")
+            elif not _geo_enabled():
+                ui.notify(t("Eingecheckt ✓"), type="positive")
             elif ort:
                 ui.notify(t("Eingecheckt ✓ · {ort} ({dist} m)", ort=ort, dist=dist), type="positive")
             elif gps:
@@ -3723,9 +3919,10 @@ def main_page():
                     if oe:
                         ui.label(t("Eingecheckt seit {zeit} Uhr", zeit=_t(oe["checkin"]))) \
                             .classes("text-lg font-medium text-green-700")
-                        ui.label(t("Nachweis: ") + _presence(oe.get("checkin_ort"),
-                                 oe.get("checkin_dist"), oe.get("checkin_loc"), oe.get("checkin_ip"))) \
-                            .classes("text-xs text-gray-500")
+                        _nachweis = _presence(oe.get("checkin_ort"), oe.get("checkin_dist"),
+                                              oe.get("checkin_loc"), oe.get("checkin_ip"))
+                        if _nachweis:
+                            ui.label(t("Nachweis: ") + _nachweis).classes("text-xs text-gray-500")
                         ui.button(t("Check-out"), icon="logout", on_click=do_checkout) \
                             .props("unelevated size=lg color=negative")
                     else:

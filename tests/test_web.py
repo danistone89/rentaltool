@@ -331,3 +331,27 @@ async def test_buchungsaktionen_deutsch(user: User, mock_backend, monkeypatch, t
     await user.should_see("Aktionen")
     await user.should_see("Zeit nachtragen")
     await user.should_not_see("Add time entry")
+
+
+async def test_scanner_dialog_zeigt_neue_bedienung(user: User, mock_backend, tmp_path, monkeypatch):
+    """Der Dialog selbst (Python-Seite). Das Scanner-JS laeuft im Headless-
+    Harness nicht, daher wird run_javascript stillgelegt."""
+    from app import receipts, housekeeping as hk
+    monkeypatch.setattr(receipts, "RECEIPTS", str(tmp_path / "receipts.json"))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setattr(web.ui, "run_javascript", lambda *a, **k: None)
+    await _login(user)
+    user.find(marker="nav-belege").click()
+    await user.should_see(marker="scan-open")
+    user.find(marker="scan-open").click()
+    await user.should_see(marker="scan-dialog")
+    await user.should_see("Automatisch auslösen")
+    await user.should_see("Jetzt aufnehmen")
+
+
+async def test_standorterfassung_schalter_in_einstellungen(user: User, mock_backend):
+    await _login(user)
+    user.find("Einstellungen").click()
+    user.find("Standorte").click()
+    await user.should_see("Standort bei der Zeiterfassung erfassen")
+    await user.should_see("Wirkt erst, wenn die Standorterfassung oben eingeschaltet ist.")
