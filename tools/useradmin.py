@@ -169,51 +169,66 @@ BEFEHLE = {
 
 # ------------------------------------------------------------------ CLI
 def parser():
+    # Die allgemeinen Schalter hängen an beiden Stellen (vor und nach dem
+    # Unterbefehl) – sonst stolpert man über die Reihenfolge.
+    # SUPPRESS ist hier keine Kosmetik: mit normalem Default setzt der
+    # Unterbefehl-Parser den Wert erneut und überschreibt damit ein --config,
+    # das VOR dem Unterbefehl stand – die Aktion liefe dann auf der falschen
+    # Datei.
+    gemeinsam = argparse.ArgumentParser(add_help=False)
+    gemeinsam.add_argument("--config", default=argparse.SUPPRESS,
+                           help="Pfad zur config.json")
+    gemeinsam.add_argument("--neustart", action="store_true", default=argparse.SUPPRESS,
+                           help=f"danach 'systemctl restart {DIENST}' ausführen (Server)")
+
     p = argparse.ArgumentParser(
+        parents=[gemeinsam],
         description="Benutzer der Beherbergungssteuer-App verwalten "
                     "(arbeitet direkt auf config.json).")
-    p.add_argument("--config", default=CONFIG, help="Pfad zur config.json")
-    p.add_argument("--neustart", action="store_true",
-                   help=f"danach 'systemctl restart {DIENST}' ausführen (Server)")
     sub = p.add_subparsers(dest="befehl", required=True)
 
-    sub.add_parser("liste", help="Konten mit Rolle, 2FA, Zustand und E-Mail zeigen")
+    def neu(name, **kw):
+        return sub.add_parser(name, parents=[gemeinsam], **kw)
 
-    sp = sub.add_parser("passwort", help="Passwort setzen (legt das Konto bei Bedarf an)")
+    neu("liste", help="Konten mit Rolle, 2FA, Zustand und E-Mail zeigen")
+
+    sp = neu("passwort", help="Passwort setzen (legt das Konto bei Bedarf an)")
     sp.add_argument("benutzer")
     sp.add_argument("--passwort", help="ohne Angabe: verdeckte Eingabe")
     sp.add_argument("--rolle", choices=ROLLEN, help="Pflicht bei neuen Konten")
     sp.add_argument("--email", help="für Benachrichtigungen und 'Passwort vergessen'")
 
-    sp = sub.add_parser("link", help="Einmal-Link zum Passwortsetzen ausgeben (ohne Mail)")
+    sp = neu("link", help="Einmal-Link zum Passwortsetzen ausgeben (ohne Mail)")
     sp.add_argument("benutzer")
     sp.add_argument("--url", help=f"Basis-Adresse (sonst app_url, sonst {DEFAULT_URL})")
 
-    sp = sub.add_parser("rolle", help="Rolle ändern")
+    sp = neu("rolle", help="Rolle ändern")
     sp.add_argument("benutzer")
     sp.add_argument("rolle", choices=ROLLEN)
 
-    sp = sub.add_parser("2fa-aus", help="2FA eines Kontos entfernen")
+    sp = neu("2fa-aus", help="2FA eines Kontos entfernen")
     sp.add_argument("benutzer")
 
-    sp = sub.add_parser("loeschen", help="Konto löschen")
+    sp = neu("loeschen", help="Konto löschen")
     sp.add_argument("benutzer")
     return p
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    pfad = getattr(args, "config", CONFIG)
+    neustart = getattr(args, "neustart", False)
     fn, schreibt = BEFEHLE[args.befehl]
     try:
-        cfg = laden(args.config)
+        cfg = laden(pfad)
         ausgabe = fn(cfg, args)
         if schreibt:
-            speichern(cfg, args.config)
+            speichern(cfg, pfad)
     except Fehler as ex:
         print(f"Fehler: {ex}", file=sys.stderr)
         return 1
     print("\n".join(ausgabe))
-    if schreibt and args.neustart:
+    if schreibt and neustart:
         rc = subprocess.call(["systemctl", "restart", DIENST])
         print(f"Dienst {DIENST} neu gestartet." if rc == 0
               else f"Neustart von {DIENST} fehlgeschlagen (Code {rc}).")

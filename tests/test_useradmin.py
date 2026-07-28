@@ -11,6 +11,13 @@ import useradmin  # noqa: E402
 from app import auth  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def keine_echte_config(tmp_path, monkeypatch):
+    """Sicherheitsnetz: Selbst wenn ein Test --config vergisst, darf er niemals
+    die echte config.json des Repos anfassen."""
+    monkeypatch.setattr(useradmin, "CONFIG", str(tmp_path / "nicht-vorhanden.json"))
+
+
 @pytest.fixture
 def konfig(tmp_path):
     p = tmp_path / "config.json"
@@ -116,6 +123,15 @@ def test_loeschen(konfig):
 def test_unbekannter_benutzer(konfig, capsys):
     assert lauf(konfig, "2fa-aus", "niemand") == 1
     assert "gibt es nicht" in capsys.readouterr().err
+
+
+def test_config_gilt_in_beiden_reihenfolgen(konfig, capsys):
+    """--config vor dem Unterbefehl darf nicht vom Unterbefehl-Default
+    überschrieben werden (sonst schreibt das Werkzeug in die falsche Datei)."""
+    assert useradmin.main(["--config", konfig, "rolle", "anna", "manager"]) == 0
+    assert gelesen(konfig)["anna"]["role"] == "manager"
+    assert useradmin.main(["rolle", "anna", "putzkraft", "--config", konfig]) == 0
+    assert gelesen(konfig)["anna"]["role"] == "putzkraft"
 
 
 def test_schreiben_legt_sicherung_an(konfig):
