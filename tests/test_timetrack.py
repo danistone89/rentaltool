@@ -115,3 +115,55 @@ def test_aggregate_ohne_saetze_liefert_null_betraege():
     agg = timetrack.aggregate(rows, {})
     assert agg["a"]["total_minutes"] == 240
     assert agg["a"]["total_amount"] == 0.0
+
+
+# --------------------------------------------------- Abrechnungsstatus
+def test_abrechnen_markieren_und_zuruecknehmen(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    a = timetrack.add_manual("putzi", datetime(2026, 7, 2, 8), datetime(2026, 7, 2, 10))
+    b = timetrack.add_manual("putzi", datetime(2026, 7, 3, 8), datetime(2026, 7, 3, 11))
+    assert not timetrack.is_billed(a) and not timetrack.is_billed(b)
+
+    n = timetrack.mark_billed([a["id"]], "admin", when=datetime(2026, 8, 1, 12))
+    assert n == 1
+    eintraege = {e["id"]: e for e in timetrack.entries("putzi")}
+    assert timetrack.is_billed(eintraege[a["id"]])
+    assert eintraege[a["id"]]["abgerechnet_von"] == "admin"
+    assert not timetrack.is_billed(eintraege[b["id"]])
+
+    # erneutes Markieren aendert nichts (Meldezeitpunkt bleibt erhalten)
+    assert timetrack.mark_billed([a["id"]], "wer-anders") == 0
+    eintraege = {e["id"]: e for e in timetrack.entries("putzi")}
+    assert eintraege[a["id"]]["abgerechnet_von"] == "admin"
+
+    assert timetrack.unmark_billed([a["id"]]) == 1
+    assert not timetrack.is_billed(timetrack.get_entry(a["id"]))
+
+
+def test_summary_kennzahlen(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    a = timetrack.add_manual("putzi", datetime(2026, 7, 2, 8), datetime(2026, 7, 2, 10),
+                             apartment="Cottaer Straße")          # Do, 120 min
+    timetrack.add_manual("putzi", datetime(2026, 7, 4, 8), datetime(2026, 7, 4, 11),
+                         apartment="Wernerstraße")                # Sa, 180 min
+    timetrack.mark_billed([a["id"]], "admin")
+
+    s = timetrack.summary(timetrack.entries("putzi"),
+                          {"stundensatz_werktag": 15, "stundensatz_wochenende": 20,
+                           "wochenendsatz_aktiv": True})
+    assert s["minutes"] == 300 and s["count"] == 2
+    assert s["avg_minutes"] == 150
+    assert s["minutes_werktag"] == 120 and s["minutes_wochenende"] == 180
+    assert s["amount"] == 90.0                    # 2h*15 + 3h*20
+    assert s["billed_minutes"] == 120 and s["billed_count"] == 1
+    assert s["open_minutes"] == 180 and s["open_count"] == 1
+    assert s["billed_amount"] == 30.0 and s["open_amount"] == 60.0
+    assert s["apartments"] == {"Cottaer Straße", "Wernerstraße"}
+    assert s["last_date"] == date(2026, 7, 4)
+
+
+def test_summary_ignoriert_laufende_einsaetze(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    timetrack.check_in("putzi", now=datetime(2026, 7, 2, 8))
+    s = timetrack.summary(timetrack.entries("putzi"))
+    assert s["count"] == 0 and s["minutes"] == 0 and s["avg_minutes"] == 0

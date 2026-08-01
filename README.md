@@ -161,6 +161,42 @@ Grund nur noch „Vorbereiten für N Personen"; die abreisenden Gäste stehen im
 Detail-Dialog. Der **Checklisten-Durchgang** zeigt denselben „Vorbereiten
 für"-Kasten oben – dort, wo tatsächlich gearbeitet wird.
 
+## Zeiterfassung: Übersicht & Abrechnungsstatus
+
+**Für Mitarbeiter** steht über der Zeitenliste eine **eigene Übersicht**
+(`_meine_kennzahlen`): Stunden im laufenden Abrechnungsmonat, Ø-Dauer je
+Einsatz, Anzahl Einsätze und Wohnungen, Wochenend-/Feiertagsanteil, Vormonat,
+Gesamtsumme und – sofern Stundensätze gepflegt sind – der Betrag. Zeitraum ist
+immer der **Abrechnungsmonat (19.–18.)**, damit die Zahlen zu dem passen, was
+ans Steuerbüro geht.
+
+Darunter der **Abrechnungsstand**: wie viele Stunden noch offen und wie viele
+bereits gemeldet sind, mit Fortschrittsbalken.
+
+**Für den Admin** gibt es unter „Auswertung" den Block **Abrechnungsstatus**
+(`_abrechnen_block`). Nach dem Versand an den Steuerberater setzt
+**„Als abgerechnet markieren"** alle Einträge des gewählten Abrechnungsmonats
+auf gemeldet; der Filter „Mitarbeiter" wirkt mit, es lässt sich also auch
+einzeln abrechnen. **„Markierung aufheben"** nimmt es zurück. Beides fragt
+vorher nach.
+
+Bewusst ein **eigener Schritt** nach dem Senden: der Mailversand kann
+scheitern, und manche Meldung läuft über Portal oder Post.
+
+**Wirkung:** Ein abgerechneter Eintrag bekommt in der Liste ein Schloss-Symbol
+und ist für Mitarbeiter **nicht mehr änderbar oder löschbar** – sonst weicht der
+Bestand von dem ab, was beim Steuerbüro liegt. Der Admin kann weiterhin
+korrigieren. Die CSV enthält eine Spalte `Abrechnungsstatus`.
+
+Gespeichert wird direkt am Zeiteintrag in `worklog.json`: `abgerechnet`
+(Zeitstempel) und `abgerechnet_von`. Ein bereits markierter Eintrag wird beim
+erneuten Markieren nicht überschrieben – der ursprüngliche Meldezeitpunkt
+bleibt erhalten.
+
+> Technischer Hinweis: Der Bestätigungsdialog wird in einen **eigenen Container
+> außerhalb von `body`** gehängt (`dlg_slot`). Läge er in `body`, würde er beim
+> Neuaufbau mitten in seinem eigenen Klick-Handler gelöscht.
+
 ## Belegscanner
 
 **Belege → „Beleg scannen"** in zwei Schritten:

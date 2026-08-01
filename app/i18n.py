@@ -147,6 +147,28 @@ _EN = {
     "Wechseltag – Anreise noch heute": "Turnover day – arrival still today",
     "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Person": "Guest",
+
+    # ------------------------------------------- Übersicht Zeiterfassung
+    "Meine Übersicht": "My overview",
+    "Stunden dieser Monat": "Hours this month",
+    "Ø je Einsatz": "Avg. per job",
+    "davon Wo.-ende/Feiertag": "of which weekend/holiday",
+    "Werktags {h}": "Weekdays {h}",
+    "Vormonat": "Previous month",
+    "Gesamt erfasst": "Total recorded",
+    "Betrag dieser Monat": "Amount this month",
+    "nach hinterlegtem Stundensatz": "at your hourly rate",
+    "{n} Einsätze": "{n} jobs",
+    "{n} Wohnungen": "{n} apartments",
+    "Abrechnungsstand": "Billing status",
+    "noch offen": "still open",
+    "abgerechnet": "billed",
+    "Std": "hrs",
+    "Ans Steuerbüro gemeldet – nicht mehr änderbar.":
+        "Reported to the tax office – no longer editable.",
+    "„Abgerechnet“ heißt: ans Steuerbüro gemeldet. Diese Einträge "
+    "lassen sich nicht mehr ändern.":
+        "“Billed” means reported to the tax office. These entries can no longer be changed.",
     "Personen": "Guests",
     "Buchungskanal": "Booking channel",
     "Name": "Name",

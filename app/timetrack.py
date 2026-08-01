@@ -143,6 +143,85 @@ def duration_minutes(e):
     return int((b - a).total_seconds() // 60)
 
 
+# ------------------------------------------------- Abrechnungsstatus
+def is_billed(e):
+    """Wurde dieser Eintrag schon ans Steuerbüro gemeldet?"""
+    return bool(e.get("abgerechnet"))
+
+
+def mark_billed(entry_ids, by, when=None):
+    """Einträge als 'abgerechnet' markieren. Gibt die Anzahl der Änderungen zurück.
+
+    Ein bereits markierter Eintrag bleibt unangetastet – der ursprüngliche
+    Zeitpunkt der Meldung soll erhalten bleiben.
+    """
+    ids = {str(i) for i in entry_ids}
+    ts = (when or datetime.now()).isoformat(timespec="seconds")
+    items = _read()
+    n = 0
+    for e in items:
+        if str(e.get("id")) in ids and not e.get("abgerechnet"):
+            e["abgerechnet"] = ts
+            e["abgerechnet_von"] = by
+            n += 1
+    if n:
+        _write(items)
+    return n
+
+
+def unmark_billed(entry_ids):
+    """Markierung wieder entfernen (Korrektur einer versehentlichen Meldung)."""
+    ids = {str(i) for i in entry_ids}
+    items = _read()
+    n = 0
+    for e in items:
+        if str(e.get("id")) in ids and e.get("abgerechnet"):
+            e.pop("abgerechnet", None)
+            e.pop("abgerechnet_von", None)
+            n += 1
+    if n:
+        _write(items)
+    return n
+
+
+def summary(rows, user_cfg=None, defaults=None):
+    """Kennzahlen einer Eintragsmenge (nur abgeschlossene Einträge zählen).
+
+    Liefert Minuten, Einsätze, Schnitt, Aufteilung Werktag/Wochenende sowie die
+    Trennung offen / abgerechnet – jeweils in Minuten, Anzahl und Betrag.
+    """
+    done = [e for e in rows if e.get("checkout")]
+    out = {"minutes": 0, "count": len(done), "avg_minutes": 0,
+           "minutes_werktag": 0, "minutes_wochenende": 0, "amount": 0.0,
+           "billed_minutes": 0, "billed_count": 0, "billed_amount": 0.0,
+           "open_minutes": 0, "open_count": 0, "open_amount": 0.0,
+           "apartments": set(), "last_date": None}
+    for e in done:
+        mins = duration_minutes(e) or 0
+        kind = kind_of(e)
+        betrag = amount(mins, rate_for(kind, user_cfg, defaults))
+        out["minutes"] += mins
+        out["amount"] += betrag
+        if kind == feiertage.WOCHENENDE:
+            out["minutes_wochenende"] += mins
+        else:
+            out["minutes_werktag"] += mins
+        ziel = "billed" if is_billed(e) else "open"
+        out[f"{ziel}_minutes"] += mins
+        out[f"{ziel}_count"] += 1
+        out[f"{ziel}_amount"] += betrag
+        if e.get("apartment"):
+            out["apartments"].add(e["apartment"])
+        d = entry_date(e)
+        if out["last_date"] is None or d > out["last_date"]:
+            out["last_date"] = d
+    out["amount"] = round(out["amount"], 2)
+    out["billed_amount"] = round(out["billed_amount"], 2)
+    out["open_amount"] = round(out["open_amount"], 2)
+    out["avg_minutes"] = int(out["minutes"] / out["count"]) if out["count"] else 0
+    return out
+
+
 def fmt_dur(mins):
     if mins is None:
         return "läuft…"

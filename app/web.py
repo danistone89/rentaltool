@@ -367,7 +367,8 @@ def _zeit_csv_bytes(rows, show_user):
     w = csv.writer(buf, delimiter=";")
     w.writerow((["Mitarbeiter"] if show_user else []) +
                ["Datum", "Von", "Bis", "Wohnung", "Dauer", "Minuten",
-                "Tagesart", "Anlass", "Stundensatz", "Betrag", "Ort ein"])
+                "Tagesart", "Anlass", "Stundensatz", "Betrag", "Abrechnungsstatus",
+                "Ort ein"])
     defaults = _rate_defaults()
     for e in rows:
         mins = timetrack.duration_minutes(e) or 0
@@ -381,6 +382,7 @@ def _zeit_csv_bytes(rows, show_user):
             feiertage.LABELS[kind], feiertage.label_of(d),
             f"{rate:.2f}".replace(".", ",") if rate else "",
             f"{timetrack.amount(mins, rate):.2f}".replace(".", ",") if rate else "",
+            f"abgerechnet {_d(e['abgerechnet'])}" if timetrack.is_billed(e) else "offen",
             _presence(e.get("checkin_ort"), e.get("checkin_dist"),
                       e.get("checkin_loc"), e.get("checkin_ip"))]))
     return buf.getvalue().encode("utf-8-sig")
@@ -450,6 +452,10 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                             ui.chip(t(feiertage.label_of(timetrack.entry_date(e)))) \
                                 .props("color=amber-7 text-color=white dense square") \
                                 .classes("text-[10px] shrink-0")
+                        if timetrack.is_billed(e):
+                            ui.chip(t("abgerechnet"), icon="lock") \
+                                .props("color=green-7 text-color=white dense square") \
+                                .classes("text-[10px] shrink-0")
                     sub = []
                     if show_user:
                         sub.append(staff.get(e["user"], e["user"]))
@@ -461,12 +467,110 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                         ui.label(" · ".join(sub)).classes("text-xs text-gray-400 truncate")
                 ui.label(timetrack.fmt_dur(timetrack.duration_minutes(e))) \
                     .classes("text-sm font-medium shrink-0")
-                ui.button(icon="edit", on_click=lambda ev=e:
-                          _time_edit_dialog(ev["user"], apts, admin, staff, entry=ev, on_saved=on_change)) \
-                    .props("flat round dense").tooltip(t("Bearbeiten"))
-                ui.button(icon="delete", on_click=lambda ev=e:
-                          (timetrack.delete_entry(ev["id"]), ui.notify(t("Eintrag gelöscht."), type="warning"),
-                           on_change())).props("flat round dense color=negative").tooltip(t("Löschen"))
+                # Gemeldete Zeiten darf nur der Admin noch anfassen – sonst weicht
+                # das, was beim Steuerbüro liegt, von dem hier ab.
+                if timetrack.is_billed(e) and not admin:
+                    ui.icon("lock").classes("text-gray-300 shrink-0") \
+                        .tooltip(t("Ans Steuerbüro gemeldet – nicht mehr änderbar."))
+                else:
+                    ui.button(icon="edit", on_click=lambda ev=e:
+                              _time_edit_dialog(ev["user"], apts, admin, staff, entry=ev, on_saved=on_change)) \
+                        .props("flat round dense").tooltip(t("Bearbeiten"))
+                    ui.button(icon="delete", on_click=lambda ev=e:
+                              (timetrack.delete_entry(ev["id"]), ui.notify(t("Eintrag gelöscht."), type="warning"),
+                               on_change())).props("flat round dense color=negative").tooltip(t("Löschen"))
+
+
+def _mini_kpi(label, wert, zusatz="", icon="schedule", ton="primary"):
+    """Kachel für die Mitarbeiter-Übersicht."""
+    with ui.card().classes("rounded-xl shadow-sm border border-slate-100 p-3 gap-0 min-w-[136px] flex-grow"):
+        with ui.row().classes("items-center gap-1 no-wrap"):
+            ui.icon(icon).classes(f"text-{ton} text-base shrink-0")
+            ui.label(label).classes("text-[11px] text-gray-500 leading-tight")
+        ui.label(wert).classes(f"text-2xl font-bold text-{ton} leading-tight mt-1")
+        if zusatz:
+            ui.label(zusatz).classes("text-[11px] text-gray-400 leading-tight")
+
+
+def _meine_kennzahlen(user):
+    """Übersicht für Mitarbeiter: eigene Stunden, Einsätze und Abrechnungsstand.
+
+    Zeitraum ist der Abrechnungsmonat (19.–18.), damit die Zahlen zu dem passen,
+    was ans Steuerbüro geht.
+    """
+    eigene = [e for e in timetrack.entries(user) if e.get("checkout")]
+    heute = date.today()
+    akt = _billing_month(heute.isoformat())
+    monate = sorted({_billing_month(e["checkin"]) for e in eigene}, reverse=True)
+    vor = None
+    for m in monate:
+        if m < akt:
+            vor = m
+            break
+
+    ucfg, defs = USERS.get(user), _rate_defaults()
+
+    def summe(m):
+        return timetrack.summary([e for e in eigene if _billing_month(e["checkin"]) == m],
+                                 ucfg, defs)
+
+    s_akt, s_ges = summe(akt), timetrack.summary(eigene, ucfg, defs)
+    money = _has_rates()
+    st, en = _billing_period(akt)
+
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.icon("insights").classes("text-primary text-xl")
+            ui.label(t("Meine Übersicht")).classes("font-medium")
+            ui.space()
+            ui.label(f"{_month_label(akt)} · {st.strftime('%d.%m.')}–{en.strftime('%d.%m.')}") \
+                .classes("text-xs text-gray-500")
+        with ui.row().classes("w-full gap-2 flex-wrap"):
+            _mini_kpi(t("Stunden dieser Monat"), _hours_num(s_akt["minutes"]),
+                      t("{n} Einsätze", n=s_akt["count"]), "schedule")
+            _mini_kpi(t("Ø je Einsatz"),
+                      timetrack.fmt_dur(s_akt["avg_minutes"]) if s_akt["count"] else "–",
+                      t("{n} Wohnungen", n=len(s_akt["apartments"])) if s_akt["apartments"] else "",
+                      "timelapse")
+            if s_akt["minutes_wochenende"]:
+                _mini_kpi(t("davon Wo.-ende/Feiertag"), _hours_num(s_akt["minutes_wochenende"]),
+                          t("Werktags {h}", h=_hours_num(s_akt["minutes_werktag"])),
+                          "weekend", "amber-8")
+            if vor:
+                _mini_kpi(t("Vormonat"), _hours_num(summe(vor)["minutes"]),
+                          _month_label(vor), "history", "slate-600")
+            _mini_kpi(t("Gesamt erfasst"), _hours_num(s_ges["minutes"]),
+                      t("{n} Einsätze", n=s_ges["count"]), "functions", "slate-600")
+            if money and s_akt["amount"]:
+                _mini_kpi(t("Betrag dieser Monat"), _eur(s_akt["amount"]),
+                          t("nach hinterlegtem Stundensatz"), "payments")
+
+        # Abrechnungsstand über alle Zeiten
+        offen, abger = s_ges["open_minutes"], s_ges["billed_minutes"]
+        with ui.column().classes("w-full gap-1 rounded-lg bg-slate-50 border border-slate-200 p-3"):
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.icon("receipt_long").classes("text-slate-500 text-base shrink-0")
+                ui.label(t("Abrechnungsstand")).classes(
+                    "text-xs font-semibold uppercase tracking-wide text-slate-500")
+            with ui.row().classes("w-full items-center gap-4 flex-wrap"):
+                with ui.column().classes("gap-0"):
+                    ui.label(t("noch offen")).classes("text-[11px] text-gray-500")
+                    ui.label(_hours_num(offen) + " " + t("Std")) \
+                        .classes("text-lg font-bold text-amber-700 leading-tight")
+                    if money and s_ges["open_amount"]:
+                        ui.label(_eur(s_ges["open_amount"])).classes("text-[11px] text-gray-500")
+                ui.element("div").classes("w-px h-10 bg-slate-200")
+                with ui.column().classes("gap-0"):
+                    ui.label(t("abgerechnet")).classes("text-[11px] text-gray-500")
+                    ui.label(_hours_num(abger) + " " + t("Std")) \
+                        .classes("text-lg font-bold text-green-700 leading-tight")
+                    if money and s_ges["billed_amount"]:
+                        ui.label(_eur(s_ges["billed_amount"])).classes("text-[11px] text-gray-500")
+            if offen + abger:
+                ui.linear_progress(value=abger / (offen + abger), show_value=False) \
+                    .props("color=green rounded track-color=amber-3 size=8px").classes("w-full")
+            ui.label(t("„Abgerechnet“ heißt: ans Steuerbüro gemeldet. Diese Einträge "
+                       "lassen sich nicht mehr ändern.")).classes("text-[11px] text-gray-400")
 
 
 def _stb_email_body(ym, rows, staff):
@@ -509,7 +613,90 @@ def _stb_email_body(ym, rows, staff):
     return anrede + "\n\n" + intro + "\n\n" + "\n\n".join(blocks) + "\n\n" + gruss
 
 
-def _admin_zeiten(apts, staff, on_change):
+def _abrechnen_block(rows, ym, on_change, dlg_slot):
+    """Admin: Zeiten eines Abrechnungsmonats als ans Steuerbüro gemeldet markieren.
+
+    Bewusst als eigener Schritt nach dem Versand – der Versand kann scheitern
+    oder die Meldung auch per Post/Portal laufen. Rückgängig machen geht.
+
+    `dlg_slot` ist ein Container AUSSERHALB des neu gebauten Bereichs. Läge der
+    Bestätigungsdialog darin, würde er beim Neuaufbau mitten in seinem eigenen
+    Klick-Handler gelöscht – der Aufbau bricht dann ab und die Seite bleibt leer.
+    """
+    offen = [e for e in rows if not timetrack.is_billed(e)]
+    fertig = [e for e in rows if timetrack.is_billed(e)]
+    o_min = sum(timetrack.duration_minutes(e) or 0 for e in offen)
+    f_min = sum(timetrack.duration_minutes(e) or 0 for e in fertig)
+    wann = sorted({e.get("abgerechnet", "")[:10] for e in fertig if e.get("abgerechnet")})
+
+    def _confirm(titel, text, ok_label, farbe, aktion):
+        dlg_slot.clear()                     # nur ein Dialog gleichzeitig
+        with dlg_slot:
+            with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
+                ui.label(titel).classes("text-lg font-bold")
+                ui.label(text).classes("text-sm text-slate-600 whitespace-pre-wrap")
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button("Abbrechen", on_click=dlg.close).props("flat")
+                    ui.button(ok_label, on_click=lambda: (dlg.close(), aktion())) \
+                        .props(f"unelevated no-caps color={farbe}")
+        dlg.open()
+
+    def markieren():
+        n = timetrack.mark_billed([e["id"] for e in offen], _cur_user())
+        ui.notify(f"{n} Einträge als abgerechnet markiert ✓", type="positive")
+        on_change()
+
+    def zuruecknehmen():
+        n = timetrack.unmark_billed([e["id"] for e in fertig])
+        ui.notify(f"Markierung bei {n} Einträgen aufgehoben.", type="warning")
+        on_change()
+
+    with ui.column().classes("w-full gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 mt-2"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("receipt_long").classes("text-slate-500")
+            ui.label("Abrechnungsstatus").classes("font-medium")
+            ui.space()
+            if offen and not fertig:
+                ui.chip("offen", icon="pending").props("color=amber-7 text-color=white dense")
+            elif fertig and not offen:
+                ui.chip("abgerechnet", icon="check_circle") \
+                    .props("color=green-7 text-color=white dense")
+            elif fertig and offen:
+                ui.chip("teilweise abgerechnet", icon="incomplete_circle") \
+                    .props("color=orange-8 text-color=white dense")
+        if not rows:
+            ui.label("Keine Zeiten in diesem Zeitraum.").classes("text-sm text-gray-400")
+            return
+        ui.label(f"{len(fertig)} von {len(rows)} Einträgen abgerechnet · "
+                 f"offen {_hours_num(o_min)} Std · abgerechnet {_hours_num(f_min)} Std"
+                 + (f" · gemeldet am {', '.join(_d(w) for w in wann)}" if wann else "")) \
+            .classes("text-sm text-slate-600")
+        with ui.row().classes("gap-2 flex-wrap"):
+            if offen:
+                ui.button(f"Als abgerechnet markieren ({len(offen)})", icon="task_alt",
+                          on_click=lambda: _confirm(
+                              "Als abgerechnet markieren?",
+                              f"{len(offen)} Einträge aus {_month_label(ym)} "
+                              f"({_hours_num(o_min)} Stunden) werden als ans Steuerbüro "
+                              f"gemeldet markiert.\n\nDie Mitarbeiter können diese Zeiten "
+                              f"danach nicht mehr ändern oder löschen.",
+                              "Markieren", "positive", markieren)) \
+                    .props("unelevated no-caps color=positive")
+            if fertig:
+                ui.button(f"Markierung aufheben ({len(fertig)})", icon="undo",
+                          on_click=lambda: _confirm(
+                              "Markierung aufheben?",
+                              f"Bei {len(fertig)} Einträgen aus {_month_label(ym)} wird der "
+                              f"Status „abgerechnet“ entfernt. Sie sind danach wieder "
+                              f"änderbar.\n\nNur nutzen, wenn die Meldung ans Steuerbüro "
+                              f"nicht oder falsch rausgegangen ist.",
+                              "Aufheben", "negative", zuruecknehmen)) \
+                    .props("outline no-caps color=negative")
+        ui.label("Der Filter „Mitarbeiter“ oben wirkt mit – so lässt sich auch einzeln "
+                 "abrechnen.").classes("text-[11px] text-gray-400")
+
+
+def _admin_zeiten(apts, staff, on_change, dlg_slot):
     all_entries = [e for e in timetrack.entries() if e.get("checkout")]
     months = sorted({_billing_month(e["checkin"]) for e in all_entries}, reverse=True) \
         or [_billing_month(date.today().isoformat())]
@@ -591,6 +778,9 @@ def _admin_zeiten(apts, staff, on_change):
                           on_click=lambda: ui.download.content(
                               _zeit_csv_bytes(rows, True), f"arbeitszeiten_{state['month']}.csv",
                               media_type="text/csv")).props("outline no-caps")
+            # on_change (nicht das lokale render): _admin_zeiten hält all_entries
+            # außerhalb von render() fest – nur der äußere Neuaufbau liest frisch.
+            _abrechnen_block(rows, state["month"], on_change, dlg_slot)
             _zeit_list(rows, apts, True, staff, on_change, "Einzelne Einträge", True)
     render()
 
@@ -4392,6 +4582,8 @@ def main_page():
         apts = _apts()
         staff = _staff_users()
         _feature_header("schedule", "Zeiterfassung", "Start/Stop, manuell erfassen & bearbeiten")
+        # Platz für Dialoge, der beim Neuaufbau von `body` stehen bleibt.
+        dlg_slot = ui.element("div")
         body = ui.column().classes("w-full gap-4")
 
         async def _presence_now():
@@ -4451,11 +4643,12 @@ def main_page():
                 ui.button(t("Zeit manuell erfassen"), icon="add",
                           on_click=lambda: _time_edit_dialog(user, apts, admin, staff, on_saved=render)) \
                     .props("outline no-caps")
+                _meine_kennzahlen(user)
                 _zeit_list(timetrack.entries(user), apts, admin, staff, render, t("Meine Zeiten"), False)
                 if admin:
                     ui.separator()
                     ui.label("Auswertung (Admin)").classes("text-lg font-semibold")
-                    _admin_zeiten(apts, staff, render)
+                    _admin_zeiten(apts, staff, render, dlg_slot)
         render()
 
     def build_reinigung():

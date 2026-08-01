@@ -545,3 +545,85 @@ async def test_passwort_vergessen_bremst_wiederholung(user: User, mock_backend,
     await _forgot(user, "carl")
     await _forgot(user, "carl")
     assert len(reset_bereit) == 1   # zweite Anfrage innerhalb der Sperrzeit: keine Mail
+
+
+async def _login_as(user, name, rolle):
+    from app import auth as _auth
+    await user.open("/login")
+    user.find(marker="login-user").type(name)
+    user.find(marker="login-pw").type(name)
+    user.find("Anmelden").click()
+    await user.open("/")
+
+
+async def test_putzkraft_sieht_eigene_kennzahlen(user: User, mock_backend, tmp_path, monkeypatch):
+    """Die Putzkraft bekommt in der Zeiterfassung eine Übersicht ihrer Stunden."""
+    from datetime import datetime
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.USERS, "putzi", {
+        "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
+        "totp_secret": "", "name": "putzi"})
+    heute = date.today()
+    timetrack.add_manual("putzi", datetime(heute.year, heute.month, heute.day, 9),
+                         datetime(heute.year, heute.month, heute.day, 11),
+                         apartment="Cottaer Straße")
+    await _login_as(user, "putzi", "putzkraft")
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Meine Übersicht")
+    await user.should_see("Stunden dieser Monat")
+    await user.should_see("Abrechnungsstand")
+    await user.should_see("noch offen")
+
+
+async def test_abgerechnete_zeit_ist_fuer_putzkraft_gesperrt(user: User, mock_backend,
+                                                             tmp_path, monkeypatch):
+    """Ist eine Zeit ans Steuerbüro gemeldet, darf die Putzkraft sie nicht mehr
+    bearbeiten oder löschen – sonst weicht der Bestand von der Meldung ab."""
+    from datetime import datetime
+    from nicegui import ui as _ui
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.USERS, "putzi", {
+        "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
+        "totp_secret": "", "name": "putzi"})
+    heute = date.today()
+    e = timetrack.add_manual("putzi", datetime(heute.year, heute.month, heute.day, 9),
+                             datetime(heute.year, heute.month, heute.day, 11))
+    timetrack.mark_billed([e["id"]], "admin")
+
+    await _login_as(user, "putzi", "putzkraft")
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("abgerechnet")
+    # kein Lösch-Button mehr in der Liste
+    icons = [getattr(b, "props", {}).get("icon") for b in user.find(_ui.button).elements]
+    assert "delete" not in icons, f"Löschen trotz Abrechnung möglich: {icons}"
+
+
+async def test_admin_kann_abrechnen_und_zuruecknehmen(user: User, mock_backend,
+                                                      tmp_path, monkeypatch):
+    from datetime import datetime
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    heute = date.today()
+    timetrack.add_manual("test", datetime(heute.year, heute.month, heute.day, 9),
+                         datetime(heute.year, heute.month, heute.day, 12))
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Abrechnungsstatus")
+    await user.should_see("Als abgerechnet markieren (1)")
+    user.find("Als abgerechnet markieren (1)").click()
+    await user.should_see("Als abgerechnet markieren?")
+    await user.should_see("Die Mitarbeiter können diese Zeiten danach nicht mehr "
+                          "ändern oder löschen.")
+    user.find("Markieren").click()
+    assert all(timetrack.is_billed(x) for x in timetrack.entries("test"))
+
+    # Der Neuaufbau aus einem Klick-Handler heraus setzt den Harness auf den
+    # Standard-Bereich zurueck (dasselbe passiert beim bestehenden Loeschen-Knopf).
+    # Der Zustand wird deshalb nach frischem Aufruf des Bereichs geprueft.
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Markierung aufheben (1)")
+    await user.should_not_see("Als abgerechnet markieren (1)")
+
+    user.find("Markierung aufheben (1)").click()
+    await user.should_see("Markierung aufheben?")
+    user.find("Aufheben").click()
+    assert not any(timetrack.is_billed(x) for x in timetrack.entries("test"))
