@@ -627,3 +627,42 @@ async def test_admin_kann_abrechnen_und_zuruecknehmen(user: User, mock_backend,
     await user.should_see("Markierung aufheben?")
     user.find("Aufheben").click()
     assert not any(timetrack.is_billed(x) for x in timetrack.entries("test"))
+
+
+async def test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    """Der Kopf einer Tagesgruppe muss ohne Aufklappen zeigen, wie viele
+    Reinigungen des Tages noch frei sind. Genau der kritische Fall: zwei
+    Buchungen an einem Tag, davon nur EINE zu vergeben."""
+    from datetime import timedelta
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setitem(web.USERS, "vale", {
+        "password_hash": auth.hash_password("vale"), "role": "putzkraft",
+        "totp_secret": "", "name": "Valeriya"})
+
+    tag = (date.today() + timedelta(days=4)).isoformat()
+    from app import data as _data
+
+    def _b(bid, apt_id, apt_name):
+        return {"id": bid, "type": "reservation", "is-blocked-booking": False,
+                "apartment": {"id": apt_id, "name": apt_name},
+                "arrival": (date.today() + timedelta(days=1)).isoformat(),
+                "departure": tag, "check-in": "15:00", "check-out": "10:00",
+                "adults": 2, "children": 0, "guest-name": f"Gast {bid}",
+                "channel": {"name": "Direct booking"}, "notice": ""}
+    monkeypatch.setattr(_data, "_reservations", lambda *a, **k: [
+        _b(501, 2748963, "Cottaer Straße"), _b(502, 2960031, "Wernerstraße")])
+    bk.set_assignment(501, "vale", "test")          # eine von zweien vergeben
+
+    await _login(user)
+    await user.should_see("KOMMENDE TAGE")
+    # Kopf der Tagesgruppe – ohne Klick auf die Aufklapp-Fläche
+    await user.should_see("2 Reinigungen")
+    await user.should_see("1 frei")                 # genau eine ist noch offen
+    await user.should_see("Valeriya")               # die andere hat einen Namen
+    await user.should_see("1 Reinigung noch niemandem zugewiesen")   # Banner oben

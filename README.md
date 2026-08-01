@@ -161,6 +161,26 @@ Grund nur noch „Vorbereiten für N Personen"; die abreisenden Gäste stehen im
 Detail-Dialog. Der **Checklisten-Durchgang** zeigt denselben „Vorbereiten
 für"-Kasten oben – dort, wo tatsächlich gearbeitet wird.
 
+### Freie Reinigungen ohne Aufklappen erkennen
+
+Die kommenden Tage sind zu Gruppen zusammengeklappt. Wer sehen wollte, ob noch
+etwas zu vergeben ist, musste jeden Tag einzeln aufklappen – besonders tückisch,
+wenn an einem Tag **zwei** Reinigungen anstehen und nur **eine** davon offen ist.
+
+Der Kopf jeder Tagesgruppe zeigt das deshalb direkt (`_tagesgruppe`):
+
+* Chip **„n frei"** (bernstein) für die noch nicht zugewiesenen Reinigungen,
+* Chip mit dem **Namen** der Zuständigen, wenn genau eine Person zugewiesen ist,
+  sonst **„n vergeben"** (grün),
+* der Rahmen der Gruppe wird bernsteinfarben, sobald etwas offen ist,
+* über der Liste steht zusätzlich, wie viele Reinigungen **insgesamt** noch
+  niemandem zugewiesen sind.
+
+Der Kopf ist ein eigener Quasar-`header`-Slot; dadurch entfällt der
+Standard-Aufklapppfeil, der deshalb von Hand ergänzt wird. Abgesichert durch
+`tests/test_web.py::test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen`
+(zwei Buchungen an einem Tag, eine davon vergeben).
+
 ## Zeiterfassung: Übersicht & Abrechnungsstatus
 
 **Für Mitarbeiter** steht über der Zeitenliste eine **eigene Übersicht**

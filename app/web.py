@@ -3350,14 +3350,61 @@ def _render_cleaning(user, admin, staff, activate):
         for j in future:
             groups.setdefault(j["departure"], []).append(j)
         ui.label("KOMMENDE TAGE").classes("text-xs font-semibold tracking-wide text-gray-400 mt-4")
+        offen_ges = 0
         for d in sorted(groups):
-            dd = date.fromisoformat(d)
-            n = len(groups[d])
-            with ui.expansion(f"{_WD[dd.weekday()]} {dd.strftime('%d.%m.%Y')}  ·  "
-                              f"{n} Reinigung{'en' if n != 1 else ''}", icon="event") \
-                    .classes("w-full border border-slate-100 rounded-xl"):
-                for j in groups[d]:
-                    _cleaning_compact(j, user, admin, staff, activate)
+            offen_ges += sum(1 for j in groups[d] if not bookings.assignee_of(j["id"]))
+        if offen_ges:
+            with ui.row().classes("w-full items-center gap-2 no-wrap text-amber-800 "
+                                  "bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"):
+                ui.icon("person_off").classes("text-amber-700 text-base shrink-0")
+                ui.label(t("{n} Reinigung noch niemandem zugewiesen", n=offen_ges)
+                         if offen_ges == 1 else
+                         t("{n} Reinigungen noch niemandem zugewiesen", n=offen_ges)) \
+                    .classes("text-sm font-medium")
+        for d in sorted(groups):
+            _tagesgruppe(d, groups[d], user, admin, staff, activate)
+
+
+def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
+    """Ein ausklappbarer Tag. Der Kopf muss ohne Aufklappen zeigen, wie viele
+    Reinigungen des Tages noch frei sind – bei zwei Buchungen an einem Tag ist
+    oft nur eine davon zu vergeben."""
+    dd = date.fromisoformat(d)
+    wd = (_WD_EN if i18n.lang() == "en" else _WD)[dd.weekday()]
+    n = len(tagesjobs)
+    offen, vergeben = [], []
+    for j in tagesjobs:
+        (vergeben if bookings.assignee_of(j["id"]) else offen).append(j)
+    namen = sorted({staff.get(bookings.assignee_of(j["id"]),
+                              bookings.assignee_of(j["id"])) for j in vergeben})
+
+    rahmen = "border-amber-300" if offen else "border-slate-100"
+    exp = ui.expansion(value=False).classes(f"w-full border {rahmen} rounded-xl")
+    with exp.add_slot("header"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("event").classes(("text-amber-600" if offen else "text-gray-400")
+                                     + " text-xl shrink-0")
+            with ui.column().classes("gap-0 min-w-0"):
+                ui.label(f"{wd} {dd.strftime('%d.%m.%Y')}").classes("font-medium leading-tight")
+                ui.label(t("{n} Reinigung", n=n) if n == 1 else t("{n} Reinigungen", n=n)) \
+                    .classes("text-xs text-gray-500 leading-tight")
+            ui.space()
+            with ui.row().classes("items-center gap-1 flex-wrap justify-end shrink-0"):
+                if offen:
+                    ui.chip(t("{n} frei", n=len(offen)), icon="person_off") \
+                        .props("color=amber-8 text-color=white dense square")
+                if vergeben:
+                    # Bei genau einem Namen den Namen zeigen – das ist die
+                    # Information, die man sonst durch Aufklappen sucht.
+                    ui.chip(namen[0] if len(namen) == 1
+                            else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
+                        .props("color=green-7 text-color=white dense square")
+            # Der eigene Header-Slot ersetzt Quasars Aufklapp-Pfeil – ohne diesen
+            # Hinweis sieht die Zeile nicht mehr klickbar aus.
+            ui.icon("expand_more").classes("text-gray-400 shrink-0")
+    with exp:
+        for j in tagesjobs:
+            _cleaning_compact(j, user, admin, staff, activate)
 
 
 def _add_time_dialog(job, user, on_saved=None):

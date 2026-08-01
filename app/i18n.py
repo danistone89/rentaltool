@@ -147,6 +147,12 @@ _EN = {
     "Wechseltag – Anreise noch heute": "Turnover day – arrival still today",
     "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Person": "Guest",
+    "{n} Reinigung": "{n} cleaning",
+    "{n} Reinigungen": "{n} cleanings",
+    "{n} frei": "{n} free",
+    "{n} vergeben": "{n} assigned",
+    "{n} Reinigung noch niemandem zugewiesen": "{n} cleaning not assigned yet",
+    "{n} Reinigungen noch niemandem zugewiesen": "{n} cleanings not assigned yet",
 
     # ------------------------------------------- Übersicht Zeiterfassung
     "Meine Übersicht": "My overview",
