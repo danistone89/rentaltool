@@ -134,6 +134,33 @@ freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.
 
+## Reinigung: Abreise und Anreise strikt getrennt
+
+In einem Reinigungsauftrag stehen zwei Personenzahlen – die der **abreisenden**
+und die der **anreisenden** Gäste. Standen beide untereinander in derselben
+Karte, wurde regelmäßig die falsche gelesen und für die falsche Personenzahl
+eingedeckt (z. B. für 3 Abreisende statt für 2 Anreisende).
+
+Deshalb gilt in der Reinigungskarte: **Abreise und Anreise liegen in getrennten
+Tabs** („Vorbereiten" / „Abreise"), Vorreiter ist immer „Vorbereiten".
+
+* **„Vorbereiten"** (`_prep_panel`): farbiger Kasten mit der Anreise-Zahl in
+  großer Schrift, darunter die Aufschlüsselung (Erwachsene/Kinder), Gastname und
+  Anreisezeitpunkt. Am **Wechseltag** wird der Kasten orange.
+* **„Abreise"** (`_depart_panel`): neutral grau, kleine Schrift, **keine große
+  Zahl**, mit dem ausdrücklichen Hinweis „Nur zur Info – nicht die Zahl für die
+  Vorbereitung."
+
+Die Regel dahinter: **eine große Personenzahl gibt es in der ganzen Oberfläche
+nur ein einziges Mal, und die meint immer die Anreise.** Wer das später ändert,
+holt den Fehler zurück – `tests/test_web.py::test_abreise_und_anreise_getrennt`
+prüft genau das (3 reisen ab, 2 kommen → große Zahl muss „2" sein).
+
+In der **Tagesliste kommender Reinigungen** (Kompaktzeile) steht aus demselben
+Grund nur noch „Vorbereiten für N Personen"; die abreisenden Gäste stehen im
+Detail-Dialog. Der **Checklisten-Durchgang** zeigt denselben „Vorbereiten
+für"-Kasten oben – dort, wo tatsächlich gearbeitet wird.
+
 ## Belegscanner
 
 **Belege → „Beleg scannen"** in zwei Schritten:
@@ -274,6 +301,45 @@ Validiert gegen zwei Monate:
   **341,90 € Steuer**. (Das eingereichte Formular hatte Airbnb falsch mit 7
   angegeben – ohne Auswirkung auf die Steuer.)
 * **Mai 2026**: 14 Buchungen · 7.155,86 € verbleibender Umsatz.
+
+### Warum nicht auf die Summe der Rechnungsbeträge?
+
+Die häufigste Verwechslung – deshalb hier festgehalten. Die Summe dessen, was
+die Gäste **insgesamt gezahlt** haben, ist **nicht** die Bemessungsgrundlage:
+darin steckt schon die Beherbergungssteuer, die die Portale beim Gast kassiert
+haben. 6 % darauf wäre Steuer auf die Steuer.
+
+Dezember 2025 zeigt es, weil es dazu die eingereichte Anmeldung gibt:
+
+| | |
+|---|---:|
+| Summe Rechnungsbeträge | 5.991,89 € |
+| − darin enthaltene Beherbergungssteuer | 293,61 € |
+| **= Bemessungsgrundlage** | **5.698,28 €** |
+| × 6 % | **341,90 €** ✅ eingereicht |
+
+Auf die Rechnungsbeträge gerechnet kämen 359,51 € heraus – 17,61 € zu viel.
+
+Rechtlich: Bemessungsgrundlage ist nach **§ 4 Abs. 1 der Satzung** das
+Beherbergungsentgelt *einschließlich Umsatzsteuer* (die Reinigungsgebühr gehört
+nach **FAQ 5.2** ausdrücklich dazu); die Beherbergungssteuer selbst ist nach
+**FAQ 5.11** „lediglich durchlaufender Posten" und zählt nicht mit.
+
+Begriffe deshalb bewusst so und nicht anders: **Rechnungsbetrag** (was der Gast
+zahlt) − **enthaltene BSt** = **Bemessungsgrundlage** × 6 % = **Steuer**. Das
+Wort „Bruttopreis" ist hier verboten – es liest sich wie „alles inklusive" und
+meint je nach Leser beide Beträge.
+
+Nach **„Berechnen"** zeigt die Oberfläche genau diese Kette zweimal: als
+**Summen-Tabelle** (`_summen_tabelle` in `app/web.py`, mit Spalte „Formular /
+nachrichtlich", damit klar ist welche Zeile eingereicht wird) und je Buchung
+als vier Spalten in der Buchungstabelle. Abgesichert durch
+`tests/test_web.py::test_summen_tabelle_zeigt_die_kette`.
+
+> Randfall: Buchungen **ohne** ausgewiesene `Übernachtungssteuer`-Zeile
+> (typisch Direktbuchungen) gehen mit dem **vollen Betrag** in die Basis. Ist
+> dort die Steuer im Preis schon enthalten, wird sie mitbesteuert. Bei
+> Direktbuchungen die Beherbergungssteuer daher separat ausweisen.
 
 ## Konfiguration
 

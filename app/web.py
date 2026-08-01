@@ -1746,6 +1746,91 @@ def _kpi(container, label, value, icon="analytics", accent=False):
             ui.label(value).classes("text-2xl font-bold mt-1 text-primary")
 
 
+def _satz_label(satz):
+    """0.06 -> '6 %', 0.065 -> '6,5 %'."""
+    p = round(satz * 100, 4)
+    s = f"{p:g}".replace(".", ",")
+    return f"{s} %"
+
+
+def _summen_tabelle(r, satz):
+    """Alle Summen einer Anmeldung als Tabelle.
+
+    Beantwortet die Frage, an der man sich sonst verrechnet: WELCHE Summe ist
+    die Bemessungsgrundlage? Nicht die Summe der Rechnungsbeträge – aus der
+    muss erst die vom Gast mitbezahlte Beherbergungssteuer raus. Die Spalte
+    rechts sagt, welche Zeile tatsächlich ins amtliche Formular wandert.
+    """
+    rem = r["remaining_rows"]
+    s_rechnung = round(sum(x["price"] for x in rem), 2)
+    s_citytax = round(sum(x["citytax"] for x in rem), 2)
+    s_zeilen = round(sum(round(x["base"] * r["steuersatz"], 2) for x in rem), 2)
+    e = data.euro
+
+    # (Art, Bezeichnung, Wert, Herkunft)
+    zeilen = [
+        ("head", "Übernachtungen", "", ""),
+        ("line", "Übernachtungen insgesamt",
+         str(r["uebernachtungen_insgesamt"]), "Formular"),
+        ("line", "davon über Airbnb gebucht (Airbnb meldet selbst)",
+         str(r["uebernachtungen_airbnb"]), "Formular"),
+        ("sum", "= verbleibende Übernachtungen",
+         str(r["uebernachtungen_verbleibend"]), "Formular"),
+        ("head", f"Beträge – nur die {len(rem)} verbleibenden Buchungen, ohne Airbnb", "", ""),
+        ("line", "Summe Rechnungsbeträge (was die Gäste insgesamt gezahlt haben)",
+         e(s_rechnung) + " €", "nachrichtlich"),
+        ("minus", "− darin enthaltene Beherbergungssteuer (Durchlaufposten)",
+         "− " + e(s_citytax) + " €", "nachrichtlich"),
+        ("sum", "= Umsätze aus verbleibenden Übernachtungen (Bemessungsgrundlage)",
+         e(r["umsatz_verbleibend"]) + " €", "Formular"),
+        ("minus", "− steuerbefreite Umsätze",
+         "− " + e(r["umsatz_steuerbefreit"]) + " €", "Formular"),
+        ("sum", "= steuerpflichtige Umsätze",
+         e(r["umsatz_steuerpflichtig"]) + " €", "Formular"),
+        ("result", f"× {satz} = Beherbergungssteuer",
+         e(r["beherbergungssteuer"]) + " €", "Formular"),
+    ]
+
+    with ui.card().classes("w-full").mark("summen"):
+        ui.label("Summen dieser Anmeldung").classes("font-medium")
+        ui.label("Welche Summe wofür – die rechte Spalte zeigt, was ins amtliche "
+                 "Formular eingetragen wird.").classes("text-xs text-gray-500")
+        with ui.element("div").classes(
+                "w-full grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-0 mt-2 "
+                "border border-slate-200 rounded-lg overflow-hidden"):
+            def zelle(text, cls):
+                ui.label(text).classes("px-3 py-1.5 " + cls)
+
+            for art, bez, wert, herkunft in zeilen:
+                if art == "head":
+                    zelle(bez, "text-xs font-semibold uppercase tracking-wide "
+                               "text-slate-500 bg-slate-100 pt-2")
+                    zelle("", "bg-slate-100")
+                    zelle("", "bg-slate-100")
+                    continue
+                basis = {
+                    "line":   ("text-sm text-slate-700", "text-sm tabular-nums text-slate-700"),
+                    "minus":  ("text-sm text-slate-600", "text-sm tabular-nums text-slate-600"),
+                    "sum":    ("text-sm font-semibold text-slate-800 border-t border-slate-200",
+                               "text-sm font-semibold tabular-nums text-slate-800 "
+                               "border-t border-slate-200"),
+                    "result": ("text-base font-bold text-primary border-t-2 border-slate-300 "
+                               "bg-[#faf7f0]",
+                               "text-base font-bold tabular-nums text-primary "
+                               "border-t-2 border-slate-300 bg-[#faf7f0]"),
+                }[art]
+                zelle(bez, basis[0])
+                zelle(wert, basis[1] + " text-right")
+                zelle(herkunft, "text-xs text-gray-400 self-center whitespace-nowrap"
+                      + (" bg-[#faf7f0]" if art == "result" else ""))
+
+        if s_zeilen != r["beherbergungssteuer"]:
+            ui.label(f"Hinweis: Die Steuer-Spalte der Buchungstabelle aufsummiert ergibt "
+                     f"{e(s_zeilen)} €. Der Cent-Unterschied entsteht, weil die Steuer auf die "
+                     f"Gesamtsumme gerechnet wird und nicht je Buchung – angemeldet wird "
+                     f"{e(r['beherbergungssteuer'])} €.").classes("text-xs text-gray-500 mt-2")
+
+
 def render_result(container, result):
     container.clear()
     r = result
@@ -1758,8 +1843,9 @@ def render_result(container, result):
              icon="account_balance", accent=True)
 
         ui.label(f"Airbnb-ÜN (berechnet): {r['uebernachtungen_airbnb']} – fließen nicht in die "
-                 f"Steuer ein (Airbnb meldet selbst). Basis = Preis ohne durchlaufende "
-                 f"Übernachtungssteuer.").classes("text-xs text-gray-500")
+                 f"Steuer ein (Airbnb meldet selbst).").classes("text-xs text-gray-500")
+
+        satz = _satz_label(r["steuersatz"])
 
         # Buchungstabelle
         cols = [
@@ -1771,27 +1857,44 @@ def render_result(container, result):
             {"name": "nights", "label": "Nächte", "field": "nights", "align": "right"},
             {"name": "persons", "label": "Pers.", "field": "persons", "align": "right"},
             {"name": "overnights", "label": "ÜN", "field": "overnights", "align": "right"},
-            {"name": "price", "label": "Gesamtpreis €", "field": "price", "align": "right"},
-            {"name": "steuer", "label": "Steuer €", "field": "steuer", "align": "right"},
+            {"name": "price", "label": "Rechnungsbetrag €", "field": "price", "align": "right"},
+            {"name": "citytax", "label": "− enth. BSt €", "field": "citytax", "align": "right"},
+            {"name": "base", "label": "= Bemessungsgrundlage €", "field": "base", "align": "right"},
+            {"name": "steuer", "label": f"Steuer € ({satz})", "field": "steuer", "align": "right"},
         ]
         rows = []
         for x in r["rows"]:
+            # Airbnb wird nicht besteuert – dann bleiben Basis und Steuer leer,
+            # sonst summiert sich die Spalte nicht auf den steuerpfl. Umsatz.
+            leer = x["is_airbnb"]
             rows.append({
                 "departure": x["departure"], "guest": x["guest"],
                 "apartment": x["apartment"], "channel": x["channel"],
                 "arrival": x["arrival"], "nights": x["nights"],
                 "persons": x["persons"], "overnights": x["overnights"],
                 "price": data.euro(x["price"]),
-                "steuer": "—" if x["is_airbnb"] else data.euro(round(x["base"] * r["steuersatz"], 2)),
+                "citytax": "—" if leer else ("–" + data.euro(x["citytax"]) if x["citytax"] else "0,00"),
+                "base": "—" if leer else data.euro(x["base"]),
+                "steuer": "—" if leer else data.euro(round(x["base"] * r["steuersatz"], 2)),
             })
+        _summen_tabelle(r, satz)
+
         with ui.card().classes("w-full"):
             ui.label(f"Buchungen ({len(rows)}) – Abreise im Monat, bereits stattgefunden").classes("font-medium")
+            # Legende zu den vier Betragsspalten. Bewusst NICHT "Bruttopreis" für die
+            # Basis – das liest sich wie "alles inklusive" und ist genau die
+            # Verwechslung, die hier droht.
+            with ui.row().classes("w-full items-center gap-2 flex-wrap text-xs text-gray-600 "
+                                  "bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"):
+                ui.icon("functions").classes("text-slate-400 text-base")
+                ui.label("Rechnungsbetrag (was der Gast zahlt)").classes("font-medium")
+                ui.label("−").classes("text-gray-400")
+                ui.label("darin enthaltene Beherbergungssteuer (Durchlaufposten)")
+                ui.label("=").classes("text-gray-400")
+                ui.label("Bemessungsgrundlage (Beherbergungsentgelt inkl. 7 % USt)").classes("font-medium")
+                ui.label(f"× {satz} =").classes("text-gray-400")
+                ui.label("Steuer").classes("font-medium")
             ui.table(columns=cols, rows=rows, row_key="departure").classes("w-full").props("dense flat")
-            with ui.row().classes("gap-6 text-sm mt-1"):
-                ui.label(f"Steuerpflichtig (Booking/Website/Direkt): "
-                         f"{r['uebernachtungen_verbleibend']} ÜN · {data.euro(r['umsatz_verbleibend'])} € · "
-                         f"Steuer {data.euro(r['beherbergungssteuer'])} €").classes("font-semibold")
-                ui.label(f"Airbnb: {r['uebernachtungen_airbnb']} ÜN (keine Steuer)").classes("text-gray-500")
 
         # PDF erzeugen (gemeinsame Logik)
         def build_pdf():
@@ -2067,8 +2170,10 @@ def reinigung_putzkraft(activate=None):
     bkid = _PENDING_REINIGUNG.pop("booking", None)
     co = _PENDING_REINIGUNG.pop("co", None)
     ci = _PENDING_REINIGUNG.pop("ci", None)
+    nxt = _PENDING_REINIGUNG.pop("next", None)
+    same_day = _PENDING_REINIGUNG.pop("same_day", False)
     state = {"apt": pre, "return": ret, "booking": bkid, "co": co, "ci": ci,
-             "group": True, "collapsed": set()}
+             "next": nxt, "same_day": same_day, "group": True, "collapsed": set()}
     body = ui.column().classes("w-full gap-4")
 
     def open_apt(aid, anm):
@@ -2178,6 +2283,9 @@ def reinigung_putzkraft(activate=None):
                             with ui.column().classes("gap-0"):
                                 ui.label(t("Check-in")).classes("text-xs text-gray-500")
                                 ui.label(state.get("ci") or "—").classes("font-semibold")
+                # Für wie viele einzudecken ist – hier, wo tatsächlich gearbeitet wird.
+                if state.get("apt") and state.get("booking"):
+                    _prep_panel(state.get("next"), state.get("same_day"))
 
             # Fortschritt
             with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-4 gap-1"):
@@ -2556,6 +2664,80 @@ def _guest_persons(nb, explicit_children=False):
     return f"{nb.get('guest') or t('Gast')} · {_persons_text(nb, explicit_children)}"
 
 
+def _pers_count(nb):
+    """Personen einer Buchung (Erwachsene + Kinder)."""
+    if not nb:
+        return 0
+    return (nb.get("adults") or 0) + (nb.get("children") or 0) or (nb.get("persons") or 0)
+
+
+def _prep_panel(nxt, same_day):
+    """Der 'Vorbereiten für N'-Block – die EINZIGE Stelle mit einer grossen
+    Personenzahl. Die Abreise-Zahl steht bewusst nirgends so prominent, damit
+    das Putzteam nicht für die abreisenden statt für die anreisenden Gäste
+    eindeckt."""
+    if not nxt:
+        with ui.row().classes("w-full items-center gap-2 rounded-xl border border-slate-200 "
+                              "bg-slate-50 p-3"):
+            ui.icon("event_busy").classes("text-gray-400")
+            with ui.column().classes("gap-0 min-w-0"):
+                ui.label(t("keine Folgebuchung")).classes("font-medium text-slate-600")
+                ui.label(t("Nichts vorzubereiten – nur reinigen.")).classes("text-xs text-gray-500")
+        return
+    n = _pers_count(nxt)
+    tone, txt = (("bg-orange-50 border-orange-300", "text-orange-800") if same_day
+                 else ("bg-green-50 border-green-200", "text-green-800"))
+    with ui.column().classes(f"w-full gap-0 rounded-xl border p-3 {tone}").mark("prep-block"):
+        with ui.row().classes("w-full items-center gap-1 no-wrap"):
+            ui.icon("login").classes(f"{txt} text-base shrink-0")
+            ui.label(t("Vorbereiten für")).classes(
+                f"text-xs font-semibold uppercase tracking-wide {txt}")
+        with ui.row().classes("items-baseline gap-2 no-wrap"):
+            ui.label(str(n)).classes(f"text-4xl font-extrabold leading-none {txt}").mark("prep-count")
+            ui.label(t("Person") if n == 1 else t("Personen")).classes(
+                f"text-base font-semibold {txt}")
+        ui.label(_persons_text(nxt, True)).classes(f"text-sm {txt} leading-tight")
+        ui.label(nxt.get("guest") or t("Gast")).classes(
+            "text-sm text-slate-600 truncate leading-tight mt-1")
+        ui.label(f"{t('Anreise')} {_dfmt(nxt['arrival'])} · {nxt['checkin_time'] or '—'}") \
+            .classes("text-xs text-slate-500 leading-tight")
+        if same_day:
+            with ui.row().classes("w-full items-center gap-1 no-wrap mt-1"):
+                ui.icon("bolt").classes("text-orange-700 text-sm shrink-0")
+                ui.label(t("Wechseltag – Anreise noch heute")).classes(
+                    "text-xs font-semibold text-orange-700")
+
+
+def _depart_panel(job):
+    """Abreise-Angaben – bewusst neutral/klein gehalten (siehe _prep_panel)."""
+    with ui.column().classes("w-full gap-0 rounded-xl border border-slate-200 bg-slate-50 p-3") \
+            .mark("depart-block"):
+        with ui.row().classes("w-full items-center gap-1 no-wrap"):
+            ui.icon("logout").classes("text-slate-500 text-base shrink-0")
+            ui.label(t("Es reist ab")).classes(
+                "text-xs font-semibold uppercase tracking-wide text-slate-500")
+        ui.label(job.get("guest") or t("Gast")).classes(
+            "font-medium text-slate-700 truncate leading-tight")
+        ui.label(_persons_text(job, True)).classes("text-sm text-slate-600 leading-tight")
+        ui.label(f"{t('Check-out')} {_dfmt(job['departure'])} · {job.get('checkout_time') or '—'}") \
+            .classes("text-xs text-slate-500 leading-tight")
+        ui.label(t("Nur zur Info – nicht die Zahl für die Vorbereitung.")) \
+            .classes("text-xs text-slate-400 italic mt-1")
+
+
+def _ab_an_tabs(job, nxt, same_day):
+    """Abreise und Anreise in getrennten Tabs statt untereinander – Standard ist
+    'Vorbereiten', weil nur diese Zahl fürs Eindecken zählt."""
+    with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
+        tab_prep = ui.tab(t("Vorbereiten"), icon="login")
+        tab_ab = ui.tab(t("Abreise"), icon="logout")
+    with ui.tab_panels(tabs, value=tab_prep).classes("w-full"):
+        with ui.tab_panel(tab_prep).classes("p-0 pt-2"):
+            _prep_panel(nxt, same_day)
+        with ui.tab_panel(tab_ab).classes("p-0 pt-2"):
+            _depart_panel(job)
+
+
 def _events_between(d_from, d_to):
     """An-/Abreise-Ereignisse mit Datum in [d_from, d_to] (unsortiert)."""
     try:
@@ -2622,12 +2804,17 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
     return jobs
 
 
-def _open_checkliste(apt_id, apt_name, activate, booking_id=None, checkout=None, checkin=None):
-    _PENDING_REINIGUNG["apt"] = (apt_id, apt_name)
+def _open_checkliste(job, activate):
+    """Sprung Buchung → Checkliste. Nimmt den ganzen Job mit, damit in der
+    Checkliste steht, für wie viele Personen einzudecken ist."""
+    nxt = job.get("next") or None
+    _PENDING_REINIGUNG["apt"] = (job["apartment_id"], job["apartment_name"])
     _PENDING_REINIGUNG["return"] = "buchungen"   # nach Abschluss zurück zu Buchungen
-    _PENDING_REINIGUNG["booking"] = booking_id
-    _PENDING_REINIGUNG["co"] = checkout
-    _PENDING_REINIGUNG["ci"] = checkin
+    _PENDING_REINIGUNG["booking"] = job.get("id")
+    _PENDING_REINIGUNG["co"] = job.get("checkout_time")
+    _PENDING_REINIGUNG["ci"] = (nxt or {}).get("checkin_time")
+    _PENDING_REINIGUNG["next"] = nxt
+    _PENDING_REINIGUNG["same_day"] = bool(nxt and nxt.get("arrival") == job.get("departure"))
     activate("reinigung")
 
 
@@ -3138,29 +3325,9 @@ def _cleaning_card(job, user, admin, staff, activate):
                         ui.icon("arrow_forward").classes("text-gray-400 text-sm")
                         ui.icon("login").classes("text-green-700 text-base")
                         ui.label(f"{t('Check-in')} {nxt['checkin_time'] if nxt else '—'}")
-                    with ui.row().classes("w-full items-start gap-1 text-sm no-wrap"):
-                        ui.icon("logout").classes("text-deep-orange text-base mt-0.5 shrink-0")
-                        with ui.column().classes("gap-0 min-w-0"):
-                            ui.label(t("Es reist ab")).classes("text-xs text-gray-400 leading-tight")
-                            ui.label(_guest_persons(job, True)) \
-                                .classes("text-slate-700 truncate leading-tight")
-                    with ui.row().classes("w-full items-start gap-1 text-sm no-wrap mt-1"):
-                        ui.icon("login").classes(
-                            ("text-red-500" if same_day else "text-green-700")
-                            + " text-base mt-0.5 shrink-0")
-                        with ui.column().classes("gap-0 min-w-0"):
-                            ui.label(t("Anreise vorbereiten für")).classes(
-                                "text-xs leading-tight "
-                                + ("text-red-500" if same_day else "text-gray-400"))
-                            ui.label(_guest_persons(nxt, True) if nxt else t("keine Folgebuchung")) \
-                                .classes("font-semibold truncate leading-tight "
-                                         + ("text-red-700" if same_day
-                                            else ("text-green-700" if nxt else "text-gray-500")))
-                            if nxt:
-                                ui.label(f"{t('Anreise')} {_dfmt(nxt['arrival'])} · "
-                                         f"{nxt['checkin_time'] or '—'}"
-                                         + (" · " + t("Wechseltag") if same_day else "")) \
-                                    .classes("text-xs text-gray-500 leading-tight")
+
+                # Ausserhalb von `info`, sonst öffnet jeder Tab-Klick den Dialog.
+                _ab_an_tabs(job, nxt, same_day)
 
                 if open_here:
                     checkin_dt = datetime.fromisoformat(oe["checkin"])
@@ -3187,7 +3354,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                         .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
                     if not complete:
                         ui.button(t("Weiter zur Checkliste"), icon="checklist",
-                                  on_click=lambda: _open_checkliste(job["apartment_id"], job["apartment_name"], activate, job["id"], job.get("checkout_time"), (job.get("next") or {}).get("checkin_time"))) \
+                                  on_click=lambda: _open_checkliste(job, activate)) \
                             .props("unelevated no-caps size=lg").classes("w-full")
                     else:
                         with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
@@ -3229,10 +3396,15 @@ def _cleaning_compact(job, user, admin, staff, activate):
                 ui.label(f"{t('Check-out')} {job['checkout_time'] or '—'} → "
                          f"{t('Check-in')} {nxt['checkin_time'] if nxt else '—'}") \
                     .classes("text-xs text-gray-500")
-                ui.label(f"{t('Ab')}: {_guest_persons(job, True)}") \
-                    .classes("text-xs text-gray-500 truncate")
-                ui.label(f"{t('An')}: {_guest_persons(nxt, True)}" if nxt else t("keine Folgebuchung")) \
-                    .classes("text-xs truncate " + ("text-green-700" if nxt else "text-gray-400"))
+                # Nur die Anreise-Zahl – die Abreise-Personen stehen im Detail-Dialog,
+                # nebeneinander werden sie zu leicht verwechselt.
+                if nxt:
+                    n = _pers_count(nxt)
+                    ui.label(t("Vorbereiten für {n}", n=n) + " "
+                             + (t("Person") if n == 1 else t("Personen"))) \
+                        .classes("text-xs font-semibold text-green-700 truncate")
+                else:
+                    ui.label(t("keine Folgebuchung")).classes("text-xs text-gray-400 truncate")
             _status_chip(job)
             ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
@@ -3661,7 +3833,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                    lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
                    color="negative")
             action(t("Checkliste & Fotos"), "checklist",
-                   lambda: (dlg.close(), _open_checkliste(bk["apartment_id"], bk["apartment_name"], activate, bk["id"], bk.get("checkout_time"), (bk.get("next") or {}).get("checkin_time"))))
+                   lambda: (dlg.close(), _open_checkliste(bk, activate)))
             if admin:
                 action(t("Zurücksetzen (Admin)"), "restart_alt",
                        lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")

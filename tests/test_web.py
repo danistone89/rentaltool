@@ -64,6 +64,25 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     await user.should_see("per E-Mail senden")    # E-Mail-Button
 
 
+async def test_summen_tabelle_zeigt_die_kette(user: User, mock_backend):
+    """Nach 'Berechnen' muss ablesbar sein, WELCHE Summe die Bemessungsgrundlage
+    ist – die Summe der Rechnungsbeträge ist es gerade NICHT, aus ihr muss erst
+    die vom Gast mitbezahlte Beherbergungssteuer heraus."""
+    await _login(user)
+    user.find(marker="nav-beherbergungssteuer").click()
+    user.find("Berechnen").click()
+    await user.should_see(marker="summen")
+    # Dez 2025, gegen das eingereichte Formular validiert:
+    await user.should_see("5.991,89")   # Summe Rechnungsbeträge (was die Gäste zahlten)
+    await user.should_see("293,61")     # darin enthaltene Beherbergungssteuer
+    await user.should_see("5.698,28")   # = Bemessungsgrundlage / steuerpfl. Umsatz
+    await user.should_see("341,90")     # x 6 % = Steuer
+    # Die Beschriftungen, die die Verwechslung verhindern:
+    await user.should_see("Summe Rechnungsbeträge (was die Gäste insgesamt gezahlt haben)")
+    await user.should_see("− darin enthaltene Beherbergungssteuer (Durchlaufposten)")
+    await user.should_see("= steuerpflichtige Umsätze")
+
+
 async def test_einstellungen_dialog(user: User, mock_backend):
     await _login(user)
     user.find("Einstellungen").click()
@@ -279,17 +298,28 @@ async def test_zeiterfassung_englisch(user: User, mock_backend, monkeypatch, tmp
     await user.should_see("Labour Day")        # Feiertagsname uebersetzt
 
 
-def _mock_booking(monkeypatch):
-    """Eine reale Buchung mit Folgebuchung in den Buchungs-Hub schieben."""
+def _mock_booking(monkeypatch, abreise_pers=(2, 1), anreise_pers=(2, 0)):
+    """Eine reale Buchung mit Folgebuchung in den Buchungs-Hub schieben.
+
+    Die Daten sind relativ zu heute – mit festen Daten fällt die Buchung nach
+    ein paar Wochen aus dem Fenster von `_cleaning_jobs` und der Hub ist leer.
+    Abreise ist heute, die Folgebuchung reist am selben Tag an (Wechseltag).
+    """
     from app import data as _data
+    from datetime import timedelta
+    heute = date.today()
     raw = [{"id": 111, "apartment": {"id": 2748963, "name": "Cottaer Straße"},
-            "arrival": "2026-07-20", "departure": "2026-07-25",
-            "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 1,
+            "arrival": (heute - timedelta(days=5)).isoformat(),
+            "departure": heute.isoformat(),
+            "check-in": "15:00", "check-out": "10:00",
+            "adults": abreise_pers[0], "children": abreise_pers[1],
             "guest-name": "Max Mustermann", "type": "reservation",
             "channel": {"name": "Direct"}, "is-blocked-booking": False},
            {"id": 112, "apartment": {"id": 2748963, "name": "Cottaer Straße"},
-            "arrival": "2026-07-25", "departure": "2026-07-28",
-            "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 0,
+            "arrival": heute.isoformat(),
+            "departure": (heute + timedelta(days=3)).isoformat(),
+            "check-in": "15:00", "check-out": "10:00",
+            "adults": anreise_pers[0], "children": anreise_pers[1],
             "guest-name": "Erika Musterfrau", "type": "reservation",
             "channel": {"name": "Airbnb"}, "is-blocked-booking": False}]
     monkeypatch.setattr(_data, "_reservations", lambda *a, **k: raw)
@@ -331,6 +361,31 @@ async def test_buchungsaktionen_deutsch(user: User, mock_backend, monkeypatch, t
     await user.should_see("Aktionen")
     await user.should_see("Zeit nachtragen")
     await user.should_not_see("Add time entry")
+
+
+async def test_abreise_und_anreise_getrennt(user: User, mock_backend, monkeypatch, tmp_path):
+    """Die grosse Personenzahl in der Reinigungskarte ist IMMER die der Anreise.
+
+    Es reisen 3 Erwachsene ab, es kommen 2 – wer hier die Abreise-Zahl liest,
+    deckt für einen zu viel ein. Darum steht die Abreise in einem eigenen Tab
+    und nur die Anreise-Zahl gross im 'Vorbereiten'-Block.
+    """
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    _mock_booking(monkeypatch, abreise_pers=(3, 0), anreise_pers=(2, 0))
+    await _login(user)
+    await user.should_see("Vorbereiten")
+    await user.should_see("Abreise")
+    counts = [e.text for e in user.find(marker="prep-count").elements]
+    assert counts == ["2"], f"grosse Zahl muss die Anreise sein, war {counts}"
+    # Beide Blöcke existieren, aber getrennt – die Abreise-Angaben stehen im
+    # eigenen Tab und sind ausdrücklich als "nicht zum Vorbereiten" markiert.
+    assert user.find(marker="depart-block").elements
+    await user.should_see("Nur zur Info – nicht die Zahl für die Vorbereitung.")
 
 
 async def test_scanner_dialog_zeigt_neue_bedienung(user: User, mock_backend, tmp_path, monkeypatch):
