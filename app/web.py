@@ -122,6 +122,17 @@ def _cur_user():
     return app.storage.user.get("user", "")
 
 
+def _cur_area(default="buchungen"):
+    """Bereich, in dem der Nutzer gerade ist.
+
+    Aktionen aus einem Buchungs-Dialog heraus bauen die Liste dahinter neu auf.
+    Ohne diesen Merker landeten sie immer in „Buchungen“ – auch wenn man aus
+    der „Übersicht“ kam. Steht in der Sitzung, nicht global: sonst würden sich
+    mehrere angemeldete Nutzer gegenseitig umschalten.
+    """
+    return app.storage.user.get("area") or default
+
+
 def _cur_role():
     return app.storage.user.get("role", "")
 
@@ -2369,28 +2380,28 @@ def reinigung_putzkraft(activate=None):
     def open_apt(aid, anm):
         state["apt"] = (aid, anm); render()
 
-    def _photo_dialog(run, t):
+    def _photo_dialog(run, task):
         with ui.dialog() as dlg, ui.card().classes("w-[380px] max-w-full gap-2"):
-            ui.label(t["text"]).classes("font-bold")
+            ui.label(task["text"]).classes("font-bold")
             with ui.row().classes("gap-3 flex-wrap"):
-                if t.get("ref_photo"):
+                if task.get("ref_photo"):
                     with ui.column().classes("items-center gap-0"):
-                        _photo_thumb(f"/media/{t['ref_photo']}", "w-24 h-24")
+                        _photo_thumb(f"/media/{task['ref_photo']}", "w-24 h-24")
                         ui.label(t("Soll")).classes("text-xs text-gray-400")
                 istc = ui.column().classes("items-center gap-1")
 
                 def draw():
                     istc.clear()
                     with istc:
-                        p = _run_ist(run["id"], t["id"])
+                        p = _run_ist(run["id"], task["id"])
                         if p:
                             _photo_thumb(f"/media/{p}", "w-24 h-24")
                             ui.button("entfernen", on_click=lambda: (
-                                housekeeping.update_task(run["id"], t["id"], ist_photo=""),
+                                housekeeping.update_task(run["id"], task["id"], ist_photo=""),
                                 draw(), render())).props("flat dense no-caps size=sm")
                         else:
                             def saved(rel):
-                                housekeeping.update_task(run["id"], t["id"], ist_photo=rel)
+                                housekeeping.update_task(run["id"], task["id"], ist_photo=rel)
                                 draw(); render()
                             _photo_button("Ist-Foto", "ist", saved)
                             ui.label(t("Ist")).classes("text-xs text-gray-400")
@@ -2399,16 +2410,16 @@ def reinigung_putzkraft(activate=None):
                 ui.button(t("Schließen"), on_click=dlg.close).props("flat")
         dlg.open()
 
-    def _task_row(run, t):
-        done = run["tasks"].get(t["id"], {}).get("done", False)
-        has_photo = bool(_run_ist(run["id"], t["id"]))
+    def _task_row(run, task):
+        done = run["tasks"].get(task["id"], {}).get("done", False)
+        has_photo = bool(_run_ist(run["id"], task["id"]))
         with ui.row().classes("w-full items-center gap-2 no-wrap py-1"):
             cb = ui.checkbox(value=done).props("dense")
-            cb.on_value_change(lambda e, tid=t["id"]:
+            cb.on_value_change(lambda e, tid=task["id"]:
                                (housekeeping.update_task(run["id"], tid, done=e.value), render()))
-            ui.label(t["text"]).classes(
+            ui.label(task["text"]).classes(
                 "flex-grow text-sm " + ("line-through text-gray-400" if done else "text-slate-700"))
-            ui.button(icon="photo_camera", on_click=lambda: _photo_dialog(run, t)) \
+            ui.button(icon="photo_camera", on_click=lambda: _photo_dialog(run, task)) \
                 .props("flat round dense").classes("text-green-600" if has_photo else "text-primary") \
                 .tooltip(t("Foto"))
 
@@ -2439,9 +2450,9 @@ def reinigung_putzkraft(activate=None):
             aid, anm = state["apt"]
             run = housekeeping.start_run(aid, anm, user)
             cl = housekeeping.get_checklist(aid)
-            all_tasks = [t for r in cl["rooms"] for t in r["tasks"]]
+            all_tasks = [task for r in cl["rooms"] for task in r["tasks"]]
             total = len(all_tasks)
-            done = sum(1 for t in all_tasks if run["tasks"].get(t["id"], {}).get("done"))
+            done = sum(1 for task in all_tasks if run["tasks"].get(task["id"], {}).get("done"))
 
             # Kopfzeile: zurück + Titel + Menü
             with ui.row().classes("w-full items-center gap-2"):
@@ -2501,7 +2512,7 @@ def reinigung_putzkraft(activate=None):
                     if not rtasks:
                         continue
                     rn = room["name"]
-                    rdone = sum(1 for t in rtasks if run["tasks"].get(t["id"], {}).get("done"))
+                    rdone = sum(1 for task in rtasks if run["tasks"].get(task["id"], {}).get("done"))
                     is_open = rn not in collapsed
                     with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 gap-1"):
                         hdr = ui.row().classes("w-full items-center gap-2 cursor-pointer no-wrap")
@@ -2520,8 +2531,8 @@ def reinigung_putzkraft(activate=None):
                         ui.linear_progress(value=(rdone / len(rtasks) if rtasks else 0), show_value=False) \
                             .props("color=primary rounded track-color=grey-3 size=5px").classes("w-full")
                         if is_open:
-                            for t in rtasks:
-                                _task_row(run, t)
+                            for task in rtasks:
+                                _task_row(run, task)
                 # Alle aus-/einklappen
                 if collapsed:
                     ui.button(t("Alle Aufgaben anzeigen"), icon="more_horiz",
@@ -2533,8 +2544,8 @@ def reinigung_putzkraft(activate=None):
                         .props("flat no-caps color=primary").classes("w-full")
             else:
                 with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3"):
-                    for t in all_tasks:
-                        _task_row(run, t)
+                    for task in all_tasks:
+                        _task_row(run, task)
 
             # Abschließen
             def finish():
@@ -2542,8 +2553,8 @@ def reinigung_putzkraft(activate=None):
                 if state.get("booking"):
                     bookings.mark_checklist_done(state["booking"], user)
                 ui.notify(t("Checkliste abgeschlossen ✓"), type="positive")
-                if state.get("return") == "buchungen" and activate:
-                    activate("buchungen")
+                if state.get("return") and activate:
+                    activate(state["return"])
                 else:
                     state.update(apt=None); render()
             ui.button(t("Checkliste abschließen"), icon="check_circle", on_click=finish) \
@@ -2604,7 +2615,8 @@ def _admin_summary(activate):
         total_min = sum(timetrack.duration_minutes(e) or 0 for e in done_entries)
         who = bookings.assignee_of(j["id"])
         wn = staff.get(who, who) if who else "nicht zugewiesen"
-        card = ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 cursor-pointer")
+        card = ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 cursor-pointer") \
+            .mark("uebersicht-buchung")
         card.on("click", lambda b=j: open_booking_dialog(b, _cur_user(), _is_admin(), staff, activate))
         with card:
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
@@ -2999,7 +3011,7 @@ def _open_checkliste(job, activate):
     Checkliste steht, für wie viele Personen einzudecken ist."""
     nxt = job.get("next") or None
     _PENDING_REINIGUNG["apt"] = (job["apartment_id"], job["apartment_name"])
-    _PENDING_REINIGUNG["return"] = "buchungen"   # nach Abschluss zurück zu Buchungen
+    _PENDING_REINIGUNG["return"] = _cur_area()   # dorthin zurück, wo man herkam
     _PENDING_REINIGUNG["booking"] = job.get("id")
     _PENDING_REINIGUNG["co"] = job.get("checkout_time")
     _PENDING_REINIGUNG["ci"] = (nxt or {}).get("checkin_time")
@@ -3968,7 +3980,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
             ui.label(bk["apartment_name"]).classes("text-xl font-bold")
             ui.space()
             # Schließen aktualisiert die dahinterliegende Liste
-            ui.button(icon="close", on_click=lambda: (dlg.close(), activate("buchungen"))) \
+            ui.button(icon="close", on_click=lambda: (dlg.close(), activate(_cur_area()))) \
                 .props("flat round dense")
         mgr = _cur_role() in ("admin", "manager")   # Nachrichten nur Admin/Manager
         _hooks = {}
@@ -4734,6 +4746,10 @@ def main_page():
             nav_rows[a["key"]] = row
 
     def activate(key):
+        # "reinigung" ist kein Menüpunkt, sondern ein Zwischenschritt – der
+        # merkt sich nicht als Rücksprungziel.
+        if key != "reinigung":
+            app.storage.user["area"] = key
         for k, row in nav_rows.items():
             row.classes(replace=_BASE_NAV + (
                 "bg-violet-50 text-primary" if k == key else "text-slate-600 hover:bg-slate-100"))

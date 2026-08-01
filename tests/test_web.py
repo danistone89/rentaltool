@@ -666,3 +666,105 @@ async def test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen(
     await user.should_see("1 frei")                 # genau eine ist noch offen
     await user.should_see("Valeriya")               # die andere hat einen Namen
     await user.should_see("1 Reinigung noch niemandem zugewiesen")   # Banner oben
+
+
+def _aktion_klicken(user, text):
+    """Die Aktions-Buttons im Buchungs-Dialog tragen ihren Text als Kind-Label,
+    nicht als Button-Text – ein Klick auf das Label liefe ins Leere."""
+    from nicegui import ui as _ui
+
+    def texte(el):
+        for kid in el:
+            if getattr(kid, "text", None):
+                yield kid.text
+            yield from texte(kid)
+
+    for b in user.find(_ui.button).elements:
+        if text in list(texte(b)):
+            for lis in b._event_listeners.values():
+                if lis.type == "click":
+                    lis.handler(None)
+                    return
+    raise AssertionError(f"Aktion {text!r} nicht gefunden")
+
+
+def _hk_mocks(monkeypatch, tmp_path):
+    from app import housekeeping as hk, bookings as bk
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+
+
+async def test_bereich_wird_in_der_sitzung_gemerkt(user: User, mock_backend,
+                                                   tmp_path, monkeypatch):
+    """Aktionen aus einem Buchungs-Dialog sprangen immer nach „Buchungen“ –
+    auch wenn man aus der „Übersicht“ kam. Dafür merkt sich die Sitzung den
+    aktuellen Bereich."""
+    _hk_mocks(monkeypatch, tmp_path)
+    await _login(user)
+    with user.client:
+        assert web._cur_area() == "buchungen"          # Landeseite
+
+    user.find(marker="nav-uebersicht").click()
+    await user.should_see("Zusammenfassung")
+    with user.client:
+        assert web._cur_area() == "uebersicht"
+
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Meine Übersicht")
+    with user.client:
+        assert web._cur_area() == "zeiterfassung"
+
+
+async def test_checkliste_kehrt_in_den_ausgangsbereich_zurueck(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    """Der Sprung in die Checkliste merkt sich den Bereich, aus dem er kam –
+    „Checkliste abschließen“ führt dann dorthin zurück, nicht nach Buchungen."""
+    _hk_mocks(monkeypatch, tmp_path)
+    job = {"id": 701, "apartment_id": 2748963, "apartment_name": "Cottaer Straße",
+           "departure": date.today().isoformat(), "checkout_time": "10:00", "next": None}
+    await _login(user)
+
+    user.find(marker="nav-uebersicht").click()
+    await user.should_see("Zusammenfassung")
+    with user.client:
+        web._PENDING_REINIGUNG.clear()
+        web._open_checkliste(job, lambda key: None)
+        assert web._PENDING_REINIGUNG["return"] == "uebersicht"
+
+    user.find(marker="nav-buchungen").click()
+    await user.should_see("Reinigungen")
+    with user.client:
+        web._PENDING_REINIGUNG.clear()
+        web._open_checkliste(job, lambda key: None)
+        assert web._PENDING_REINIGUNG["return"] == "buchungen"
+
+
+async def test_checkliste_aus_buchung_stuerzt_nicht_ab(user: User, mock_backend,
+                                                       tmp_path, monkeypatch):
+    """Checkliste aus einer Buchung heraus oeffnen – der Normalweg der Putzkraft.
+
+    In `render()` gab es `for t in all_tasks:`; damit wurde `t` zur lokalen
+    Variable und die Uebersetzungsfunktion `t("Check-out")` weiter oben knallte
+    mit UnboundLocalError. Betroffen war genau dieser Weg, weil nur dort die
+    Check-out-/Check-in-Zeiten gesetzt sind.
+    """
+    from app import housekeeping as hk, bookings as bk
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    _mock_booking(monkeypatch)
+
+    await _login(user)
+    user.find(marker="booking-details").click()
+    await user.should_see("Aktionen")
+    # Ruft _open_checkliste + activate("reinigung") -> rendert die Checkliste.
+    # Vor dem Fix flog hier UnboundLocalError: local variable 't'.
+    _aktion_klicken(user, "Checkliste & Fotos")
+    await user.should_see("Räume & Aufgaben")
+    await user.should_see("Check-out")
+    await user.should_see("Fortschritt")

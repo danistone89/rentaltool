@@ -289,6 +289,27 @@ zugleich der Schlüssel** – fehlt eine Übersetzung, erscheint unverändert da
 Deutsche, eine Lücke kann die Oberfläche also nie leeren. Neue Sprache =
 weiteres Wörterbuch in `TRANSLATIONS`.
 
+> **Falle:** `t` ist die Übersetzungsfunktion – niemals als Schleifen- oder
+> Parametername verwenden. In `reinigung_putzkraft` hieß die Aufgaben-Variable
+> `t` (`for t in all_tasks:`); dadurch wurde `t` zur **lokalen Variable der
+> ganzen Funktion**, und `t("Check-out")` weiter oben warf `UnboundLocalError`.
+> Ergebnis: Die Checkliste stürzte genau auf dem Normalweg ab – geöffnet aus
+> einer Buchung, denn nur dort sind Check-out-/Check-in-Zeiten gesetzt. Die
+> Aufgaben-Variable heißt jetzt `task`; abgesichert durch
+> `tests/test_web.py::test_checkliste_aus_buchung_stuerzt_nicht_ab`.
+
+## Rücksprung: Aktionen landen wieder im Ausgangsbereich
+
+Aktionen aus einem Buchungs-Dialog (Schließen, „Checkliste & Fotos") bauen die
+Liste dahinter neu auf. Das Ziel war fest auf `buchungen` verdrahtet – wer aus
+der **Übersicht** kam, landete danach in den **Buchungen**.
+
+Die Sitzung merkt sich deshalb den aktuellen Bereich (`_cur_area()`, gesetzt in
+`activate()`, gespeichert in `app.storage.user`). Bewusst **pro Sitzung** und
+nicht global: sonst würden sich mehrere angemeldete Nutzer gegenseitig
+umschalten. `reinigung` wird nicht gemerkt – das ist ein Zwischenschritt, kein
+Bereich.
+
 Nicht übersetzt werden **Inhalte aus den Datendateien** (Checklisten-Punkte,
 Wohnungsnamen, Notizen, Inventar) – sie erscheinen so, wie sie angelegt wurden.
 
