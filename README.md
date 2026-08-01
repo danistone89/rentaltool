@@ -291,9 +291,11 @@ Steuersatz, Smoobu-API-Key, Airbnb-Kanalname. Gespeichert wird in `config.json`
   fließen NICHT in die steuerpflichtigen Umsätze ein (Airbnb meldet und führt
   selbst an Dresden ab). Override-Feld nur für Ausnahmen.
 * **Steuerbasis je Buchung = Buchungspreis ohne durchlaufende
-  Übernachtungssteuer** (Smoobu `price` minus die `Übernachtungssteuer`-Zeile;
-  Reinigungsgebühr bleibt enthalten). Die vom Gast separat gezahlte
-  Übernachtungssteuer ist ein Durchlaufposten und wird nicht erneut besteuert.
+  Übernachtungssteuer** (Reinigungsgebühr bleibt enthalten). Die vom Gast
+  gezahlte Übernachtungssteuer ist ein Durchlaufposten und wird nicht erneut
+  besteuert. Der Smoobu-`price` ist **immer brutto inklusive** dieser Steuer:
+  steht sie als Zeile in `price-details`, wird dieser Betrag abgezogen; fehlt
+  die Zeile, wird `price / 1,06` herausgerechnet (siehe unten).
 * **Steuer = 6 %** der steuerpflichtigen Umsätze, kaufmännisch gerundet.
 
 Validiert gegen zwei Monate:
@@ -335,6 +337,43 @@ Nach **„Berechnen"** zeigt die Oberfläche genau diese Kette zweimal: als
 nachrichtlich", damit klar ist welche Zeile eingereicht wird) und je Buchung
 als vier Spalten in der Buchungstabelle. Abgesichert durch
 `tests/test_web.py::test_summen_tabelle_zeigt_die_kette`.
+
+### Wenn Smoobu die Steuer nicht ausweist
+
+**Smoobu liefert die Beherbergungssteuer nicht als Datenfeld.** Das Feld
+`city-tax` existiert in der API, ist aber bei **allen** Buchungen `null`; der
+Einzelbuchungs-Endpunkt liefert kein einziges zusätzliches Feld. Einzige Quelle
+ist der **Freitext** `price-details` – und der ist nur bei Portalen gefüllt:
+
+| Kanal | Buchungen | mit `price-details` | mit Zeile „Übernachtungssteuer" |
+|---|---:|---:|---:|
+| Booking.com | 191 | 172 | 152 |
+| Airbnb | 18 | 18 | 0 (heißt dort „Airbnb Collected Tax") |
+| Direct booking | 6 | 0 | 0 |
+| Website | 1 | 0 | 0 |
+
+Fehlt die Zeile, ist die Steuer trotzdem im Preis – sie wird nur nicht
+aufgeschlüsselt. Belegt durch die **Gastrechnungen**, die jede Buchung als
+eigene Position mit 0 % USt ausweisen:
+
+| Rechnung | Kanal | Übernachtung | Reinigung | Basis | Beherbergungssteuer | Satz |
+|---|---|---:|---:|---:|---:|---:|
+| 60 Anja Ernst | Direktbuchung | 312,42 € | 65,00 € | **377,42 €** | 22,65 € | 6,00 % |
+| 74 Katarina Gockel | Direktbuchung | 293,00 € | 65,00 € | **358,00 €** | 21,48 € | 6,00 % |
+| 77 Jan Peters | Booking.com | 226,50 € | 75,00 € | 301,50 € | 18,09 € | 6,00 % |
+| 78 Alexander Josan | Booking.com | 358,66 € | 75,00 € | 433,66 € | 26,02 € | 6,00 % |
+| 61 Kusala Sami | Booking.com | 108,08 € | 95,00 € | 203,08 € | 14,22 € | **7,00 %** |
+| 71 Christian Michael | Booking.com | 584,39 € | 95,00 € | 679,39 € | 47,56 € | **7,00 %** |
+
+`400,07 / 1,06 = 377,42` – die Umrechnung trifft die Rechnung auf den Cent.
+Deshalb: **ausgewiesener Betrag schlägt Umrechnung** (nur so werden die 7 %
+der Wernerstraße korrekt abgezogen), sonst `price / 1,06`. Airbnb bleibt außen
+vor. Alle sechs Rechnungen liegen als Golden-Tests in
+`tests/test_steuer.py::TestGastrechnungen`.
+
+> **Offen:** Die Wernerstraße rechnet mit **7 %** statt 6 %. Die Gäste zahlen
+> dort zu viel (bei Rechnung 71: 47,56 € statt 40,76 €), abgeführt werden
+> korrekt 6 %. Die Einstellung gehört in Smoobu/Booking.com auf 6 % korrigiert.
 
 > Randfall: Buchungen **ohne** ausgewiesene `Übernachtungssteuer`-Zeile
 > (typisch Direktbuchungen) gehen mit dem **vollen Betrag** in die Basis. Ist
