@@ -176,8 +176,23 @@ Der Kopf jeder Tagesgruppe zeigt das deshalb direkt (`_tagesgruppe`):
 * über der Liste steht zusätzlich, wie viele Reinigungen **insgesamt** noch
   niemandem zugewiesen sind.
 
-Der Kopf ist ein eigener Quasar-`header`-Slot; dadurch entfällt der
-Standard-Aufklapppfeil, der deshalb von Hand ergänzt wird. Abgesichert durch
+Der Kopf ist ein eigener Quasar-`header`-Slot. Zwei Fallen dabei:
+
+* Quasars **Aufklapppfeil bleibt erhalten** – wer einen eigenen ergänzt, bekommt
+  zwei Pfeile nebeneinander.
+* Die Chips stehen **unter** dem Datum, nicht daneben. Nebeneinander reicht der
+  Platz auf dem Handy nicht: die Datumsspalte schrumpft, das Datum bricht mitten
+  um („So" / „02.08.2026") und die Chips laufen darüber. Das Datum steht deshalb
+  zusätzlich auf `whitespace-nowrap` und ohne Jahr (die Liste reicht ohnehin nur
+  21 Tage).
+
+Zum Nachprüfen der Handy-Darstellung: Chrome headless erzwingt eine
+**Mindest-Fensterbreite von ~500 px**, `--window-size=390,…` liefert also nur
+einen 390-px-Ausschnitt eines 500-px-Viewports und täuscht abgeschnittene
+Ränder vor. Stattdessen den Inhalt in einen Container fester Breite
+(`w-[360px]`) legen und in einem breiteren Fenster aufnehmen.
+
+Abgesichert durch
 `tests/test_web.py::test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen`
 (zwei Buchungen an einem Tag, eine davon vergeben).
 

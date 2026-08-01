@@ -3381,27 +3381,32 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
     rahmen = "border-amber-300" if offen else "border-slate-100"
     exp = ui.expansion(value=False).classes(f"w-full border {rahmen} rounded-xl")
     with exp.add_slot("header"):
-        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        # Die Chips stehen UNTER dem Datum, nicht daneben. Nebeneinander laufen
+        # sie auf dem Handy über den rechten Rand (die Kopfzeile bricht nicht um,
+        # und der Platz reicht neben Datum und Quasars Aufklapppfeil nicht).
+        # Quasars Pfeil bleibt trotz eigenem Header-Slot erhalten – keinen
+        # zweiten ergänzen.
+        with ui.row().classes("w-full items-start gap-2 no-wrap"):
             ui.icon("event").classes(("text-amber-600" if offen else "text-gray-400")
-                                     + " text-xl shrink-0")
-            with ui.column().classes("gap-0 min-w-0"):
-                ui.label(f"{wd} {dd.strftime('%d.%m.%Y')}").classes("font-medium leading-tight")
-                ui.label(t("{n} Reinigung", n=n) if n == 1 else t("{n} Reinigungen", n=n)) \
-                    .classes("text-xs text-gray-500 leading-tight")
-            ui.space()
-            with ui.row().classes("items-center gap-1 flex-wrap justify-end shrink-0"):
-                if offen:
-                    ui.chip(t("{n} frei", n=len(offen)), icon="person_off") \
-                        .props("color=amber-8 text-color=white dense square")
-                if vergeben:
-                    # Bei genau einem Namen den Namen zeigen – das ist die
-                    # Information, die man sonst durch Aufklappen sucht.
-                    ui.chip(namen[0] if len(namen) == 1
-                            else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
-                        .props("color=green-7 text-color=white dense square")
-            # Der eigene Header-Slot ersetzt Quasars Aufklapp-Pfeil – ohne diesen
-            # Hinweis sieht die Zeile nicht mehr klickbar aus.
-            ui.icon("expand_more").classes("text-gray-400 shrink-0")
+                                     + " text-xl shrink-0 mt-0.5")
+            with ui.column().classes("gap-1 min-w-0 flex-grow"):
+                with ui.column().classes("gap-0 min-w-0"):
+                    ui.label(f"{wd} {dd.strftime('%d.%m.')}") \
+                        .classes("font-medium leading-tight whitespace-nowrap")
+                    ui.label(t("{n} Reinigung", n=n) if n == 1 else t("{n} Reinigungen", n=n)) \
+                        .classes("text-xs text-gray-500 leading-tight whitespace-nowrap")
+                with ui.row().classes("items-center gap-1 flex-wrap"):
+                    if offen:
+                        ui.chip(t("{n} frei", n=len(offen)), icon="person_off") \
+                            .props("color=amber-8 text-color=white dense square") \
+                            .classes("text-xs !ml-0")
+                    if vergeben:
+                        # Bei genau einem Namen den Namen zeigen – das ist die
+                        # Information, die man sonst durch Aufklappen sucht.
+                        ui.chip(namen[0] if len(namen) == 1
+                                else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
+                            .props("color=green-7 text-color=white dense square") \
+                            .classes("text-xs !ml-0")
     with exp:
         for j in tagesjobs:
             _cleaning_compact(j, user, admin, staff, activate)
