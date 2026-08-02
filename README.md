@@ -35,8 +35,10 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/auth.py` | Login (PBKDF2) + optionale 2FA (TOTP) + Einladungs-Links |
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
+| `app/ical.py` | Reinigungstermin als `.ics` für den eigenen Kalender |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
+| `tools/check_shadowing.py` | Findet überschattete Modulnamen (läuft als Test mit) |
 
 ## Amtliches PDF-Formular
 
@@ -173,9 +175,10 @@ wen ist. Die Buchungsseite hat deshalb **drei Tabs**:
 | **Alle Reinigungen** | alles, hier wird zugewiesen |
 | Kalender | unverändert |
 
-Gestartet wird auf **„Meine Reinigungen"** – am Tagesanfang zählt, wofür man
-selbst zuständig ist. Wer nichts zugewiesen hat, landet automatisch auf
-**„Alle Reinigungen"**, weil dort etwas zu holen ist.
+**„Meine Reinigungen" ist die Startseite der App.** Nach dem Anmelden landet
+man immer dort – `_finish_login` verwirft dazu den gemerkten Bereich, der nur
+*innerhalb* einer Sitzung gilt (Neuladen nach einer Aktion). Ist nichts
+zugewiesen, führt ein Knopf im Leerzustand direkt zu „Alle Reinigungen".
 
 In der eigenen Liste sind die Chips „n frei" / „n vergeben" sinnlos (alles ist
 zugewiesen). Dort stehen im Kopf der Tagesgruppe stattdessen die **Wohnungen** –
@@ -185,6 +188,29 @@ entfällt.
 Beide Listen kommen aus derselben Funktion (`_render_cleaning(..., nur_eigene=)`).
 Die „Bitte nachtragen"-Erinnerung läuft nur im Alle-Zweig, sonst würde sie bei
 jedem Seitenaufbau zweimal ausgelöst.
+
+### Termin in den eigenen Kalender (.ics)
+
+Jede Reinigungskarte hat **„In meinen Kalender"**, ebenso die Aktionsliste im
+Buchungs-Dialog. Erzeugt wird eine `.ics`-Datei (`app/ical.py`, reine
+Standardbibliothek):
+
+* **Zeitfenster** = Check-out bis zur Anreise der Folgebuchung **am selben Tag**;
+  sonst zwei Stunden ab Check-out. Liegt die Anreise vor dem Check-out (kaputte
+  Daten), greift ebenfalls die Zwei-Stunden-Regel – ein Termin darf nie vor
+  seinem Beginn enden.
+* **Titel** „Reinigung <Wohnung>", am Wechseltag mit Zusatz. **Beschreibung**
+  mit Check-out, „Vorbereiten für N Personen", Anreisezeit und Gastname.
+* **Erinnerung** 60 Minuten vorher (`VALARM`).
+* **Zeitzone**: `TZID=Europe/Berlin` mit vollständigem `VTIMEZONE`-Block. Ohne
+  den würden Kalender die Zeit als „schwebend" behandeln und bei Sommerzeit
+  oder auf Reisen verschieben.
+* Text wird nach RFC 5545 maskiert (`; , \` und Zeilenumbrüche) und auf
+  **75 Oktette gefaltet** – die Faltung achtet auf UTF-8-Grenzen, sonst
+  zerbrächen Umlaute mitten im Zeichen.
+
+Abgedeckt durch `tests/test_ical.py` (9 Tests: Zeitfenster, Wechseltag,
+Rückfall bei kaputten Zeiten, Maskierung, Faltung, Erinnerung, Dateiname).
 
 ### Freie Reinigungen ohne Aufklappen erkennen
 

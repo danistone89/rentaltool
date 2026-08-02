@@ -890,3 +890,48 @@ async def test_ohne_zuweisung_startet_alle_reinigungen(user: User, mock_backend,
     await user.open("/")
     # "Alle Reinigungen" ist aktiv -> die Buchung ist sichtbar
     await user.should_see("Cottaer Straße")
+
+
+async def test_startseite_ist_meine_reinigungen(user: User, mock_backend,
+                                                tmp_path, monkeypatch):
+    """Nach dem Anmelden ist „Meine Reinigungen" die erste Seite – auch wenn in
+    einer früheren Sitzung ein anderer Bereich offen war."""
+    _hk_mocks(monkeypatch, tmp_path)
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Meine Übersicht")
+    with user.client:
+        assert web._cur_area() == "zeiterfassung"
+
+    with user.client:                              # Sitzung beenden
+        web.app.storage.user["authenticated"] = False
+    await _login(user)                             # frische Anmeldung
+    with user.client:
+        assert web._cur_area() == "buchungen", "Start nicht auf der Buchungsseite"
+    await user.should_see("Meine Reinigungen")
+
+
+async def test_kalender_knopf_auf_der_reinigungskarte(user: User, mock_backend,
+                                                      tmp_path, monkeypatch):
+    """Aus einem Putzevent heraus lässt sich der Termin als .ics laden."""
+    from app import bookings as bk
+    _hk_mocks(monkeypatch, tmp_path)
+    _mock_booking(monkeypatch)
+    bk.set_assignment(111, "test", "test")        # damit die Karte unter "Meine" steht
+    await _login(user)
+    await user.should_see(marker="ical")
+    knopf = list(user.find(marker="ical").elements)[0]
+    assert "Kalender" in (knopf.text or "")
+
+
+def test_ics_der_gemockten_buchung_ist_gueltig():
+    """Fachlicher Gegencheck ohne Oberfläche: Wechseltag-Fenster stimmt."""
+    from app import ical
+    job = {"id": 111, "apartment_name": "Cottaer Straße", "departure": "2026-08-05",
+           "checkout_time": "10:00", "guest": "Max Mustermann",
+           "next": {"arrival": "2026-08-05", "checkin_time": "15:00",
+                    "adults": 2, "children": 0, "guest": "Erika Musterfrau"}}
+    text = ical.cleaning_event(job).decode("utf-8")
+    assert "DTSTART;TZID=Europe/Berlin:20260805T100000" in text
+    assert "DTEND;TZID=Europe/Berlin:20260805T150000" in text
+    assert "Wechseltag" in text

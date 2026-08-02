@@ -27,7 +27,7 @@ from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402
-                 bookings, receipts, feiertage, i18n)
+                 bookings, receipts, feiertage, i18n, ical)
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -899,6 +899,10 @@ def _finish_login(username, role):
     app.storage.user["authenticated"] = True
     app.storage.user["user"] = username
     app.storage.user["role"] = role
+    # Beim Start immer auf der Startseite landen ("Meine Reinigungen"), nicht
+    # dort, wo die letzte Sitzung aufgehört hat. Der gemerkte Bereich gilt nur
+    # innerhalb einer Sitzung, z. B. beim Neuladen nach einer Aktion.
+    app.storage.user.pop("area", None)
     # Profilsprache schlägt die am Login-Schirm gewählte Sprache
     profil = (USERS.get(username, {}) or {}).get("lang")
     if profil:
@@ -3086,17 +3090,16 @@ def render_buchungen(activate):
         ui.button(icon="refresh", on_click=lambda: (data.clear_cache(), activate("buchungen"))) \
             .props("flat round").tooltip(t("Aktualisieren"))
     staff = _staff_users()
-    # „Meine Reinigungen“ zuerst: am Tagesanfang zählt, wofür man selbst
-    # zuständig ist. Zuweisen passiert in „Alle Reinigungen“.
-    hat_eigene = any(bookings.assignee_of(j["id"]) == user for j in _cleaning_jobs())
+    # „Meine Reinigungen“ ist die Startansicht: am Tagesanfang zählt, wofür man
+    # selbst zuständig ist. Zuweisen passiert in „Alle Reinigungen“.
     with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
         t_meine = ui.tab(t("Meine Reinigungen"), icon="assignment_ind")
         t_alle = ui.tab(t("Alle Reinigungen"), icon="cleaning_services")
         t_cal = ui.tab(t("Kalender"), icon="calendar_month")
-    # Wer nichts zugewiesen hat, startet dort, wo es etwas zu holen gibt.
-    with ui.tab_panels(tabs, value=(t_meine if hat_eigene else t_alle)).classes("w-full"):
+    with ui.tab_panels(tabs, value=t_meine).classes("w-full"):
         with ui.tab_panel(t_meine).mark("panel-meine"):
-            _render_cleaning(user, admin, staff, activate, nur_eigene=True)
+            _render_cleaning(user, admin, staff, activate, nur_eigene=True,
+                             zu_allen=lambda: tabs.set_value(t_alle))
         with ui.tab_panel(t_alle).mark("panel-alle"):
             _render_cleaning(user, admin, staff, activate)
         with ui.tab_panel(t_cal):
@@ -3338,9 +3341,9 @@ def _single_month(state, user, admin, staff, activate, rerender):
                 bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
 
 
-def _render_cleaning(user, admin, staff, activate, nur_eigene=False):
+def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=None):
     """Reinigungsliste. `nur_eigene` blendet auf die eigenen Aufträge ein –
-    das ist der Startbildschirm: am Tagesanfang zählt, wofür man zuständig ist.
+    das ist die Startansicht: am Tagesanfang zählt, wofür man zuständig ist.
     """
     jobs = _cleaning_jobs()
     if nur_eigene:
@@ -3352,6 +3355,9 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False):
                     .classes("text-gray-500")
                 ui.label(t("Unter „Alle Reinigungen“ siehst du, was noch frei ist.")) \
                     .classes("text-xs text-gray-400")
+                if zu_allen:
+                    ui.button(t("Alle Reinigungen ansehen"), icon="cleaning_services",
+                              on_click=zu_allen).props("unelevated no-caps").classes("mt-2")
             return
     else:
         # Offene "Nachtragen"-Fälle einmalig per E-Mail anstoßen – nur hier,
@@ -3460,6 +3466,21 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate, nur_eigene=False):
     with exp:
         for j in tagesjobs:
             _cleaning_compact(j, user, admin, staff, activate)
+
+
+def _kalender_download(job):
+    """Reinigungstermin als .ics herunterladen – für den eigenen Kalender."""
+    try:
+        ui.download.content(ical.cleaning_event(job), ical.dateiname(job),
+                            media_type="text/calendar")
+    except Exception as ex:                       # defekte Buchungsdaten
+        ui.notify(t("Kalender-Datei konnte nicht erstellt werden: {fehler}", fehler=ex),
+                  type="negative", timeout=8000)
+        return
+    start, ende = ical.zeitfenster(job)
+    ui.notify(t("Termin {von}–{bis} Uhr heruntergeladen ✓",
+                von=start.strftime("%H:%M"), bis=ende.strftime("%H:%M")),
+              type="positive")
 
 
 def _add_time_dialog(job, user, on_saved=None):
@@ -3620,6 +3641,10 @@ def _cleaning_card(job, user, admin, staff, activate):
 
                 # Ausserhalb von `info`, sonst öffnet jeder Tab-Klick den Dialog.
                 _ab_an_tabs(job, nxt, same_day)
+                with ui.row().classes("w-full justify-end -mt-1"):
+                    ui.button(t("In meinen Kalender"), icon="event_available",
+                              on_click=lambda: _kalender_download(job)) \
+                        .props("flat dense no-caps size=sm").mark("ical")
 
                 if open_here:
                     checkin_dt = datetime.fromisoformat(oe["checkin"])
@@ -4126,6 +4151,8 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                    color="negative")
             action(t("Checkliste & Fotos"), "checklist",
                    lambda: (dlg.close(), _open_checkliste(bk, activate)))
+            action(t("In meinen Kalender (.ics)"), "event_available",
+                   lambda: _kalender_download(bk))
             if admin:
                 action(t("Zurücksetzen (Admin)"), "restart_alt",
                        lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")

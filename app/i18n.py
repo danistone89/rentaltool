@@ -148,6 +148,12 @@ _EN = {
     "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Person": "Guest",
     "Meine Reinigungen": "My cleanings",
+    "Alle Reinigungen ansehen": "View all cleanings",
+    "In meinen Kalender": "Add to my calendar",
+    "In meinen Kalender (.ics)": "Add to my calendar (.ics)",
+    "Termin {von}–{bis} Uhr heruntergeladen ✓": "Event {von}–{bis} downloaded ✓",
+    "Kalender-Datei konnte nicht erstellt werden: {fehler}":
+        "Could not create the calendar file: {fehler}",
     "Alle Reinigungen": "All cleanings",
     "Dir ist gerade keine Reinigung zugewiesen.":
         "No cleaning is assigned to you right now.",
