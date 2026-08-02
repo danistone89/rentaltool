@@ -122,6 +122,19 @@ def _cur_user():
     return app.storage.user.get("user", "")
 
 
+def _checklisten_an():
+    """Sind die Reinigungs-Checklisten (samt Soll-/Ist-Fotos) eingeschaltet?
+
+    Für den Start bewusst AUS: Checklisten müssen je Wohnung gepflegt werden und
+    verlangen Foto-Disziplin – beim Einführen ist das zu viel auf einmal. Der
+    Schalter steht in den Einstellungen (Reinigung); Code und bereits erfasste
+    Daten bleiben erhalten. Ausgeblendet werden: der Checklisten-Durchgang,
+    „Checkliste & Fotos“, der Fortschrittsbalken sowie in der Übersicht der Tab
+    „Durchgänge“ und die Checklisten-Konfiguration.
+    """
+    return bool(CFG.get("checklisten_aktiv", False))
+
+
 def _cur_area(default="buchungen"):
     """Bereich, in dem der Nutzer gerade ist.
 
@@ -1572,6 +1585,7 @@ def open_settings():
             t_pdf = ui.tab("PDF & Steuer", icon="description")
             t_arch = ui.tab("Archiv", icon="cloud_upload")
             t_orte = ui.tab("Standorte", icon="place")
+            t_rein = ui.tab("Reinigung", icon="cleaning_services")
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
             t_stb = ui.tab("Steuerberater", icon="account_balance")
@@ -1652,6 +1666,23 @@ def open_settings():
                     ui.button("Durchsuchen", icon="folder_open",
                               on_click=browse_belege).props("outline no-caps")
 
+            with ui.tab_panel(t_rein):
+                cl_on = ui.switch("Checklisten & Fotonachweis verwenden",
+                                  value=_checklisten_an()).props("dense")
+                ui.label("Aus: Die Putzkraft startet die Arbeitszeit, meldet bei Bedarf "
+                         "Schäden oder Verbrauch und beendet die Zeit – fertig. Das ist "
+                         "der einfache Einstieg.").classes("text-xs text-gray-500")
+                ui.label("An: Zusätzlich der Checklisten-Durchgang je Wohnung mit Soll-/"
+                         "Ist-Fotos, der Fortschrittsbalken auf der Reinigungskarte, die "
+                         "Aktion „Checkliste & Fotos“ sowie in der Übersicht der Tab "
+                         "„Durchgänge“ und die Checklisten-Konfiguration.") \
+                    .classes("text-xs text-gray-500")
+                ui.label("Umschalten löscht nichts: bereits erfasste Durchgänge, Fotos "
+                         "und angelegte Checklisten bleiben erhalten und sind nach dem "
+                         "Wiedereinschalten wieder da.").classes("text-xs text-gray-400 mt-1")
+                ui.label("Solange die Checklisten aus sind, gilt eine Reinigung als "
+                         "„Fertig“, sobald die Arbeitszeit erfasst und beendet ist.") \
+                    .classes("text-xs text-gray-400")
             with ui.tab_panel(t_orte):
                 geo_on = ui.switch("Standort bei der Zeiterfassung erfassen",
                                    value=_geo_enabled()).props("dense")
@@ -1841,6 +1872,7 @@ def open_settings():
                              ("stundensatz_wochenende", satz_we)):
                 CFG[key] = round(float(fld.value), 2) if fld.value else ""
             CFG["standort_erfassung"] = bool(geo_on.value)
+            CFG["checklisten_aktiv"] = bool(cl_on.value)
             for key in inputs:
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
@@ -2351,6 +2383,18 @@ def _hk_header(title, subtitle):
 def render_reinigung(activate=None):
     # "reinigung" wird nur noch aus einer Buchung geöffnet -> immer die Checklisten-
     # Durchgangs-Ansicht (auch für Admins, die eine Reinigung inspizieren).
+    if not _checklisten_an():
+        # Alle Einstiege sind ausgeblendet; wer trotzdem hier landet (alter Link,
+        # offener Tab), soll nicht auf einer leeren Seite stehen.
+        with ui.column().classes("w-full items-center gap-2 py-10"):
+            ui.icon("checklist_rtl").classes("text-5xl text-gray-300")
+            ui.label(t("Checklisten sind ausgeschaltet.")).classes("text-gray-600 font-medium")
+            ui.label(t("Arbeitszeit starten und beenden reicht.")).classes("text-sm text-gray-500")
+            if activate:
+                ui.button(t("Zu den Reinigungen"), icon="cleaning_services",
+                          on_click=lambda: activate("buchungen")) \
+                    .props("unelevated no-caps").classes("mt-2")
+        return
     reinigung_putzkraft(activate)
 
 
@@ -2569,17 +2613,19 @@ def reinigung_putzkraft(activate=None):
 def reinigung_uebersicht(activate=None):
     _hk_header("Übersicht", "Zusammenfassung aller Reinigungen, Schäden & Bestand")
     apts = _apts()
+    listen = _checklisten_an()
     with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
         t_sum = ui.tab("Zusammenfassung", icon="insights")
-        t_runs = ui.tab("Durchgänge", icon="fact_check")
+        t_runs = ui.tab("Durchgänge", icon="fact_check") if listen else None
         t_dmg = ui.tab("Schäden", icon="report_problem")
         t_shop = ui.tab("Einkaufsliste", icon="shopping_cart")
         t_cfg = ui.tab("Konfiguration", icon="tune")
     with ui.tab_panels(tabs, value=t_sum).classes("w-full"):
         with ui.tab_panel(t_sum):
             _admin_summary(activate)
-        with ui.tab_panel(t_runs):
-            _admin_runs()
+        if t_runs is not None:
+            with ui.tab_panel(t_runs):
+                _admin_runs()
         with ui.tab_panel(t_dmg):
             _admin_damages()
         with ui.tab_panel(t_shop):
@@ -2613,8 +2659,8 @@ def _admin_summary(activate):
     if not jobs:
         ui.label("Keine Reinigungen im Zeitraum.").classes("text-gray-500 mt-3"); return
     ui.label("Alle Reinigungen").classes("text-sm font-semibold text-gray-500 mt-3")
+    listen = _checklisten_an()
     for j, st in zip(jobs, statuses):
-        dprog, tprog = _checklist_progress(j, None)
         done_entries = [e for e in timetrack.entries_for_booking(j["id"]) if e.get("checkout")]
         total_min = sum(timetrack.duration_minutes(e) or 0 for e in done_entries)
         who = bookings.assignee_of(j["id"])
@@ -2629,9 +2675,12 @@ def _admin_summary(activate):
                     with ui.row().classes("w-full items-center gap-2 no-wrap"):
                         ui.label(j["apartment_name"]).classes("font-medium truncate flex-grow min-w-0")
                         _status_chip(j)
-                    ui.label(f"{_dfmt(j['departure'])} · {wn} · Checkliste {dprog}/{tprog} · "
-                             f"{timetrack.fmt_dur(total_min) if total_min else '0:00 h'}") \
-                        .classes("text-xs text-gray-500 truncate")
+                    zeile = [_dfmt(j["departure"]), wn]
+                    if listen:
+                        dprog, tprog = _checklist_progress(j, None)
+                        zeile.append(f"Checkliste {dprog}/{tprog}")
+                    zeile.append(timetrack.fmt_dur(total_min) if total_min else "0:00 h")
+                    ui.label(" · ".join(zeile)).classes("text-xs text-gray-500 truncate")
                 ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
 
@@ -2719,8 +2768,13 @@ def render_reinigung_refresh():
 
 
 def _admin_config(apts):
+    listen = _checklisten_an()
     ui.label("Checkliste & Bestand je Wohnung. Pro Aufgabe ein Beispielfoto (Soll-Zustand) "
-             "aufnehmen – die Putzkraft sieht es dann in der Checkliste.") \
+             "aufnehmen – die Putzkraft sieht es dann in der Checkliste."
+             if listen else
+             "Bestandsliste je Wohnung – daraus wählt die Putzkraft unter "
+             "„Verbrauch / Wäsche“. Checklisten sind ausgeschaltet "
+             "(Einstellungen → Reinigung).") \
         .classes("text-sm text-gray-500")
     sel = ui.select(apts, label="Wohnung wählen",
                     value=(next(iter(apts), None))).props("outlined dense") \
@@ -2756,54 +2810,55 @@ def _admin_config(apts):
                 ui.notify("Konfiguration gespeichert ✓", type="positive")
 
         with box:
-            with ui.row().classes("w-full items-center gap-2"):
-                ui.label("Räume & Aufgaben").classes("font-medium")
-                ui.space()
-                ui.button("Speichern", icon="save", on_click=lambda: persist()) \
-                    .props("unelevated no-caps")
-            for ri, room in enumerate(cl["rooms"]):
-                with ui.card().classes("w-full gap-1"):
-                    with ui.row().classes("w-full items-center gap-2"):
-                        rn = ui.input("Raum", value=room["name"]).props("dense outlined").classes("w-56")
-                        room_inputs.append((room, rn))
-                        ui.space()
-                        ui.button(icon="delete", on_click=lambda i=ri: (collect(), cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
-                            .props("flat dense round color=negative")
-                    for ti, task in enumerate(room["tasks"]):
-                        with ui.column().classes("w-full gap-1 py-1 border-b border-slate-50"):
-                            with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                                tt = ui.input("Aufgabe", value=task["text"]).props("dense outlined").classes("flex-grow")
-                                task_inputs.append((task, tt))
-                                ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
-                                    .props("flat dense round color=negative").tooltip("Aufgabe löschen")
+            if listen:
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.label("Räume & Aufgaben").classes("font-medium")
+                    ui.space()
+                    ui.button("Speichern", icon="save", on_click=lambda: persist()) \
+                        .props("unelevated no-caps")
+                for ri, room in enumerate(cl["rooms"]):
+                    with ui.card().classes("w-full gap-1"):
+                        with ui.row().classes("w-full items-center gap-2"):
+                            rn = ui.input("Raum", value=room["name"]).props("dense outlined").classes("w-56")
+                            room_inputs.append((room, rn))
+                            ui.space()
+                            ui.button(icon="delete", on_click=lambda i=ri: (collect(), cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                                .props("flat dense round color=negative")
+                        for ti, task in enumerate(room["tasks"]):
+                            with ui.column().classes("w-full gap-1 py-1 border-b border-slate-50"):
+                                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                                    tt = ui.input("Aufgabe", value=task["text"]).props("dense outlined").classes("flex-grow")
+                                    task_inputs.append((task, tt))
+                                    ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                                        .props("flat dense round color=negative").tooltip("Aufgabe löschen")
 
-                            def ref_saved(rel, tid=task["id"]):
-                                collect()
-                                housekeeping.save_checklist(aid, cl)
-                                housekeeping.set_task_ref_photo(aid, tid, rel)
-                                render_cfg()
+                                def ref_saved(rel, tid=task["id"]):
+                                    collect()
+                                    housekeeping.save_checklist(aid, cl)
+                                    housekeeping.set_task_ref_photo(aid, tid, rel)
+                                    render_cfg()
 
-                            def ref_remove(tid=task["id"]):
-                                collect()
-                                housekeeping.save_checklist(aid, cl)
-                                housekeeping.set_task_ref_photo(aid, tid, None)
-                                render_cfg()
-                            with ui.row().classes("w-full items-center gap-2 flex-wrap pl-1"):
-                                if task.get("ref_photo"):
-                                    _photo_thumb(f"/media/{task['ref_photo']}", "w-16 h-16")
-                                    ui.label("Beispielfoto").classes("text-xs text-gray-400")
-                                    _photo_button("ändern", "ref", ref_saved, icon="photo_camera")
-                                    ui.button("entfernen", icon="close", on_click=ref_remove) \
-                                        .props("flat dense no-caps size=sm color=negative")
-                                else:
-                                    _photo_button("Beispielfoto", "ref", ref_saved, icon="add_a_photo")
-                                    ui.label("(Soll-Zustand fotografieren)").classes("text-xs text-gray-400")
-                    ui.button("Aufgabe hinzufügen", icon="add",
-                              on_click=lambda rm=room: (collect(), rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
-                        .props("flat dense no-caps")
-            ui.button("Raum hinzufügen", icon="add_home",
-                      on_click=lambda: (collect(), cl["rooms"].append({"name": "Neuer Raum", "tasks": []}), housekeeping.save_checklist(aid, cl), render_cfg())) \
-                .props("outline no-caps")
+                                def ref_remove(tid=task["id"]):
+                                    collect()
+                                    housekeeping.save_checklist(aid, cl)
+                                    housekeeping.set_task_ref_photo(aid, tid, None)
+                                    render_cfg()
+                                with ui.row().classes("w-full items-center gap-2 flex-wrap pl-1"):
+                                    if task.get("ref_photo"):
+                                        _photo_thumb(f"/media/{task['ref_photo']}", "w-16 h-16")
+                                        ui.label("Beispielfoto").classes("text-xs text-gray-400")
+                                        _photo_button("ändern", "ref", ref_saved, icon="photo_camera")
+                                        ui.button("entfernen", icon="close", on_click=ref_remove) \
+                                            .props("flat dense no-caps size=sm color=negative")
+                                    else:
+                                        _photo_button("Beispielfoto", "ref", ref_saved, icon="add_a_photo")
+                                        ui.label("(Soll-Zustand fotografieren)").classes("text-xs text-gray-400")
+                        ui.button("Aufgabe hinzufügen", icon="add",
+                                  on_click=lambda rm=room: (collect(), rm["tasks"].append({"id": housekeeping._uid(), "text": "Neue Aufgabe", "ref_photo": None}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                            .props("flat dense no-caps")
+                ui.button("Raum hinzufügen", icon="add_home",
+                          on_click=lambda: (collect(), cl["rooms"].append({"name": "Neuer Raum", "tasks": []}), housekeeping.save_checklist(aid, cl), render_cfg())) \
+                    .props("outline no-caps")
 
             ui.separator()
             ui.label("Bestandsliste (Verbrauch/Wäsche)").classes("font-medium")
@@ -3048,16 +3103,23 @@ def _past_checkout(job):
 
 
 def _booking_status(job):
-    """Status-Key. 'Fertig' nur, wenn die Checkliste VOLLSTÄNDIG erledigt ist UND
-    Arbeitszeit erfasst wurde."""
+    """Status-Key. 'Fertig' heißt: Arbeitszeit erfasst – und, falls Checklisten
+    eingeschaltet sind, zusätzlich die Checkliste vollständig abgehakt.
+
+    Ohne diese Unterscheidung käme bei ausgeschalteten Checklisten NIE ein
+    'Fertig' zustande, weil sich keine Checkliste mehr abhaken lässt.
+    """
     bid = job["id"]
     who = bookings.assignee_of(bid)
     entries = timetrack.entries_for_booking(bid)
     has_time = any(e.get("checkout") for e in entries)
     open_now = any(not e.get("checkout") for e in entries)
     started = bool(entries)
-    dprog, tprog = _checklist_progress(job, None)
-    fully_done = tprog > 0 and dprog >= tprog
+    if _checklisten_an():
+        dprog, tprog = _checklist_progress(job, None)
+        fully_done = tprog > 0 and dprog >= tprog
+    else:
+        fully_done = True
     if fully_done and has_time:
         return "abgeschlossen"
     if open_now:
@@ -3648,8 +3710,13 @@ def _cleaning_card(job, user, admin, staff, activate):
 
                 if open_here:
                     checkin_dt = datetime.fromisoformat(oe["checkin"])
-                    dprog, tprog = _checklist_progress(job, user)
-                    complete = bool(tprog) and dprog >= tprog
+                    listen = _checklisten_an()
+                    if listen:
+                        dprog, tprog = _checklist_progress(job, user)
+                        complete = bool(tprog) and dprog >= tprog
+                    else:
+                        dprog = tprog = 0
+                        complete = True     # ohne Checkliste direkt zu den Schritten
                     with ui.card().classes("w-full bg-violet-50 rounded-xl p-3 gap-1 shadow-none"):
                         with ui.row().classes("w-full items-center"):
                             ui.label(t("Arbeitszeit läuft")).classes("text-xs text-gray-500")
@@ -3663,23 +3730,25 @@ def _cleaning_card(job, user, admin, staff, activate):
                             lbl.text = str(datetime.now().replace(microsecond=0) - cd.replace(microsecond=0))
                         tick()
                         ui.timer(1.0, tick)
-                    with ui.row().classes("w-full items-center"):
-                        ui.label(t("Checkliste")).classes("font-medium text-sm")
-                        ui.space()
-                        ui.label(f"{dprog}/{tprog} erledigt").classes("text-xs text-gray-500")
-                    ui.linear_progress(value=(dprog / tprog if tprog else 0), show_value=False) \
-                        .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
+                    if listen:
+                        with ui.row().classes("w-full items-center"):
+                            ui.label(t("Checkliste")).classes("font-medium text-sm")
+                            ui.space()
+                            ui.label(f"{dprog}/{tprog} erledigt").classes("text-xs text-gray-500")
+                        ui.linear_progress(value=(dprog / tprog if tprog else 0), show_value=False) \
+                            .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
                     if not complete:
                         ui.button(t("Weiter zur Checkliste"), icon="checklist",
                                   on_click=lambda: _open_checkliste(job, activate)) \
                             .props("unelevated no-caps size=lg").classes("w-full")
                     else:
-                        with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
-                            ui.icon("check_circle").classes("text-base")
-                            ui.label(t("Alle Aufgaben abgeschlossen"))
+                        if listen:
+                            with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
+                                ui.icon("check_circle").classes("text-base")
+                                ui.label(t("Alle Aufgaben abgeschlossen"))
                         ui.label(t("Nächste Schritte")).classes("text-xs font-semibold text-gray-400 mt-1")
                         with ui.column().classes("w-full gap-1"):
-                            _step_button("Fotos & Schäden prüfen", "photo_camera",
+                            _step_button("Schaden melden", "report_problem",
                                          lambda: open_damage_dialog(job["apartment_id"], job["apartment_name"], user, booking_id=job["id"]))
                             _step_button("Notiz hinzufügen", "sticky_note_2",
                                          lambda: _note_dialog(job))
@@ -3688,11 +3757,14 @@ def _cleaning_card(job, user, admin, staff, activate):
                         ui.button(t("Arbeitszeit beenden"), icon="stop_circle", on_click=_do_out) \
                             .props("unelevated no-caps size=lg color=negative").classes("w-full mt-1")
                 elif status == "abgeschlossen":
-                    dprog, tprog = _checklist_progress(job, user)
                     with ui.row().classes("w-full items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-2"):
                         ui.icon("check_circle")
-                        ui.label(t("Fertig · {dauer} · {done}/{total} erledigt",
-                                    dauer=timetrack.fmt_dur(total_min), done=dprog, total=tprog))
+                        if _checklisten_an():
+                            dprog, tprog = _checklist_progress(job, user)
+                            ui.label(t("Fertig · {dauer} · {done}/{total} erledigt",
+                                        dauer=timetrack.fmt_dur(total_min), done=dprog, total=tprog))
+                        else:
+                            ui.label(t("Fertig · {dauer}", dauer=timetrack.fmt_dur(total_min)))
                 else:
                     if total_min:
                         ui.label(t("Erfasst {dauer}", dauer=timetrack.fmt_dur(total_min))).classes("text-xs text-gray-500")
@@ -4149,8 +4221,9 @@ def open_booking_dialog(bk, user, admin, staff, activate):
             action(t("Schaden melden"), "report_problem",
                    lambda: (dlg.close(), open_damage_dialog(bk["apartment_id"], bk["apartment_name"], user, on_saved=reopen, booking_id=bk["id"])),
                    color="negative")
-            action(t("Checkliste & Fotos"), "checklist",
-                   lambda: (dlg.close(), _open_checkliste(bk, activate)))
+            if _checklisten_an():
+                action(t("Checkliste & Fotos"), "checklist",
+                       lambda: (dlg.close(), _open_checkliste(bk, activate)))
             action(t("In meinen Kalender (.ics)"), "event_available",
                    lambda: _kalender_download(bk))
             if admin:

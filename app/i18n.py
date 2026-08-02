@@ -148,6 +148,12 @@ _EN = {
     "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Person": "Guest",
     "Meine Reinigungen": "My cleanings",
+    "Checklisten sind ausgeschaltet.": "Checklists are switched off.",
+    "Arbeitszeit starten und beenden reicht.":
+        "Starting and stopping the timer is enough.",
+    "Zu den Reinigungen": "Go to cleanings",
+    "Fertig · {dauer}": "Done · {dauer}",
+    "Schaden melden": "Report damage",
     "Alle Reinigungen ansehen": "View all cleanings",
     "In meinen Kalender": "Add to my calendar",
     "In meinen Kalender (.ics)": "Add to my calendar (.ics)",

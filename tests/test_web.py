@@ -107,10 +107,11 @@ async def test_uebersicht_admin(user: User, mock_backend, tmp_path, monkeypatch)
         monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "a.json"))
+    monkeypatch.setitem(web.CFG, "checklisten_aktiv", True)
     await _login(user)
     user.find(marker="nav-uebersicht").click()
     await user.should_see("Zusammenfassung")  # neue Auswertung
-    await user.should_see("Durchgänge")       # weitere Admin-Tabs
+    await user.should_see("Durchgänge")       # nur bei aktiven Checklisten
     await user.should_see("Schäden")
     await user.should_see("Konfiguration")
 
@@ -345,7 +346,6 @@ async def test_buchungsaktionen_englisch(user: User, mock_backend, monkeypatch, 
     await user.should_see("Add note")
     await user.should_see("Supplies / laundry")
     await user.should_see("Report damage")
-    await user.should_see("Checklist & photos")
     await user.should_not_see("Zeit nachtragen")
 
 
@@ -777,6 +777,7 @@ async def test_checkliste_aus_buchung_stuerzt_nicht_ab(user: User, mock_backend,
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
     monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setitem(web.CFG, "checklisten_aktiv", True)   # Funktion ist sonst aus
     _mock_booking(monkeypatch)
 
     await _login(user)
@@ -935,3 +936,46 @@ def test_ics_der_gemockten_buchung_ist_gueltig():
     assert "DTSTART;TZID=Europe/Berlin:20260805T100000" in text
     assert "DTEND;TZID=Europe/Berlin:20260805T150000" in text
     assert "Wechseltag" in text
+
+
+async def test_checklisten_aus_blendet_alles_aus(user: User, mock_backend,
+                                                 tmp_path, monkeypatch):
+    """Vorgabe: Checklisten aus. Dann darf nirgends mehr etwas davon auftauchen."""
+    _hk_mocks(monkeypatch, tmp_path)
+    _mock_booking(monkeypatch)
+    assert not web._checklisten_an(), "Checklisten müssen per Vorgabe aus sein"
+
+    await _login(user)
+    await user.should_not_see("Weiter zur Checkliste")
+    await user.should_not_see("Checkliste")
+
+    user.find(marker="booking-details").click()
+    await user.should_see("Aktionen")
+    await user.should_not_see("Checkliste & Fotos")
+
+    user.find(marker="nav-uebersicht").click()
+    await user.should_see("Zusammenfassung")
+    await user.should_not_see("Durchgänge")
+    await user.should_not_see("Räume & Aufgaben")      # Konfiguration ohne Checkliste
+    await user.should_see("Bestandsliste (Verbrauch/Wäsche)")   # bleibt
+
+
+async def test_fertig_haengt_ohne_checkliste_nur_an_der_zeit(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    """Ohne Checkliste käme sonst NIE ein „Fertig" zustande."""
+    from datetime import datetime
+    from app import bookings as bk
+    _hk_mocks(monkeypatch, tmp_path)
+    _mock_booking(monkeypatch)
+    heute = date.today()
+    timetrack.add_manual("test", datetime(heute.year, heute.month, heute.day, 9),
+                         datetime(heute.year, heute.month, heute.day, 11),
+                         booking_id=111, apartment="Cottaer Straße")
+    bk.set_assignment(111, "test", "test")
+
+    job = {"id": 111, "apartment_id": 2748963, "departure": heute.isoformat()}
+    assert web._booking_status(job) == "abgeschlossen"
+
+    monkeypatch.setitem(web.CFG, "checklisten_aktiv", True)
+    assert web._booking_status(job) != "abgeschlossen", \
+        "Mit Checklisten muss die Checkliste zusätzlich zählen"

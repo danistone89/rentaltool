@@ -44,5 +44,6 @@
     "_hinweis": "users werden von der App verwaltet (Benutzer-Dialog): dort Mitarbeiter per E-Mail einladen, sie vergeben sich ueber einen Einmal-Link (7 Tage, app_url) selbst ein Passwort. Ausgesperrt? auth.users auf {} setzen -> beim naechsten Aufruf Admin neu anlegen. Rollen: admin | manager | putzkraft.",
     "storage_secret": "",
     "users": {}
-  }
+  },
+  "checklisten_aktiv": false
 }

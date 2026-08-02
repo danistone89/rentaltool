@@ -283,6 +283,34 @@ bleibt erhalten.
 > außerhalb von `body`** gehängt (`dlg_slot`). Läge er in `body`, würde er beim
 > Neuaufbau mitten in seinem eigenen Klick-Handler gelöscht.
 
+## Checklisten & Fotonachweis (Vorgabe: AUS)
+
+Für den Einstieg sind die **Reinigungs-Checklisten ausgeschaltet**
+(`config.checklisten_aktiv`, Vorgabe `false`). Sie verlangen Pflege je Wohnung
+und Foto-Disziplin – beim Einführen ist das zu viel auf einmal.
+
+**Ausgeschaltet läuft eine Reinigung so:** Arbeitszeit starten → bei Bedarf
+Schaden melden, Notiz, Verbrauch/Wäsche → Arbeitszeit beenden. Fertig.
+
+Ausgeblendet werden dann:
+
+* der **Checklisten-Durchgang** (Bereich `reinigung`) samt Soll-/Ist-Fotos,
+* die Aktion **„Checkliste & Fotos"** im Buchungs-Dialog,
+* **Fortschrittsbalken** und „Weiter zur Checkliste" auf der Reinigungskarte,
+* in der Übersicht der Tab **„Durchgänge"** und der Checklisten-Teil der
+  **Konfiguration** (die Bestandsliste bleibt – sie speist „Verbrauch/Wäsche"),
+* die Checklisten-Spalte in der Zusammenfassung.
+
+**Wichtig für den Status:** `_booking_status` verlangt für „Fertig" sonst eine
+vollständig abgehakte Checkliste. Bei ausgeschalteten Checklisten zählt allein
+die erfasste Arbeitszeit – sonst käme nie ein „Fertig" zustande.
+
+Wieder einschalten: **Einstellungen → Reinigung**. Es wird nichts gelöscht –
+angelegte Checklisten, erfasste Durchgänge und Fotos bleiben erhalten und sind
+danach wieder da. Der Absturz-Regressionstest
+(`test_checkliste_aus_buchung_stuerzt_nicht_ab`) schaltet die Funktion für sich
+ein, die Abdeckung bleibt also bestehen.
+
 ## Belegscanner
 
 **Belege → „Beleg scannen"** in zwei Schritten:
