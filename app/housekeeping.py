@@ -83,7 +83,7 @@ def get_checklist(apt_id):
     key = str(apt_id)
     if key not in all_cl:
         all_cl[key] = {"rooms": [
-            {"name": rn, "tasks": [{"id": _uid(), "text": t, "ref_photo": None} for t in tasks]}
+            {"name": rn, "tasks": [{"id": _uid(), "text": txt, "ref_photo": None} for txt in tasks]}
             for rn, tasks in DEFAULT_ROOMS]}
         _write(CHECKLISTS, all_cl)
     return all_cl[key]
@@ -98,9 +98,9 @@ def save_checklist(apt_id, checklist):
 def set_task_ref_photo(apt_id, task_id, rel_photo):
     cl = get_checklist(apt_id)
     for room in cl["rooms"]:
-        for t in room["tasks"]:
-            if t["id"] == task_id:
-                t["ref_photo"] = rel_photo
+        for task in room["tasks"]:
+            if task["id"] == task_id:
+                task["ref_photo"] = rel_photo
     save_checklist(apt_id, cl)
 
 

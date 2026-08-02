@@ -161,6 +161,31 @@ Grund nur noch „Vorbereiten für N Personen"; die abreisenden Gäste stehen im
 Detail-Dialog. Der **Checklisten-Durchgang** zeigt denselben „Vorbereiten
 für"-Kasten oben – dort, wo tatsächlich gearbeitet wird.
 
+### „Meine Reinigungen" als Startbildschirm
+
+Sind an einem Tag zwei Reinigungen zu machen – eine für Gabriel, eine für
+Valeriya – war in einer gemeinsamen Liste nicht zu erkennen, welche Wohnung für
+wen ist. Die Buchungsseite hat deshalb **drei Tabs**:
+
+| Tab | Inhalt |
+|---|---|
+| **Meine Reinigungen** | nur die eigenen Aufträge – der Startbildschirm |
+| **Alle Reinigungen** | alles, hier wird zugewiesen |
+| Kalender | unverändert |
+
+Gestartet wird auf **„Meine Reinigungen"** – am Tagesanfang zählt, wofür man
+selbst zuständig ist. Wer nichts zugewiesen hat, landet automatisch auf
+**„Alle Reinigungen"**, weil dort etwas zu holen ist.
+
+In der eigenen Liste sind die Chips „n frei" / „n vergeben" sinnlos (alles ist
+zugewiesen). Dort stehen im Kopf der Tagesgruppe stattdessen die **Wohnungen** –
+die Information, die man morgens braucht. Auch der bernsteinfarbene Warnrahmen
+entfällt.
+
+Beide Listen kommen aus derselben Funktion (`_render_cleaning(..., nur_eigene=)`).
+Die „Bitte nachtragen"-Erinnerung läuft nur im Alle-Zweig, sonst würde sie bei
+jedem Seitenaufbau zweimal ausgelöst.
+
 ### Freie Reinigungen ohne Aufklappen erkennen
 
 Die kommenden Tage sind zu Gruppen zusammengeklappt. Wer sehen wollte, ob noch

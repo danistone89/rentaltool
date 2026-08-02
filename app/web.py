@@ -2646,18 +2646,18 @@ def _admin_runs():
                           icon="cleaning_services").classes("w-full"):
             for room in cl["rooms"]:
                 ui.label(room["name"]).classes("font-medium text-sm mt-2")
-                for t in room["tasks"]:
-                    st = r["tasks"].get(t["id"], {})
+                for task in room["tasks"]:
+                    st = r["tasks"].get(task["id"], {})
                     with ui.column().classes("w-full gap-1 pl-1 py-1 border-b border-slate-50"):
                         with ui.row().classes("w-full items-center gap-2"):
                             ui.icon("check_circle" if st.get("done") else "radio_button_unchecked") \
                                 .classes("text-green-600" if st.get("done") else "text-gray-300")
-                            ui.label(t["text"]).classes("text-sm")
-                        if t.get("ref_photo") or st.get("ist_photo"):
+                            ui.label(task["text"]).classes("text-sm")
+                        if task.get("ref_photo") or st.get("ist_photo"):
                             with ui.row().classes("items-end gap-4 pl-7 flex-wrap"):
-                                if t.get("ref_photo"):
+                                if task.get("ref_photo"):
                                     with ui.column().classes("items-center gap-0"):
-                                        _photo_thumb(f"/media/{t['ref_photo']}", "w-16 h-16")
+                                        _photo_thumb(f"/media/{task['ref_photo']}", "w-16 h-16")
                                         ui.label("Soll").classes("text-xs text-gray-400")
                                 if st.get("ist_photo"):
                                     with ui.column().classes("items-center gap-0"):
@@ -2672,12 +2672,15 @@ def _admin_damages():
     for d in dmg:
         color = {"hoch": "text-red-700", "mittel": "text-amber-700"}.get(d["urgency"], "text-gray-600")
         with ui.card().classes("w-full"):
-            with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                ui.icon("report_problem").classes(color)
-                ui.label(f"{d['apartment_name']} · {d['room']}").classes("font-semibold")
-                ui.label(d["urgency"]).classes(f"text-xs {color}")
-                ui.label(f"{_d(d['ts'])} · {d['reporter']}").classes("text-xs text-gray-500")
-                ui.space()
+            # Datum/Melder unter den Titel, nicht daneben – nebeneinander läuft
+            # die Zeile auf dem Handy über den rechten Rand.
+            with ui.row().classes("w-full items-start gap-2 no-wrap"):
+                ui.icon("report_problem").classes(color + " shrink-0 mt-0.5")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    with ui.row().classes("items-center gap-2 flex-wrap"):
+                        ui.label(f"{d['apartment_name']} · {d['room']}").classes("font-semibold")
+                        ui.label(d["urgency"]).classes(f"text-xs {color}")
+                    ui.label(f"{_d(d['ts'])} · {d['reporter']}").classes("text-xs text-gray-500")
                 if d["status"] == "offen":
                     ui.button("erledigt", icon="check",
                               on_click=lambda i=d["id"]: (housekeeping.set_damage_status(i, "erledigt"),
@@ -2695,12 +2698,12 @@ def _admin_shopping():
     if not items:
         ui.label("Einkaufsliste ist leer.").classes("text-gray-500"); return
     for r in items:
-        with ui.row().classes("w-full items-center gap-2 no-wrap"):
-            ui.icon("shopping_cart").classes("text-primary")
-            ui.label(f"{r['menge']}× {r['item']}").classes("font-medium")
-            ui.label(f"({r['apartment_name']}, {r['kategorie']})").classes("text-xs text-gray-500")
-            ui.label(f"{_d(r['ts'])} · {r['reporter']}").classes("text-xs text-gray-400")
-            ui.space()
+        with ui.row().classes("w-full items-start gap-2 no-wrap"):
+            ui.icon("shopping_cart").classes("text-primary shrink-0 mt-0.5")
+            with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                ui.label(f"{r['menge']}× {r['item']}").classes("font-medium")
+                ui.label(f"({r['apartment_name']}, {r['kategorie']})").classes("text-xs text-gray-500")
+                ui.label(f"{_d(r['ts'])} · {r['reporter']}").classes("text-xs text-gray-400")
             ui.button("gekauft", icon="check",
                       on_click=lambda i=r["id"]: (housekeeping.set_restock_status(i, "erledigt"),
                                                   render_reinigung_refresh())) \
@@ -2735,8 +2738,8 @@ def _admin_config(apts):
             """Aktuelle Feldwerte in die Datenstrukturen übernehmen."""
             for room, f in room_inputs:
                 room["name"] = f.value
-            for t, f in task_inputs:
-                t["text"] = f.value
+            for task, f in task_inputs:
+                task["text"] = f.value
             for it, nf, kf in inv_inputs:
                 it["name"] = nf.value
                 it["kategorie"] = kf.value
@@ -2762,28 +2765,28 @@ def _admin_config(apts):
                         ui.space()
                         ui.button(icon="delete", on_click=lambda i=ri: (collect(), cl["rooms"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                             .props("flat dense round color=negative")
-                    for ti, t in enumerate(room["tasks"]):
+                    for ti, task in enumerate(room["tasks"]):
                         with ui.column().classes("w-full gap-1 py-1 border-b border-slate-50"):
                             with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                                tt = ui.input("Aufgabe", value=t["text"]).props("dense outlined").classes("flex-grow")
-                                task_inputs.append((t, tt))
+                                tt = ui.input("Aufgabe", value=task["text"]).props("dense outlined").classes("flex-grow")
+                                task_inputs.append((task, tt))
                                 ui.button(icon="delete", on_click=lambda i=ti, rm=room: (collect(), rm["tasks"].pop(i), housekeeping.save_checklist(aid, cl), render_cfg())) \
                                     .props("flat dense round color=negative").tooltip("Aufgabe löschen")
 
-                            def ref_saved(rel, tid=t["id"]):
+                            def ref_saved(rel, tid=task["id"]):
                                 collect()
                                 housekeeping.save_checklist(aid, cl)
                                 housekeeping.set_task_ref_photo(aid, tid, rel)
                                 render_cfg()
 
-                            def ref_remove(tid=t["id"]):
+                            def ref_remove(tid=task["id"]):
                                 collect()
                                 housekeeping.save_checklist(aid, cl)
                                 housekeeping.set_task_ref_photo(aid, tid, None)
                                 render_cfg()
                             with ui.row().classes("w-full items-center gap-2 flex-wrap pl-1"):
-                                if t.get("ref_photo"):
-                                    _photo_thumb(f"/media/{t['ref_photo']}", "w-16 h-16")
+                                if task.get("ref_photo"):
+                                    _photo_thumb(f"/media/{task['ref_photo']}", "w-16 h-16")
                                     ui.label("Beispielfoto").classes("text-xs text-gray-400")
                                     _photo_button("ändern", "ref", ref_saved, icon="photo_camera")
                                     ui.button("entfernen", icon="close", on_click=ref_remove) \
@@ -3083,11 +3086,18 @@ def render_buchungen(activate):
         ui.button(icon="refresh", on_click=lambda: (data.clear_cache(), activate("buchungen"))) \
             .props("flat round").tooltip(t("Aktualisieren"))
     staff = _staff_users()
+    # „Meine Reinigungen“ zuerst: am Tagesanfang zählt, wofür man selbst
+    # zuständig ist. Zuweisen passiert in „Alle Reinigungen“.
+    hat_eigene = any(bookings.assignee_of(j["id"]) == user for j in _cleaning_jobs())
     with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
-        t_clean = ui.tab(t("Reinigungen"), icon="cleaning_services")
+        t_meine = ui.tab(t("Meine Reinigungen"), icon="assignment_ind")
+        t_alle = ui.tab(t("Alle Reinigungen"), icon="cleaning_services")
         t_cal = ui.tab(t("Kalender"), icon="calendar_month")
-    with ui.tab_panels(tabs, value=t_clean).classes("w-full"):
-        with ui.tab_panel(t_clean):
+    # Wer nichts zugewiesen hat, startet dort, wo es etwas zu holen gibt.
+    with ui.tab_panels(tabs, value=(t_meine if hat_eigene else t_alle)).classes("w-full"):
+        with ui.tab_panel(t_meine).mark("panel-meine"):
+            _render_cleaning(user, admin, staff, activate, nur_eigene=True)
+        with ui.tab_panel(t_alle).mark("panel-alle"):
             _render_cleaning(user, admin, staff, activate)
         with ui.tab_panel(t_cal):
             _render_calendar(user, admin, staff, activate)
@@ -3328,15 +3338,30 @@ def _single_month(state, user, admin, staff, activate, rerender):
                 bar.on("click", lambda _e, bk=b: open_booking_dialog(bk, user, admin, staff, activate))
 
 
-def _render_cleaning(user, admin, staff, activate):
+def _render_cleaning(user, admin, staff, activate, nur_eigene=False):
+    """Reinigungsliste. `nur_eigene` blendet auf die eigenen Aufträge ein –
+    das ist der Startbildschirm: am Tagesanfang zählt, wofür man zuständig ist.
+    """
     jobs = _cleaning_jobs()
+    if nur_eigene:
+        jobs = [j for j in jobs if bookings.assignee_of(j["id"]) == user]
+        if not jobs:
+            with ui.column().classes("w-full items-center gap-1 py-8"):
+                ui.icon("assignment_turned_in").classes("text-5xl text-gray-300")
+                ui.label(t("Dir ist gerade keine Reinigung zugewiesen.")) \
+                    .classes("text-gray-500")
+                ui.label(t("Unter „Alle Reinigungen“ siehst du, was noch frei ist.")) \
+                    .classes("text-xs text-gray-400")
+            return
+    else:
+        # Offene "Nachtragen"-Fälle einmalig per E-Mail anstoßen – nur hier,
+        # damit die Erinnerung nicht zweimal je Seitenaufbau läuft.
+        for j in jobs:
+            if _booking_status(j) == "nachtragen":
+                _notify_nachtragen(j, staff)
     if not jobs:
         ui.label(t("Keine anstehenden Reinigungen.")).classes("text-gray-500 mt-4")
         return
-    # Offene "Nachtragen"-Fälle einmalig per E-Mail anstoßen
-    for j in jobs:
-        if _booking_status(j) == "nachtragen":
-            _notify_nachtragen(j, staff)
     today = date.today().isoformat()
     overdue = [j for j in jobs if _booking_status(j) == "nachtragen"]
     odids = {j["id"] for j in overdue}
@@ -3354,7 +3379,8 @@ def _render_cleaning(user, admin, staff, activate):
         for j in todayj:
             _cleaning_card(j, user, admin, staff, activate)
     if not overdue and not todayj:
-        ui.label(t("Heute keine Reinigungen. 🎉")).classes("text-gray-500 mt-2")
+        ui.label(t("Für dich heute nichts zu tun. 🎉") if nur_eigene
+                 else t("Heute keine Reinigungen. 🎉")).classes("text-gray-500 mt-2")
 
     # Kommende Tage – kompakt, ausklappbar
     if future:
@@ -3365,7 +3391,7 @@ def _render_cleaning(user, admin, staff, activate):
         offen_ges = 0
         for d in sorted(groups):
             offen_ges += sum(1 for j in groups[d] if not bookings.assignee_of(j["id"]))
-        if offen_ges:
+        if offen_ges and not nur_eigene:
             with ui.row().classes("w-full items-center gap-2 no-wrap text-amber-800 "
                                   "bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"):
                 ui.icon("person_off").classes("text-amber-700 text-base shrink-0")
@@ -3374,13 +3400,17 @@ def _render_cleaning(user, admin, staff, activate):
                          t("{n} Reinigungen noch niemandem zugewiesen", n=offen_ges)) \
                     .classes("text-sm font-medium")
         for d in sorted(groups):
-            _tagesgruppe(d, groups[d], user, admin, staff, activate)
+            _tagesgruppe(d, groups[d], user, admin, staff, activate, nur_eigene)
 
 
-def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
+def _tagesgruppe(d, tagesjobs, user, admin, staff, activate, nur_eigene=False):
     """Ein ausklappbarer Tag. Der Kopf muss ohne Aufklappen zeigen, wie viele
     Reinigungen des Tages noch frei sind – bei zwei Buchungen an einem Tag ist
-    oft nur eine davon zu vergeben."""
+    oft nur eine davon zu vergeben.
+
+    In der eigenen Liste (`nur_eigene`) ist das sinnlos – dort ist alles
+    zugewiesen. Stattdessen stehen im Kopf die Wohnungen, damit man ohne
+    Aufklappen sieht, wo man hin muss."""
     dd = date.fromisoformat(d)
     wd = (_WD_EN if i18n.lang() == "en" else _WD)[dd.weekday()]
     n = len(tagesjobs)
@@ -3390,7 +3420,8 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
     namen = sorted({staff.get(bookings.assignee_of(j["id"]),
                               bookings.assignee_of(j["id"])) for j in vergeben})
 
-    rahmen = "border-amber-300" if offen else "border-slate-100"
+    # In der eigenen Liste gibt es nichts Freies – dann kein Warnrahmen.
+    rahmen = "border-amber-300" if (offen and not nur_eigene) else "border-slate-100"
     exp = ui.expansion(value=False).classes(f"w-full border {rahmen} rounded-xl")
     with exp.add_slot("header"):
         # Die Chips stehen UNTER dem Datum, nicht daneben. Nebeneinander laufen
@@ -3399,7 +3430,8 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
         # Quasars Pfeil bleibt trotz eigenem Header-Slot erhalten – keinen
         # zweiten ergänzen.
         with ui.row().classes("w-full items-start gap-2 no-wrap"):
-            ui.icon("event").classes(("text-amber-600" if offen else "text-gray-400")
+            ui.icon("event").classes(("text-amber-600" if (offen and not nur_eigene)
+                                      else "text-gray-400")
                                      + " text-xl shrink-0 mt-0.5")
             with ui.column().classes("gap-1 min-w-0 flex-grow"):
                 with ui.column().classes("gap-0 min-w-0"):
@@ -3408,17 +3440,23 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate):
                     ui.label(t("{n} Reinigung", n=n) if n == 1 else t("{n} Reinigungen", n=n)) \
                         .classes("text-xs text-gray-500 leading-tight whitespace-nowrap")
                 with ui.row().classes("items-center gap-1 flex-wrap"):
-                    if offen:
-                        ui.chip(t("{n} frei", n=len(offen)), icon="person_off") \
-                            .props("color=amber-8 text-color=white dense square") \
-                            .classes("text-xs !ml-0")
-                    if vergeben:
-                        # Bei genau einem Namen den Namen zeigen – das ist die
-                        # Information, die man sonst durch Aufklappen sucht.
-                        ui.chip(namen[0] if len(namen) == 1
-                                else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
-                            .props("color=green-7 text-color=white dense square") \
-                            .classes("text-xs !ml-0")
+                    if nur_eigene:
+                        for wohnung in sorted({j["apartment_name"] for j in tagesjobs}):
+                            ui.chip(wohnung, icon="home") \
+                                .props("color=primary text-color=white dense square") \
+                                .classes("text-xs !ml-0")
+                    else:
+                        if offen:
+                            ui.chip(t("{n} frei", n=len(offen)), icon="person_off") \
+                                .props("color=amber-8 text-color=white dense square") \
+                                .classes("text-xs !ml-0")
+                        if vergeben:
+                            # Bei genau einem Namen den Namen zeigen – das ist die
+                            # Information, die man sonst durch Aufklappen sucht.
+                            ui.chip(namen[0] if len(namen) == 1
+                                    else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
+                                .props("color=green-7 text-color=white dense square") \
+                                .classes("text-xs !ml-0")
     with exp:
         for j in tagesjobs:
             _cleaning_compact(j, user, admin, staff, activate)
@@ -4758,7 +4796,12 @@ def main_page():
             builders.get(key, lambda: None)()
 
     if visible:
-        activate(visible[0]["key"])
+        # Nach einem Neuladen dort weitermachen, wo man war. Sonst landet man
+        # jedes Mal auf der Startseite – auch nach Aktionen, die die Seite neu
+        # laden (z. B. „Schaden erledigt“ in der Übersicht).
+        erlaubt = [a["key"] for a in visible]
+        start = _cur_area(erlaubt[0])
+        activate(start if start in erlaubt else erlaubt[0])
     else:
         with content:
             with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):

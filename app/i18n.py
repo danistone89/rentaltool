@@ -147,6 +147,13 @@ _EN = {
     "Wechseltag – Anreise noch heute": "Turnover day – arrival still today",
     "Nächste Anreise: {datum} · {zeit}": "Next arrival: {datum} · {zeit}",
     "Person": "Guest",
+    "Meine Reinigungen": "My cleanings",
+    "Alle Reinigungen": "All cleanings",
+    "Dir ist gerade keine Reinigung zugewiesen.":
+        "No cleaning is assigned to you right now.",
+    "Unter „Alle Reinigungen“ siehst du, was noch frei ist.":
+        "Under “All cleanings” you can see what is still free.",
+    "Für dich heute nichts zu tun. \U0001F389": "Nothing for you today. \U0001F389",
     "{n} Reinigung": "{n} cleaning",
     "{n} Reinigungen": "{n} cleanings",
     "{n} frei": "{n} free",

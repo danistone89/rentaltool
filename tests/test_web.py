@@ -269,7 +269,8 @@ async def test_oberflaeche_auf_englisch(user: User, mock_backend, monkeypatch, t
     await user.should_see("Sections")          # Navigations-Überschrift
     await user.should_see("Bookings")          # Bereichsname
     await user.should_see("My account")
-    await user.should_see("Cleanings")         # Tab in Buchungen
+    await user.should_see("All cleanings")     # Tab in Buchungen
+    await user.should_see("My cleanings")      # eigener Startbildschirm
     await user.should_not_see("Reinigungen")
 
 
@@ -668,6 +669,25 @@ async def test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen(
     await user.should_see("1 Reinigung noch niemandem zugewiesen")   # Banner oben
 
 
+def _texte_unter(user, marker):
+    """Alle Texte unterhalb eines markierten Elements.
+
+    Noetig, weil NiceGUI auch die INAKTIVEN Tab-Panels in den Elementbaum legt –
+    should_not_see() koennte "Meine" und "Alle" sonst nicht unterscheiden.
+    """
+    treffer = []
+
+    def sammle(el):
+        for kid in el:
+            if getattr(kid, "text", None):
+                treffer.append(kid.text)
+            sammle(kid)
+
+    for el in user.find(marker=marker).elements:
+        sammle(el)
+    return " | ".join(treffer)
+
+
 def _aktion_klicken(user, text):
     """Die Aktions-Buttons im Buchungs-Dialog tragen ihren Text als Kind-Label,
     nicht als Button-Text – ein Klick auf das Label liefe ins Leere."""
@@ -768,3 +788,105 @@ async def test_checkliste_aus_buchung_stuerzt_nicht_ab(user: User, mock_backend,
     await user.should_see("Räume & Aufgaben")
     await user.should_see("Check-out")
     await user.should_see("Fortschritt")
+
+
+async def test_neuladen_bleibt_im_bereich(user: User, mock_backend, tmp_path, monkeypatch):
+    """Nach einem Neuladen dort weitermachen, wo man war.
+
+    Aktionen wie „Schaden erledigt" laden die Seite neu (ui.navigate.to("/")) –
+    vorher landete man dabei jedes Mal wieder in den Buchungen.
+    """
+    _hk_mocks(monkeypatch, tmp_path)
+    await _login(user)
+    user.find(marker="nav-zeiterfassung").click()
+    await user.should_see("Meine Übersicht")
+
+    await user.open("/")                       # Neuladen
+    await user.should_see("Meine Übersicht")   # weiterhin Zeiterfassung
+    await user.should_not_see("Reinigungs-Übersicht & Buchungskalender")
+
+
+async def test_neuladen_faellt_zurueck_wenn_bereich_gesperrt(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    """Ist der gemerkte Bereich für die Rolle nicht freigegeben, greift der
+    erste erlaubte Bereich – sonst sähe eine Putzkraft eine leere Seite."""
+    _hk_mocks(monkeypatch, tmp_path)
+    monkeypatch.setitem(web.USERS, "putzi2", {
+        "password_hash": auth.hash_password("putzi2"), "role": "putzkraft",
+        "totp_secret": "", "name": "putzi2"})
+    await user.open("/login")
+    user.find(marker="login-user").type("putzi2")
+    user.find(marker="login-pw").type("putzi2")
+    user.find("Anmelden").click()
+    await user.open("/")
+
+    with user.client:                       # Bereich setzen, den die Rolle nicht hat
+        web.app.storage.user["area"] = "beherbergungssteuer"
+
+    await user.open("/")
+    await user.should_not_see("Berechnen")  # kein Zugriff -> Rückfall
+    await user.should_see("Buchungen")
+
+
+async def test_meine_reinigungen_zeigt_nur_die_eigenen(user: User, mock_backend,
+                                                       tmp_path, monkeypatch):
+    """Zwei Reinigungen heute – eine für Gabriel, eine für Valeriya.
+
+    Valeriya muss auf einen Blick sehen, welche Wohnung ihre ist. „Meine
+    Reinigungen" ist deshalb der Startbildschirm und zeigt ausschließlich die
+    eigenen; zugewiesen wird unter „Alle Reinigungen".
+    """
+    from app import bookings as bk
+    _hk_mocks(monkeypatch, tmp_path)
+    for name in ("vale", "gabi"):
+        monkeypatch.setitem(web.USERS, name, {
+            "password_hash": auth.hash_password(name), "role": "putzkraft",
+            "totp_secret": "", "name": {"vale": "Valeriya", "gabi": "Gabriel"}[name]})
+
+    heute = date.today().isoformat()
+    from app import data as _data
+
+    def _b(bid, apt_id, apt_name):
+        return {"id": bid, "type": "reservation", "is-blocked-booking": False,
+                "apartment": {"id": apt_id, "name": apt_name},
+                "arrival": "2026-07-01", "departure": heute,
+                "check-in": "15:00", "check-out": "10:00", "adults": 2, "children": 0,
+                "guest-name": f"Gast {bid}", "channel": {"name": "Direct booking"},
+                "notice": ""}
+    monkeypatch.setattr(_data, "_reservations", lambda *a, **k: [
+        _b(801, 2748963, "Cottaer Straße"), _b(802, 2960031, "Wernerstraße")])
+    bk.set_assignment(801, "vale", "admin")      # Cottaer Straße -> Valeriya
+    bk.set_assignment(802, "gabi", "admin")      # Wernerstraße   -> Gabriel
+
+    await user.open("/login")
+    user.find(marker="login-user").type("vale")
+    user.find(marker="login-pw").type("vale")
+    user.find("Anmelden").click()
+    await user.open("/")
+
+    await user.should_see("Meine Reinigungen")
+    await user.should_see("Alle Reinigungen")
+    # Startbildschirm ist "Meine" – dort steht NUR Valeriyas Wohnung.
+    meine = _texte_unter(user, "panel-meine")
+    assert "Cottaer Straße" in meine, meine
+    assert "Wernerstraße" not in meine, f"Gabriels Wohnung in 'Meine': {meine}"
+    # Unter "Alle" stehen beide – dort wird zugewiesen.
+    alle = _texte_unter(user, "panel-alle")
+    assert "Cottaer Straße" in alle and "Wernerstraße" in alle, alle
+
+
+async def test_ohne_zuweisung_startet_alle_reinigungen(user: User, mock_backend,
+                                                       tmp_path, monkeypatch):
+    """Wer nichts zugewiesen hat, landet dort, wo es etwas zu holen gibt."""
+    _hk_mocks(monkeypatch, tmp_path)
+    _mock_booking(monkeypatch)
+    monkeypatch.setitem(web.USERS, "neu", {
+        "password_hash": auth.hash_password("neu"), "role": "putzkraft",
+        "totp_secret": "", "name": "Neu"})
+    await user.open("/login")
+    user.find(marker="login-user").type("neu")
+    user.find(marker="login-pw").type("neu")
+    user.find("Anmelden").click()
+    await user.open("/")
+    # "Alle Reinigungen" ist aktiv -> die Buchung ist sichtbar
+    await user.should_see("Cottaer Straße")
