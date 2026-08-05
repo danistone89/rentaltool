@@ -9,22 +9,23 @@ import json
 import os
 from datetime import datetime
 
-from app import paths
+from app import paths, store
 
 HERE = paths.ROOT
 ASSIGN = paths.p("assignments.json")
 
 
 def _read():
-    if os.path.exists(ASSIGN):
-        with open(ASSIGN, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    return store.read(ASSIGN, {})
 
 
 def _write(obj):
-    with open(ASSIGN, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=1)
+    store.write(ASSIGN, obj)
+
+
+def _aendern():
+    """Zuweisungen unter Sperre ändern (siehe app/store.py)."""
+    return store.edit(ASSIGN, {})
 
 
 def now_iso():
@@ -42,23 +43,23 @@ def assignee_of(booking_id):
 
 def set_assignment(booking_id, assignee, by, note=""):
     """Buchung einem Mitarbeiter zuweisen/umverteilen. Gibt (eintrag, vorheriger) zurück."""
-    d = _read()
     key = str(booking_id)
-    cur = d.get(key) or {"history": []}
-    prev = cur.get("assignee")
-    cur.update({"assignee": assignee, "assigned_by": by, "ts": now_iso()})
-    cur.setdefault("history", []).append(
-        {"from": prev, "to": assignee, "by": by, "ts": now_iso(), "note": note})
-    d[key] = cur
-    _write(d)
+    with _aendern() as a:
+        cur = a.wert.get(key) or {"history": []}
+        prev = cur.get("assignee")
+        cur.update({"assignee": assignee, "assigned_by": by, "ts": now_iso()})
+        cur.setdefault("history", []).append(
+            {"from": prev, "to": assignee, "by": by, "ts": now_iso(), "note": note})
+        a.wert[key] = cur
     return cur, prev
 
 
 def clear_assignment(booking_id):
-    d = _read()
-    if str(booking_id) in d:
-        d.pop(str(booking_id))
-        _write(d)
+    with _aendern() as a:
+        if str(booking_id) in a.wert:
+            a.wert.pop(str(booking_id))
+        else:
+            a.verwerfen()
 
 
 def get_record(booking_id):
@@ -67,12 +68,11 @@ def get_record(booking_id):
 
 def set_field(booking_id, **fields):
     """Zusatzfelder am Buchungs-Datensatz setzen (legt ihn bei Bedarf an)."""
-    d = _read()
     key = str(booking_id)
-    rec = d.get(key) or {"history": []}
-    rec.update(fields)
-    d[key] = rec
-    _write(d)
+    with _aendern() as a:
+        rec = a.wert.get(key) or {"history": []}
+        rec.update(fields)
+        a.wert[key] = rec
     return rec
 
 
@@ -87,17 +87,17 @@ def is_checklist_done(booking_id):
 def reset(booking_id):
     """Workflow-Status zurücksetzen: Zuweisung, Checklisten-Abschluss und Flags löschen
     (Notiz bleibt erhalten). Status wird damit wieder 'nicht zugewiesen'."""
-    d = _read()
     key = str(booking_id)
-    rec = d.get(key)
-    if not rec:
-        return
-    for f in ("assignee", "assigned_by", "ts", "checklist_done", "checklist_by",
-              "nachtragen_notified"):
-        rec.pop(f, None)
-    rec.setdefault("history", []).append({"reset": now_iso()})
-    d[key] = rec
-    _write(d)
+    with _aendern() as a:
+        rec = a.wert.get(key)
+        if not rec:
+            a.verwerfen()
+            return
+        for f in ("assignee", "assigned_by", "ts", "checklist_done", "checklist_by",
+                  "nachtragen_notified"):
+            rec.pop(f, None)
+        rec.setdefault("history", []).append({"reset": now_iso()})
+        a.wert[key] = rec
 
 
 # ----------------------------------------------------- Smoobu-Buchung normalisieren

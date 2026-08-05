@@ -10,7 +10,7 @@ import os
 import time
 from datetime import date, timedelta
 
-from app import paths, smoobu, steuer
+from app import paths, smoobu, steuer, store
 
 HERE = paths.ROOT
 CONFIG_PATH = paths.p("config.json")
@@ -46,8 +46,12 @@ LAST_FETCH = None  # Zeitpunkt des letzten echten API-Zugriffs (datetime)
 
 
 def save_config():
-    with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
-        json.dump(CONFIG, fh, ensure_ascii=False, indent=2)
+    """Konfiguration atomar sichern.
+
+    Die heikelste Datei überhaupt: hier stehen die Benutzerkonten. Ein Abbruch
+    beim Schreiben hätte die App ohne Konten zurückgelassen (siehe app/store.py).
+    """
+    store.write(CONFIG_PATH, CONFIG, indent=2)
 
 
 def clear_cache():

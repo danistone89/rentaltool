@@ -45,3 +45,6 @@ receipts.json
 
 # Bericht der letzten Sicherung (tools/backup.py)
 backup-status.json
+
+# Sperrdateien der Speicherschicht (app/store.py)
+*.lock

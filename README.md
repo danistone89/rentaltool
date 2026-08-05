@@ -37,6 +37,7 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `app/ical.py` | Reinigungstermin als `.ics` für den eigenen Kalender |
 | `app/paths.py` | Wo die Betriebsdaten liegen (Datenordner, getrennt vom Code) |
+| `app/store.py` | Ein Weg für allen Dateizugriff: atomar schreiben, gesperrt ändern |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
 | `tools/migrate_data.py` | Betriebsdaten einmalig in einen eigenen Datenordner umziehen |
@@ -581,6 +582,55 @@ Dateien im Ziel werden nie überschrieben.
 > nicht** (`app/data.py`) und sagt, was zu tun ist. Ohne diese Prüfung liefe sie
 > mit leerer Konfiguration hoch und böte an, einen neuen Administrator anzulegen –
 > während die echten Konten unbemerkt daneben lägen.
+
+## Speicherschicht: atomar schreiben, gesperrt ändern
+
+Aller Dateizugriff läuft über `app/store.py`. Vorher machte jedes Modul „ganze
+Datei lesen → im Speicher ändern → ganze Datei überschreiben". Darin steckten
+zwei Fehler:
+
+**Nicht atomar.** `open(pfad, "w")` kürzt die Datei sofort auf 0 Bytes. Wer in
+diesem Moment abstürzt – Neustart, OOM-Killer, volle Platte – hinterlässt eine
+leere oder halbe Datei. Bei `config.json` hieße das: alle Konten weg.
+Geschrieben wird jetzt in eine Nachbardatei, auf die Platte gezwungen (`fsync`)
+und erst dann per `os.replace` umgehängt – ein Schritt, den das Dateisystem
+entweder ganz oder gar nicht macht.
+
+**Nicht gesperrt.** Zwischen Lesen und Zurückschreiben liegt eine Lücke.
+Schreibt in dieser Lücke jemand anders, ist dessen Änderung still verloren.
+
+```python
+with store.edit(LOG, []) as a:      # Sperre über die GANZE Änderung
+    a.wert.append(eintrag)          # geschrieben wird beim Verlassen
+```
+
+Wie groß der Unterschied ist, zeigt der Gegentest: vier Prozesse hängen
+gleichzeitig je 25 Einträge an dieselbe Datei. Mit der alten Arbeitsweise
+überlebten **38 von 100** Einträgen, und drei der vier Prozesse stürzten beim
+Lesen einer halb geschriebenen Datei ab. Mit `store.edit` sind es 100.
+`tests/test_store.py` prüft beides – die Parallelität mit echten Prozessen, den
+Abbruch mit einem echten `SIGKILL` mitten im Schreiben.
+
+Weitere Festlegungen:
+
+* Eine **kaputte Datei fällt nicht still auf die Vorgabe zurück**, sondern wirft
+  `store.DatenFehler`. Ein stiller Rückfall auf `[]` würde beim nächsten
+  Schreiben den noch vorhandenen Bestand endgültig überschreiben – aus einer
+  lesbaren Panne würde ein Datenverlust.
+* Gesperrt wird über eine Beidatei `<name>.lock`, nicht über die Datei selbst:
+  `os.replace` hängt eine **neue** Datei an den Namen, eine Sperre auf der alten
+  wäre danach wertlos.
+* Die Sperre ist **im selben Thread erneut betretbar**, sonst verklemmte sich die
+  App, sobald zwei Funktionen dieselbe Datei schachteln.
+* Nach 10 Sekunden Warten gibt es einen `store.SperrFehler` statt einer
+  Oberfläche, die ohne Erklärung stehenbleibt.
+
+Auch das **Steuerarchiv** hängt daran: Revision ermitteln, PDF ablegen und den
+Ledger-Eintrag anhängen laufen unter einer Sperre. Liefen zwei Ablagen
+gleichzeitig, bekämen beide dieselbe Revision und dasselbe `prev_hash` – die
+Hash-Kette wäre gebrochen, und genau die soll ja etwas beweisen. Das PDF selbst
+wird ebenfalls über eine Nachbardatei geschrieben, sonst bliebe nach einem
+Abbruch ein halbes PDF zurück, dessen Prüfsumme nicht zum Ledger passt.
 
 ## Sicherung (Nextcloud)
 

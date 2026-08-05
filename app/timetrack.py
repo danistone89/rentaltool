@@ -6,27 +6,26 @@ Speichert Einträge in worklog.json (Liste). Jeder Eintrag:
 checkin_loc/checkout_loc: {lat, lon, acc} oder {error: "..."} (Standort-Nachweis
 als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
 """
-import json
-import os
 import uuid
 from datetime import date, datetime
 
-from app import feiertage, paths
+from app import feiertage, paths, store
 
 HERE = paths.ROOT
 LOG = paths.p("worklog.json")
 
 
 def _read():
-    if os.path.exists(LOG):
-        with open(LOG, encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    return store.read(LOG, [])
 
 
 def _write(items):
-    with open(LOG, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=1)
+    store.write(LOG, items)
+
+
+def _aendern():
+    """Zeitenliste unter Sperre ändern (siehe app/store.py)."""
+    return store.edit(LOG, [])
 
 
 def get_open(user):
@@ -43,48 +42,47 @@ def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None,
     loc: GPS-Dict. ip: öffentliche IP. ort: erkanntes Objekt (Geofence). dist: m.
     booking_id/apartment: optionale Kopplung an eine Smoobu-Buchung/Wohnung.
     """
-    items = _read()
-    if any(e["user"] == user and not e.get("checkout") for e in items):
-        return None
-    now = now or datetime.now()
-    e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
-         "checkin": now.isoformat(timespec="seconds"),
-         "checkin_loc": loc, "checkin_ip": ip, "checkin_ort": ort, "checkin_dist": dist,
-         "booking_id": booking_id, "apartment": apartment,
-         "checkout": None, "checkout_loc": None, "checkout_ip": None,
-         "checkout_ort": None, "checkout_dist": None}
-    items.append(e)
-    _write(items)
+    with _aendern() as a:
+        if any(e["user"] == user and not e.get("checkout") for e in a.wert):
+            a.verwerfen()
+            return None
+        now = now or datetime.now()
+        e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
+             "checkin": now.isoformat(timespec="seconds"),
+             "checkin_loc": loc, "checkin_ip": ip, "checkin_ort": ort, "checkin_dist": dist,
+             "booking_id": booking_id, "apartment": apartment,
+             "checkout": None, "checkout_loc": None, "checkout_ip": None,
+             "checkout_ort": None, "checkout_dist": None}
+        a.wert.append(e)
     return e
 
 
 def check_out(user, loc=None, ip=None, ort=None, dist=None, now=None):
     """Offenen Eintrag des Benutzers schließen. None, wenn keiner offen ist."""
-    items = _read()
-    now = now or datetime.now()
-    for e in reversed(items):
-        if e["user"] == user and not e.get("checkout"):
-            e["checkout"] = now.isoformat(timespec="seconds")
-            e["checkout_loc"] = loc
-            e["checkout_ip"] = ip
-            e["checkout_ort"] = ort
-            e["checkout_dist"] = dist
-            _write(items)
-            return e
+    with _aendern() as a:
+        now = now or datetime.now()
+        for e in reversed(a.wert):
+            if e["user"] == user and not e.get("checkout"):
+                e["checkout"] = now.isoformat(timespec="seconds")
+                e["checkout_loc"] = loc
+                e["checkout_ip"] = ip
+                e["checkout_ort"] = ort
+                e["checkout_dist"] = dist
+                return e
+        a.verwerfen()
     return None
 
 
 def add_manual(user, checkin, checkout, booking_id=None, apartment=None):
     """Arbeitszeit nachträglich erfassen (fertiger Eintrag mit Start+Ende)."""
-    items = _read()
     e = {"id": "m-" + uuid.uuid4().hex[:10], "user": user,
          "checkin": checkin.isoformat(timespec="seconds"),
          "checkin_loc": None, "checkin_ip": None, "checkin_ort": None, "checkin_dist": None,
          "booking_id": booking_id, "apartment": apartment, "manual": True,
          "checkout": checkout.isoformat(timespec="seconds"),
          "checkout_loc": None, "checkout_ip": None, "checkout_ort": None, "checkout_dist": None}
-    items.append(e)
-    _write(items)
+    with _aendern() as a:
+        a.wert.append(e)
     return e
 
 
@@ -102,11 +100,12 @@ def entries_for_booking(booking_id):
 
 def delete_for_booking(booking_id):
     """Alle Zeiteinträge dieser Buchung entfernen (Admin-Reset). Anzahl zurück."""
-    items = _read()
     bid = str(booking_id)
-    kept = [e for e in items if str(e.get("booking_id")) != bid]
-    _write(kept)
-    return len(items) - len(kept)
+    with _aendern() as a:
+        vorher = len(a.wert)
+        a.wert = [e for e in a.wert if str(e.get("booking_id")) != bid]
+        weg = vorher - len(a.wert)
+    return weg
 
 
 def get_entry(entry_id):
@@ -115,24 +114,24 @@ def get_entry(entry_id):
 
 def update_entry(entry_id, checkin=None, checkout=None, apartment=None):
     """Zeiteintrag bearbeiten. checkin/checkout = datetime, apartment = Name/'' ."""
-    items = _read()
-    for e in items:
-        if e["id"] == entry_id:
-            if checkin is not None:
-                e["checkin"] = checkin.isoformat(timespec="seconds")
-            if checkout is not None:
-                e["checkout"] = checkout.isoformat(timespec="seconds")
-            if apartment is not None:
-                e["apartment"] = apartment
-            e["edited"] = datetime.now().isoformat(timespec="seconds")
-    _write(items)
+    with _aendern() as a:
+        for e in a.wert:
+            if e["id"] == entry_id:
+                if checkin is not None:
+                    e["checkin"] = checkin.isoformat(timespec="seconds")
+                if checkout is not None:
+                    e["checkout"] = checkout.isoformat(timespec="seconds")
+                if apartment is not None:
+                    e["apartment"] = apartment
+                e["edited"] = datetime.now().isoformat(timespec="seconds")
 
 
 def delete_entry(entry_id):
-    items = _read()
-    kept = [e for e in items if e["id"] != entry_id]
-    _write(kept)
-    return len(items) != len(kept)
+    with _aendern() as a:
+        vorher = len(a.wert)
+        a.wert = [e for e in a.wert if e["id"] != entry_id]
+        geloescht = vorher != len(a.wert)
+    return geloescht
 
 
 def duration_minutes(e):
@@ -157,30 +156,30 @@ def mark_billed(entry_ids, by, when=None):
     """
     ids = {str(i) for i in entry_ids}
     ts = (when or datetime.now()).isoformat(timespec="seconds")
-    items = _read()
     n = 0
-    for e in items:
-        if str(e.get("id")) in ids and not e.get("abgerechnet"):
-            e["abgerechnet"] = ts
-            e["abgerechnet_von"] = by
-            n += 1
-    if n:
-        _write(items)
+    with _aendern() as a:
+        for e in a.wert:
+            if str(e.get("id")) in ids and not e.get("abgerechnet"):
+                e["abgerechnet"] = ts
+                e["abgerechnet_von"] = by
+                n += 1
+        if not n:
+            a.verwerfen()
     return n
 
 
 def unmark_billed(entry_ids):
     """Markierung wieder entfernen (Korrektur einer versehentlichen Meldung)."""
     ids = {str(i) for i in entry_ids}
-    items = _read()
     n = 0
-    for e in items:
-        if str(e.get("id")) in ids and e.get("abgerechnet"):
-            e.pop("abgerechnet", None)
-            e.pop("abgerechnet_von", None)
-            n += 1
-    if n:
-        _write(items)
+    with _aendern() as a:
+        for e in a.wert:
+            if str(e.get("id")) in ids and e.get("abgerechnet"):
+                e.pop("abgerechnet", None)
+                e.pop("abgerechnet_von", None)
+                n += 1
+        if not n:
+            a.verwerfen()
     return n
 
 

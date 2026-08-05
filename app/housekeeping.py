@@ -5,13 +5,12 @@ Datenhaltung in JSON-Dateien (gitignored, betrieblich/personenbezogen), Fotos
 unter media/. Je Apartment: Checkliste (Räume→Aufgaben, Soll-Foto) + Bestandsliste.
 Reinigungsdurchgänge, Schadensmeldungen und Nachkauf-Wünsche werden protokolliert.
 """
-import json
 import os
 import shutil
 import uuid
 from datetime import datetime
 
-from app import paths
+from app import paths, store
 
 HERE = paths.ROOT
 DATA = paths.DATA_DIR
@@ -41,15 +40,16 @@ DEFAULT_INVENTORY = [
 
 
 def _read(path, default):
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    return default
+    return store.read(path, default)
 
 
 def _write(path, obj):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=1)
+    store.write(path, obj)
+
+
+def _aendern(path, default):
+    """Datei unter Sperre lesen, ändern, zurückschreiben (siehe app/store.py)."""
+    return store.edit(path, default)
 
 
 def _uid():
@@ -81,20 +81,20 @@ def save_photo(kind, data, ext="jpg", mirror_dir=None):
 # ------------------------------------------------------------- Checklisten
 def get_checklist(apt_id):
     """Checkliste eines Apartments; legt bei Bedarf eine Standardvorlage an."""
-    all_cl = _read(CHECKLISTS, {})
     key = str(apt_id)
-    if key not in all_cl:
-        all_cl[key] = {"rooms": [
-            {"name": rn, "tasks": [{"id": _uid(), "text": txt, "ref_photo": None} for txt in tasks]}
-            for rn, tasks in DEFAULT_ROOMS]}
-        _write(CHECKLISTS, all_cl)
-    return all_cl[key]
+    with _aendern(CHECKLISTS, {}) as a:
+        if key not in a.wert:
+            a.wert[key] = {"rooms": [
+                {"name": rn, "tasks": [{"id": _uid(), "text": txt, "ref_photo": None} for txt in tasks]}
+                for rn, tasks in DEFAULT_ROOMS]}
+        else:
+            a.verwerfen()
+        return a.wert[key]
 
 
 def save_checklist(apt_id, checklist):
-    all_cl = _read(CHECKLISTS, {})
-    all_cl[str(apt_id)] = checklist
-    _write(CHECKLISTS, all_cl)
+    with _aendern(CHECKLISTS, {}) as a:
+        a.wert[str(apt_id)] = checklist
 
 
 def set_task_ref_photo(apt_id, task_id, rel_photo):
@@ -108,18 +108,19 @@ def set_task_ref_photo(apt_id, task_id, rel_photo):
 
 # ------------------------------------------------------------- Bestand (Vorlage)
 def get_inventory(apt_id):
-    all_inv = _read(INVENTORY, {})
     key = str(apt_id)
-    if key not in all_inv:
-        all_inv[key] = [{"id": _uid(), "name": n, "kategorie": k} for n, k in DEFAULT_INVENTORY]
-        _write(INVENTORY, all_inv)
-    return all_inv[key]
+    with _aendern(INVENTORY, {}) as a:
+        if key not in a.wert:
+            a.wert[key] = [{"id": _uid(), "name": n, "kategorie": k}
+                           for n, k in DEFAULT_INVENTORY]
+        else:
+            a.verwerfen()
+        return a.wert[key]
 
 
 def save_inventory(apt_id, items):
-    all_inv = _read(INVENTORY, {})
-    all_inv[str(apt_id)] = items
-    _write(INVENTORY, all_inv)
+    with _aendern(INVENTORY, {}) as a:
+        a.wert[str(apt_id)] = items
 
 
 # ------------------------------------------------------------- Durchgänge
@@ -131,36 +132,34 @@ def get_open_run(apt_id, user):
 
 
 def start_run(apt_id, apt_name, user):
-    runs = _read(CLEANINGS, [])
-    ex = next((r for r in runs if str(r["apartment_id"]) == str(apt_id)
-               and r["user"] == user and not r.get("finished")), None)
-    if ex:
-        return ex
-    r = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name, "user": user,
-         "started": now_iso(), "finished": None, "tasks": {}}
-    runs.append(r)
-    _write(CLEANINGS, runs)
+    with _aendern(CLEANINGS, []) as a:
+        ex = next((r for r in a.wert if str(r["apartment_id"]) == str(apt_id)
+                   and r["user"] == user and not r.get("finished")), None)
+        if ex:
+            a.verwerfen()
+            return ex
+        r = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name,
+             "user": user, "started": now_iso(), "finished": None, "tasks": {}}
+        a.wert.append(r)
     return r
 
 
 def update_task(run_id, task_id, done=None, ist_photo=None):
-    runs = _read(CLEANINGS, [])
-    for r in runs:
-        if r["id"] == run_id:
-            t = r["tasks"].setdefault(task_id, {"done": False, "ist_photo": None})
-            if done is not None:
-                t["done"] = done
-            if ist_photo is not None:
-                t["ist_photo"] = ist_photo
-    _write(CLEANINGS, runs)
+    with _aendern(CLEANINGS, []) as a:
+        for r in a.wert:
+            if r["id"] == run_id:
+                t = r["tasks"].setdefault(task_id, {"done": False, "ist_photo": None})
+                if done is not None:
+                    t["done"] = done
+                if ist_photo is not None:
+                    t["ist_photo"] = ist_photo
 
 
 def finish_run(run_id):
-    runs = _read(CLEANINGS, [])
-    for r in runs:
-        if r["id"] == run_id:
-            r["finished"] = now_iso()
-    _write(CLEANINGS, runs)
+    with _aendern(CLEANINGS, []) as a:
+        for r in a.wert:
+            if r["id"] == run_id:
+                r["finished"] = now_iso()
 
 
 def list_runs(limit=100):
@@ -169,12 +168,11 @@ def list_runs(limit=100):
 
 # ------------------------------------------------------------- Schäden
 def add_damage(apt_id, apt_name, room, desc, urgency, photo, reporter, booking_id=None):
-    items = _read(DAMAGES, [])
     d = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name, "room": room,
          "desc": desc, "urgency": urgency, "photo": photo, "reporter": reporter,
          "booking_id": booking_id, "ts": now_iso(), "status": "offen"}
-    items.append(d)
-    _write(DAMAGES, items)
+    with _aendern(DAMAGES, []) as a:
+        a.wert.append(d)
     return d
 
 
@@ -189,21 +187,19 @@ def damages_for_booking(booking_id):
 
 
 def set_damage_status(damage_id, status):
-    items = _read(DAMAGES, [])
-    for d in items:
-        if d["id"] == damage_id:
-            d["status"] = status
-    _write(DAMAGES, items)
+    with _aendern(DAMAGES, []) as a:
+        for d in a.wert:
+            if d["id"] == damage_id:
+                d["status"] = status
 
 
 # ------------------------------------------------------------- Nachkauf/Bestand
 def add_restock(apt_id, apt_name, item, menge, kategorie, reporter, booking_id=None):
-    items = _read(RESTOCK, [])
     r = {"id": _uid(), "apartment_id": apt_id, "apartment_name": apt_name, "item": item,
          "menge": menge, "kategorie": kategorie, "reporter": reporter,
          "booking_id": booking_id, "ts": now_iso(), "status": "offen"}
-    items.append(r)
-    _write(RESTOCK, items)
+    with _aendern(RESTOCK, []) as a:
+        a.wert.append(r)
     return r
 
 
@@ -218,8 +214,7 @@ def restock_for_booking(booking_id):
 
 
 def set_restock_status(restock_id, status):
-    items = _read(RESTOCK, [])
-    for r in items:
-        if r["id"] == restock_id:
-            r["status"] = status
-    _write(RESTOCK, items)
+    with _aendern(RESTOCK, []) as a:
+        for r in a.wert:
+            if r["id"] == restock_id:
+                r["status"] = status

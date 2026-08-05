@@ -22,17 +22,15 @@ Betriebsdaten aus dem Projektordner nach `/var/lib/rentaltool` (`app/paths.py`,
 Inhaltsprüfung und wöchentlicher Wiederherstellungs-Probe (`tools/backup.py`,
 `deploy/*.timer`). Siehe README → „Datenordner" und „Sicherung".
 
-### AP2 · Sichere Speicherschicht — offen
+### AP2 · Sichere Speicherschicht — ✅ erledigt (5.8.2026)
 
-Ein Modul für allen Dateizugriff: atomares Schreiben (`os.replace`) und
-Dateisperre. Heute macht jedes Modul „ganze Datei lesen → ändern → ganze Datei
-überschreiben" (`timetrack.py`, `bookings.py`, `receipts.py`, `housekeeping.py`,
-`data.py`). Zwei gleichzeitige Zugriffe = eine Änderung verschwindet
-stillschweigend; ein Absturz mitten im Schreiben = kaputte Datei. Bei
-`config.json` hieße das: App startet nicht mehr, samt aller Konten.
-`tools/useradmin.py:63` macht es bereits richtig – der Rest zieht nach.
-
-*Abhängigkeit:* keine. *Größe:* M.
+`app/store.py` als einziger Weg für Dateizugriff: atomares Schreiben
+(Nachbardatei + `fsync` + `os.replace`) und Dateisperre über die ganze Änderung
+(`store.edit`). Umgestellt sind `timetrack`, `bookings`, `receipts`,
+`housekeeping`, `data.save_config` und das Steuerarchiv (Revision + Ledger unter
+einer Sperre, PDF atomar). Gegentest: mit der alten Arbeitsweise überlebten bei
+vier gleichzeitigen Prozessen 38 von 100 Einträgen, jetzt 100.
+Siehe README → „Speicherschicht".
 
 ### AP3 · Staging & Deploy — offen
 

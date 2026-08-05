@@ -27,7 +27,7 @@ import urllib.request
 from datetime import datetime
 from urllib.parse import quote
 
-from app import paths
+from app import paths, store
 
 HERE = paths.ROOT
 ARCHIVE_DIR = paths.p("archive")
@@ -66,35 +66,48 @@ def archive_pdf(pdf_bytes, period, values, *, now=None):
     period: 'JJJJ-MM'. values: Dict der Formularwerte (für den Nachweis).
     Gibt den Ledger-Eintrag zurück.
     """
-    entries = list_entries()
-    revision = _next_revision(period, entries)
-    year = period.split("-")[0]
-    year_dir = os.path.join(ARCHIVE_DIR, year)
-    os.makedirs(year_dir, exist_ok=True)
+    # Revision, Kettenglied und Anhängen gehören zusammen: liefen zwei Ablagen
+    # gleichzeitig, bekämen beide dieselbe Revision und dasselbe prev_hash – die
+    # Kette wäre gebrochen, und genau das soll sie ja beweisen.
+    with store.sperre(LEDGER_PATH):
+        entries = list_entries()
+        revision = _next_revision(period, entries)
+        year = period.split("-")[0]
+        year_dir = os.path.join(ARCHIVE_DIR, year)
+        os.makedirs(year_dir, exist_ok=True)
 
-    fname = f"Beherbergungssteuer_{period}_v{revision}.pdf"
-    rel = os.path.join(year, fname)
-    abspath = os.path.join(ARCHIVE_DIR, rel)
+        fname = f"Beherbergungssteuer_{period}_v{revision}.pdf"
+        rel = os.path.join(year, fname)
+        abspath = os.path.join(ARCHIVE_DIR, rel)
 
-    with open(abspath, "wb") as f:
-        f.write(pdf_bytes)
-    os.chmod(abspath, 0o444)  # schreibgeschützt
+        # Über eine Nachbardatei: ein Abbruch mitten im Schreiben hinterließe
+        # sonst ein halbes PDF, dessen Prüfsumme nicht zum Ledger passt – die
+        # Ablage wäre auf Dauer als „verändert" markiert.
+        tmp = abspath + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(pdf_bytes)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, abspath)
+        os.chmod(abspath, 0o444)  # schreibgeschützt
 
-    prev_hash = entries[-1]["entry_hash"] if entries else GENESIS
-    core = {
-        "seq": len(entries) + 1,
-        "ts": (now or datetime.now()).isoformat(timespec="seconds"),
-        "period": period,
-        "revision": revision,
-        "file": rel,
-        "sha256": _sha256(pdf_bytes),
-        "values": values,
-    }
-    entry = {**core, "prev_hash": prev_hash, "entry_hash": _entry_hash(prev_hash, core)}
+        prev_hash = entries[-1]["entry_hash"] if entries else GENESIS
+        core = {
+            "seq": len(entries) + 1,
+            "ts": (now or datetime.now()).isoformat(timespec="seconds"),
+            "period": period,
+            "revision": revision,
+            "file": rel,
+            "sha256": _sha256(pdf_bytes),
+            "values": values,
+        }
+        entry = {**core, "prev_hash": prev_hash, "entry_hash": _entry_hash(prev_hash, core)}
 
-    os.makedirs(ARCHIVE_DIR, exist_ok=True)
-    with open(LEDGER_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        os.makedirs(ARCHIVE_DIR, exist_ok=True)
+        with open(LEDGER_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
     return entry
 
 
