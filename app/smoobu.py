@@ -8,6 +8,8 @@ import json
 import urllib.request
 import urllib.error
 
+from app import mode
+
 BASE = "https://login.smoobu.com/api"
 
 
@@ -84,6 +86,10 @@ def get_messages(api_key, reservation_id):
 
 def send_message(api_key, reservation_id, body, subject=""):
     """Nachricht an den Gast senden (POST). Nur bei ausdrücklicher Aktion aufrufen."""
+    if mode.STAGING:
+        # Die Probe-Instanz arbeitet mit echten Buchungen – ein Klick hier ginge
+        # an einen echten Gast.
+        raise SmoobuError(f"{mode.LABEL}: Es wird keine Gast-Nachricht gesendet.")
     data = {"messageBody": body}
     if subject:
         data["subject"] = subject

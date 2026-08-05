@@ -27,7 +27,7 @@ from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402
-                 bookings, receipts, feiertage, i18n, ical)
+                 bookings, receipts, feiertage, i18n, ical, mode)
 try:
     from app import pdf_form
 except Exception:  # PyMuPDF optional
@@ -864,6 +864,20 @@ def logo(height=44):
         .style(f"height:{height}px;width:{round(height * 300 / 70)}px")
 
 
+def _probe_hinweis():
+    """Unuebersehbares Kennzeichen der Probe-Instanz.
+
+    Die Probe laeuft mit einer Kopie der echten Daten und sieht deshalb genau
+    aus wie der Echtbetrieb. Wer das verwechselt, sucht spaeter Eintraege, die
+    er auf der falschen Instanz gemacht hat.
+    """
+    if not mode.STAGING:
+        return
+    ui.chip(mode.LABEL, icon="science") \
+        .props("color=deep-orange text-color=white dense square") \
+        .classes("text-xs font-bold")
+
+
 def _mail_context(r):
     """Platzhalter-Werte für die E-Mail-Vorlagen."""
     betr = CFG.get("betreiber", {})
@@ -936,6 +950,7 @@ def login_page():
 
     with ui.column().classes("absolute-center items-center gap-4"):
         logo(60)
+        _probe_hinweis()
         with ui.card().classes("w-[360px] max-w-full gap-2 rounded-xl shadow-md"):
             if not USERS:
                 ui.label(t("Erst-Einrichtung – Administrator anlegen")).classes("font-semibold")
@@ -2239,6 +2254,10 @@ def _apts():
 
 
 def _photo_mirror():
+    # Kein Spiegel auf der Probe-Instanz – sonst lägen Testfotos in der echten
+    # Nextcloud (siehe app/mode.py).
+    if mode.STAGING:
+        return None
     return CFG.get("reinigung_ordner") or None
 
 
@@ -4259,6 +4278,8 @@ def open_booking_dialog(bk, user, admin, staff, activate):
 
 
 def _beleg_mirror():
+    if mode.STAGING:
+        return None
     return CFG.get("belege_ordner") or None
 
 
@@ -4717,6 +4738,7 @@ def main_page():
         ui.button(icon="menu", on_click=lambda: drawer.toggle()) \
             .props("flat round color=primary dense").classes("lg:hidden")
         logo(42)
+        _probe_hinweis()
         ui.space()
         if _is_admin():
             ui.button("Benutzer", icon="group", on_click=open_users) \

@@ -1,0 +1,19 @@
+[Unit]
+Description=Beherbergungssteuer PROBE-Instanz (rentaltool-staging)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rentaltool-staging
+# Eigener Datenordner: die Probe darf den Echtbetrieb nicht anfassen.
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool-staging
+# Schaltet Mailversand, Gast-Nachrichten und Nextcloud-Spiegel ab (app/mode.py)
+# und zeigt das Kennzeichen in der Oberflaeche.
+Environment=RENTALTOOL_STAGING=1
+ExecStart=/opt/rentaltool-staging/.venv/bin/python app/web.py
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

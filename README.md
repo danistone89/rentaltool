@@ -38,10 +38,14 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/ical.py` | Reinigungstermin als `.ics` für den eigenen Kalender |
 | `app/paths.py` | Wo die Betriebsdaten liegen (Datenordner, getrennt vom Code) |
 | `app/store.py` | Ein Weg für allen Dateizugriff: atomar schreiben, gesperrt ändern |
+| `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
 | `tools/migrate_data.py` | Betriebsdaten einmalig in einen eigenen Datenordner umziehen |
 | `tools/backup.py` | Tägliche Sicherung auf die Nextcloud + Wiederherstellungs-Probe |
+| `tools/deploy.sh` | Ausrollen mit Tests, Rauchprobe und Rückweg |
+| `tools/staging_refresh.py` | Probe-Instanz mit entschärfter Kopie der Echtdaten füllen |
+| `tools/watchdog.py` | Wächter: Oberfläche, Smoobu, Daten, Sicherung |
 | `tools/check_shadowing.py` | Findet überschattete Modulnamen (läuft als Test mit) |
 
 Der Fahrplan für den weiteren Ausbau steht in [`docs/roadmap.md`](docs/roadmap.md).
@@ -686,6 +690,82 @@ Die wöchentliche Probe ist Absicht: eine Sicherung, die nie zurückgeholt wurde
 ist keine Sicherung. Scheitert etwas, geht eine E-Mail an den
 Benachrichtigungs-Absender und der Timer meldet den Fehlschlag. Der letzte Lauf
 steht in `backup-status.json` im Datenordner.
+
+## Ausrollen, Probe-Instanz, Wächter
+
+### Ausrollen
+
+```bash
+tools/deploy.sh probe      # aktueller Zweig -> Probe-Instanz (Port 3002)
+tools/deploy.sh echt       # main -> app.ds-apartments.de (Port 3001)
+```
+
+Vorher lief das von Hand: `git pull`, `systemctl restart`, hoffen. Das Skript
+macht daraus einen Ablauf mit Netz:
+
+1. Arbeitsverzeichnis sauber? Echtbetrieb nur aus `main`.
+2. **Tests laufen zuerst** (`--ohne-tests` überspringt das).
+3. Ausrollen, Dienst neu starten.
+4. **Rauchprobe:** Antwortet `/login` mit dem Anmeldeformular, und steht kein
+   Fehler im Journal? Bewusst der Seiteninhalt und nicht nur „Prozess läuft" –
+   ein Prozess, der beim Rendern abstürzt, wäre sonst nicht zu unterscheiden.
+5. Schlägt die Probe fehl: **automatisch zurück auf den vorherigen Stand**,
+   erneut prüfen, Journal ausgeben.
+
+### Probe-Instanz
+
+Zweiter Dienst auf Port 3002 (`/opt/rentaltool-staging`, Daten in
+`/var/lib/rentaltool-staging`). Erreichbar über einen SSH-Tunnel – damit ist sie
+von außen gar nicht sichtbar, und weil sie dann auf `localhost` läuft,
+funktioniert auch die **Kamera** des Belegscanners (die verlangt HTTPS oder
+localhost):
+
+```bash
+ssh -L 3002:127.0.0.1:3002 rentaltool     # dann http://127.0.0.1:3002 öffnen
+```
+
+Gefüllt wird sie mit einer **Kopie der echten Daten** – nur so fällt auf, was
+mit zwei Buchungen am selben Tag oder 300 Zeiteinträgen passiert:
+
+```bash
+ssh rentaltool 'cd /opt/rentaltool-staging && python3 tools/staging_refresh.py --jetzt'
+systemctl restart rentaltool-staging
+```
+
+Genau das macht sie gefährlich: echte Gäste, echte Mitarbeiter, echte
+E-Mail-Adressen. Deshalb **zwei Ebenen**:
+
+* `staging_refresh.py` nimmt beim Kopieren alle Wege nach draußen aus der
+  Konfiguration: Mail-App-Passwörter, Spiegel-Ordner, WebDAV und – besonders
+  wichtig – das **Sicherungsziel** (sonst überschriebe eine Sicherung der Probe
+  die echten Sicherungen am selben Ort).
+* `app/mode.py` sperrt dieselben Wege **im Code** (`RENTALTOOL_STAGING=1` in der
+  Unit): kein Mailversand, keine Gast-Nachrichten an Smoobu, kein
+  Nextcloud-Spiegel. Wer die Konfiguration von Hand wieder füllt, kommt trotzdem
+  nicht raus.
+
+In der Oberfläche steht oben ein oranges **PROBE-INSTANZ**-Kennzeichen – die
+Probe sieht sonst exakt aus wie der Echtbetrieb.
+
+> Die Probe hängt bewusst nicht unter einer eigenen Adresse: dafür bräuchte es
+> einen DNS-Eintrag und ein Zertifikat. Wenn das später nötig wird (z. B. um die
+> App als PWA auf dem Handy zu testen), reicht ein A-Record auf den Server.
+
+### Wächter
+
+`tools/watchdog.py` läuft alle 10 Minuten (`rentaltool-watchdog.timer`) und prüft:
+
+| Prüfung | Warum |
+|---|---|
+| Oberfläche | Antwortet `/login` **mit Anmeldeformular**? Ein Prozess, der beim Rendern abstürzt, sieht von außen gesund aus |
+| Smoobu | Ohne API sind Buchungslisten leer – das sieht aus wie „nichts zu tun", ist aber ein Ausfall |
+| Daten | Lassen sich Konten, Zeiten und Zuweisungen lesen? |
+| Sicherung | Nicht älter als 36 h – eine Sicherung, die still aufgehört hat, ist der gefährlichste Ausfall |
+
+Gemeldet wird **nur bei Wechseln**: einmal, wenn etwas kippt; danach höchstens
+alle 6 Stunden erneut; und einmal, wenn es sich wieder fängt. Sonst gewöhnt man
+sich an die Mails und liest sie irgendwann nicht mehr. Stand in
+`watchdog-status.json` im Datenordner, Handlauf mit `--zeigen` (meldet nie).
 
 ## Konfiguration
 

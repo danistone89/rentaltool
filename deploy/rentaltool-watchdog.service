@@ -1,0 +1,12 @@
+[Unit]
+Description=Waechter rentaltool (Oberflaeche, Smoobu, Daten, Sicherung)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rentaltool
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool
+ExecStart=/opt/rentaltool/.venv/bin/python tools/watchdog.py
+# Exit-Code != 0 heisst "etwas ist gestoert" – das soll den Timer nicht als
+# kaputt markieren, gemeldet wird per E-Mail.
+SuccessExitStatus=0 1

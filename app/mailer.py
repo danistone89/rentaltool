@@ -14,6 +14,8 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 
+from app import mode
+
 
 class MailError(RuntimeError):
     pass
@@ -49,7 +51,14 @@ def build_message(email_cfg, pdf_bytes, filename, context, *, subject=None, body
 
 
 def send(email_cfg, msg):
-    """Nachricht über Gmail-SMTP versenden."""
+    """Nachricht über Gmail-SMTP versenden.
+
+    Einziger Ausgang für alle Mail-Arten – deshalb steht die Probe-Sperre hier
+    und nicht in den einzelnen `send_*`-Funktionen.
+    """
+    if mode.STAGING:
+        raise MailError(f"{mode.LABEL}: Es wird nichts versendet. "
+                        f"Die Mail wäre an {msg['To']} gegangen.")
     host = email_cfg.get("smtp_host") or "smtp.gmail.com"
     port = int(email_cfg.get("smtp_port") or 587)
     user = (email_cfg.get("absender") or "").strip()

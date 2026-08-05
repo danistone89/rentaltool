@@ -1,0 +1,10 @@
+[Unit]
+Description=Waechter rentaltool alle 10 Minuten
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

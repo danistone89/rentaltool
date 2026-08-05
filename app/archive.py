@@ -27,7 +27,7 @@ import urllib.request
 from datetime import datetime
 from urllib.parse import quote
 
-from app import paths, store
+from app import mode, paths, store
 
 HERE = paths.ROOT
 ARCHIVE_DIR = paths.p("archive")
@@ -156,6 +156,10 @@ def _webdav_cfg(cfg):
 
 
 def has_mirror(cfg):
+    # Auf der Probe-Instanz gibt es keinen Spiegel: sonst landete beim
+    # Ausprobieren eine Kopie in der echten Nextcloud-Buchhaltung.
+    if mode.STAGING:
+        return False
     return bool(_webdav_cfg(cfg) or (cfg or {}).get("archiv_spiegel"))
 
 
@@ -258,6 +262,8 @@ def _webdav_upload_one(entry, w):
 # ---- öffentliche API ----
 def mirror_entry(entry, cfg):
     """Eine abgelegte PDF + Ledger in den konfigurierten Spiegel bringen."""
+    if mode.STAGING:
+        return None
     w = _webdav_cfg(cfg)
     if w:
         return _webdav_upload_one(entry, w)
@@ -274,6 +280,8 @@ def mirror_entry(entry, cfg):
 
 def mirror_all(cfg):
     """Alle bisher abgelegten Dokumente + Ledger spiegeln. Anzahl zurück."""
+    if mode.STAGING:
+        return 0
     w = _webdav_cfg(cfg)
     entries = list_entries()
     n = 0

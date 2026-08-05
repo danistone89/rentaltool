@@ -32,13 +32,15 @@ einer Sperre, PDF atomar). Gegentest: mit der alten Arbeitsweise überlebten bei
 vier gleichzeitigen Prozessen 38 von 100 Einträgen, jetzt 100.
 Siehe README → „Speicherschicht".
 
-### AP3 · Staging & Deploy — offen
+### AP3 · Staging & Deploy — ✅ erledigt (5.8.2026)
 
-Zweite Instanz zum Ausprobieren, ein Deploy-Skript (Tests vorher, Smoke-Check
-nachher, Rollback-Weg) statt `git pull` + `systemctl restart` von Hand. Dazu
-Monitoring: Dienst tot oder Smoobu-Fehler → Meldung. Heute merkt es niemand.
-
-*Abhängigkeit:* keine. *Größe:* M.
+`tools/deploy.sh` rollt mit Tests, Rauchprobe und automatischem Rückweg aus.
+Probe-Instanz auf Port 3002 mit eigenem Datenordner, erreichbar über
+SSH-Tunnel; gefüllt aus den Echtdaten, aber zweifach entschärft
+(`tools/staging_refresh.py` räumt die Konfiguration, `app/mode.py` sperrt
+Mail/Gast-Nachrichten/Spiegel im Code). `tools/watchdog.py` prüft alle 10
+Minuten Oberfläche, Smoobu, Daten und Alter der Sicherung und meldet nur bei
+Wechseln. Siehe README → „Ausrollen, Probe-Instanz, Wächter".
 
 ---
 
