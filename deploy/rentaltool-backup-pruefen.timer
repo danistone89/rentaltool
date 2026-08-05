@@ -1,0 +1,10 @@
+[Unit]
+Description=Woechentliche Wiederherstellungs-Probe rentaltool
+
+[Timer]
+OnCalendar=Mon *-*-* 04:30
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

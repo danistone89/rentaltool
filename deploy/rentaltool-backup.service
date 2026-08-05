@@ -1,0 +1,13 @@
+[Unit]
+Description=Sicherung rentaltool -> Nextcloud
+# Ohne den rclone-Mount bzw. ohne Netz hat das Hochladen keinen Zweck.
+After=network-online.target rclone-nextcloud.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rentaltool
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool
+ExecStart=/opt/rentaltool/.venv/bin/python tools/backup.py sichern
+# Scheitert die Sicherung, meldet das Werkzeug selbst per E-Mail und liefert
+# einen Exit-Code != 0 – der Fehlschlag steht damit auch in `systemctl status`.

@@ -12,10 +12,10 @@ import shutil
 import subprocess
 from datetime import datetime
 
-from app import housekeeping
+from app import housekeeping, paths
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RECEIPTS = os.path.join(HERE, "receipts.json")
+HERE = paths.ROOT
+RECEIPTS = paths.p("receipts.json")
 
 _EDITABLE = {"merchant", "amount", "note", "kategorie", "apartment_id", "apartment_name"}
 _KNOWN_MERCHANTS = ["ALDI", "LIDL", "REWE", "EDEKA", "KAUFLAND", "PENNY", "NETTO",

@@ -10,10 +10,22 @@ import os
 import time
 from datetime import date, timedelta
 
-from app import smoobu, steuer
+from app import paths, smoobu, steuer
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_PATH = os.path.join(HERE, "config.json")
+HERE = paths.ROOT
+CONFIG_PATH = paths.p("config.json")
+
+# Getrennter Datenordner eingerichtet, Konfiguration aber noch im Projektordner?
+# Dann sind die Daten nicht umgezogen. Ohne diese Prüfung startete die App mit
+# leerer Konfiguration – und böte auf der Login-Seite an, einen NEUEN
+# Administrator anzulegen, während die echten Konten unbemerkt daneben liegen.
+if paths.getrennt() and not os.path.exists(CONFIG_PATH) \
+        and os.path.exists(os.path.join(paths.ROOT, "config.json")):
+    raise SystemExit(
+        f"config.json fehlt im Datenordner {paths.DATA_DIR}, liegt aber noch im "
+        f"Projektordner {paths.ROOT}.\n"
+        f"Erst die Daten umziehen, dann starten:\n"
+        f"  python3 tools/migrate_data.py {paths.DATA_DIR} --jetzt")
 
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni",
           "Juli", "August", "September", "Oktober", "November", "Dezember"]

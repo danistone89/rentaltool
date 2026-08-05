@@ -1,0 +1,12 @@
+[Unit]
+Description=Taegliche Sicherung rentaltool
+
+[Timer]
+OnCalendar=*-*-* 03:30
+# Nicht alle Dienste gleichzeitig auf die Cloud loslassen.
+RandomizedDelaySec=600
+# War der Server um 03:30 aus, wird beim naechsten Start nachgeholt.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

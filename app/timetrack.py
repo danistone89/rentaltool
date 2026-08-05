@@ -11,10 +11,10 @@ import os
 import uuid
 from datetime import date, datetime
 
-from app import feiertage
+from app import feiertage, paths
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOG = os.path.join(HERE, "worklog.json")
+HERE = paths.ROOT
+LOG = paths.p("worklog.json")
 
 
 def _read():

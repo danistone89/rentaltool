@@ -11,9 +11,11 @@ import shutil
 import uuid
 from datetime import datetime
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = HERE
-MEDIA_DIR = os.path.join(HERE, "media")
+from app import paths
+
+HERE = paths.ROOT
+DATA = paths.DATA_DIR
+MEDIA_DIR = paths.p("media")
 
 CHECKLISTS = os.path.join(DATA, "checklists.json")
 INVENTORY = os.path.join(DATA, "inventory.json")

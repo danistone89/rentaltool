@@ -9,8 +9,10 @@ import json
 import os
 from datetime import datetime
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ASSIGN = os.path.join(HERE, "assignments.json")
+from app import paths
+
+HERE = paths.ROOT
+ASSIGN = paths.p("assignments.json")
 
 
 def _read():

@@ -42,3 +42,6 @@ assignments.json
 
 # Belege/Rechnungen (betrieblich/personenbezogen)
 receipts.json
+
+# Bericht der letzten Sicherung (tools/backup.py)
+backup-status.json

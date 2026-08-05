@@ -36,9 +36,14 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/feiertage.py` | Gesetzliche Feiertage Sachsen + Tagesart (Werktag / Wochenende+Feiertag) |
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `app/ical.py` | Reinigungstermin als `.ics` für den eigenen Kalender |
+| `app/paths.py` | Wo die Betriebsdaten liegen (Datenordner, getrennt vom Code) |
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
+| `tools/migrate_data.py` | Betriebsdaten einmalig in einen eigenen Datenordner umziehen |
+| `tools/backup.py` | Tägliche Sicherung auf die Nextcloud + Wiederherstellungs-Probe |
 | `tools/check_shadowing.py` | Findet überschattete Modulnamen (läuft als Test mit) |
+
+Der Fahrplan für den weiteren Ausbau steht in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Amtliches PDF-Formular
 
@@ -550,6 +555,84 @@ vor. Alle sechs Rechnungen liegen als Golden-Tests in
 > (typisch Direktbuchungen) gehen mit dem **vollen Betrag** in die Basis. Ist
 > dort die Steuer im Preis schon enthalten, wird sie mitbesteuert. Bei
 > Direktbuchungen die Beherbergungssteuer daher separat ausweisen.
+
+## Datenordner: Code und Betriebsdaten getrennt
+
+Auf dem Server liegt das Repo unter `/opt/rentaltool` und wird per `git pull`
+erneuert. Die Betriebsdaten liegen **daneben** in `/var/lib/rentaltool`:
+Konten (`config.json`), Arbeitszeiten, Zuweisungen, Belege, Reinigungsdaten,
+Fotos (`media/`), das Steuerarchiv (`archive/`) sowie Vorlage und Unterschrift
+(`templates/`, `assets/` – beide personenbezogen und gitignored).
+
+Gesteuert über die Umgebungsvariable **`RENTALTOOL_DATA`** (`app/paths.py`).
+**Ohne die Variable bleibt alles wie bisher**: Datenordner = Projektordner, also
+unverändert für lokale Entwicklung und Tests.
+
+```bash
+python3 tools/migrate_data.py /var/lib/rentaltool           # Probelauf: was würde umziehen
+python3 tools/migrate_data.py /var/lib/rentaltool --jetzt   # verschieben
+```
+
+Verschoben, nicht kopiert – zwei Bestände wären schlimmer als einer. Vorhandene
+Dateien im Ziel werden nie überschrieben.
+
+> **Schutz gegen den gefährlichsten Fehler:** Steht `RENTALTOOL_DATA`, fehlt dort
+> aber `config.json`, während sie noch im Projektordner liegt, **startet die App
+> nicht** (`app/data.py`) und sagt, was zu tun ist. Ohne diese Prüfung liefe sie
+> mit leerer Konfiguration hoch und böte an, einen neuen Administrator anzulegen –
+> während die echten Konten unbemerkt daneben lägen.
+
+## Sicherung (Nextcloud)
+
+`tools/backup.py` sichert den **gesamten Datenordner** täglich als `tar.gz` in die
+Nextcloud. Ziel steht in `config.json` als `backup_ziel`:
+
+```json
+"backup_ziel": "nextcloud:03 Immobilien/DS Apartments & Suites/Backups/rentaltool"
+```
+
+Enthält der Wert einen `remote:`-Präfix, läuft die Übertragung **direkt über
+rclone** – bewusst am FUSE-Mount `/mnt/nextcloud` vorbei: rclone prüft die
+Prüfsumme nach dem Hochladen, der Mount tut das nicht. Ein Pfad ohne Präfix wird
+als lokaler Ordner behandelt (Tests, lokale Installation).
+
+```bash
+python3 tools/backup.py sichern    # bauen, prüfen, hochladen, aufräumen
+python3 tools/backup.py pruefen    # jüngste Sicherung zurückholen und auspacken
+python3 tools/backup.py liste      # Bestand am Ziel
+```
+
+**Was „geprüft" heißt.** Ein `tar` ohne Fehlermeldung sagt nichts darüber, ob der
+Inhalt brauchbar ist. Vor dem Hochladen wird das Paket deshalb wieder ausgepackt
+und dreifach gelesen: jede JSON-Datei muss sich parsen lassen, es müssen
+**Benutzerkonten** enthalten sein (ohne sie wäre die Wiederherstellung wertlos),
+und die **Hash-Kette des Steuerarchivs** muss unversehrt sein. Schlägt eines
+davon fehl, wird **nicht hochgeladen und nicht aufgeräumt** – die letzte heile
+Sicherung bleibt damit stehen.
+
+Eine defekte Datei im laufenden Betrieb bricht die Sicherung dagegen **nicht** ab:
+genau dafür ist sie da. Sie wird mitgesichert und gemeldet.
+
+**Aufbewahrung:** die 14 jüngsten Stände, dazu die letzten 8 Sonntage und die
+letzten 12 Monatsersten. Bewusst „die 14 jüngsten" statt „alles der letzten 14
+Tage" – bleibt die Sicherung mal zwei Wochen aus, wären nach der zweiten Lesart
+beim nächsten Lauf fast alle Stände auf einen Schlag fällig. Fremde Dateien am
+Ziel werden nie angefasst.
+
+**Nicht** gesichert werden Programmcode (steht im Git) und `.nicegui/` (nur
+Sitzungen, ~80 MB).
+
+Zeitpläne (`deploy/`, nach `/etc/systemd/system/`):
+
+| Timer | Wann | Was |
+|---|---|---|
+| `rentaltool-backup.timer` | täglich 03:30 | sichern |
+| `rentaltool-backup-pruefen.timer` | montags 04:30 | Wiederherstellung üben |
+
+Die wöchentliche Probe ist Absicht: eine Sicherung, die nie zurückgeholt wurde,
+ist keine Sicherung. Scheitert etwas, geht eine E-Mail an den
+Benachrichtigungs-Absender und der Timer meldet den Fehlschlag. Der letzte Lauf
+steht in `backup-status.json` im Datenordner.
 
 ## Konfiguration
 

@@ -14,9 +14,13 @@ Benötigt PyMuPDF (`pip install pymupdf`).
 import os
 import fitz  # PyMuPDF
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE = os.path.join(HERE, "templates", "anmeldung_blank.pdf")
-SIGNATURE = os.path.join(HERE, "assets", "signature.png")
+from app import paths
+
+HERE = paths.ROOT
+# Vorlage und Unterschrift sind personenbezogen (gitignored) und gehören damit
+# zum Datenbestand, nicht zum Code.
+TEMPLATE = paths.p("templates", "anmeldung_blank.pdf")
+SIGNATURE = paths.p("assets", "signature.png")
 
 FONT = "helv"
 FS = 10.0

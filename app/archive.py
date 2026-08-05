@@ -27,8 +27,10 @@ import urllib.request
 from datetime import datetime
 from urllib.parse import quote
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ARCHIVE_DIR = os.path.join(HERE, "archive")
+from app import paths
+
+HERE = paths.ROOT
+ARCHIVE_DIR = paths.p("archive")
 LEDGER_PATH = os.path.join(ARCHIVE_DIR, "ledger.jsonl")
 GENESIS = "GENESIS"
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Wiederherstellungs-Probe rentaltool (juengste Sicherung zurueckholen und auspacken)
+After=network-online.target rclone-nextcloud.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rentaltool
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool
+ExecStart=/opt/rentaltool/.venv/bin/python tools/backup.py pruefen
+# Eine Sicherung, die nie zurueckgeholt wurde, ist keine Sicherung. Das laeuft
+# deshalb woechentlich – nicht einmalig bei der Einrichtung.
