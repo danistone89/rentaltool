@@ -669,6 +669,70 @@ async def test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen(
     await user.should_see("1 Reinigung noch niemandem zugewiesen")   # Banner oben
 
 
+async def test_tagesgruppe_zeigt_je_reinigung_den_mitarbeiter(
+        user: User, mock_backend, tmp_path, monkeypatch):
+    """Aufgeklappt muss an JEDER Reinigung stehen, wer sie übernimmt – sonst
+    sagt der Kopf zwar „2 vergeben", die Zuordnung Buchung → Mitarbeiter fehlt
+    aber. Eine dritte, freie Reinigung bleibt als solche erkennbar."""
+    from datetime import timedelta
+    from nicegui import ui as _ui
+    from app import housekeeping as hk, bookings as bk
+    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
+    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
+    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
+        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
+    for u, n in (("vale", "Valeriya"), ("mira", "Mira")):
+        monkeypatch.setitem(web.USERS, u, {
+            "password_hash": auth.hash_password(u), "role": "putzkraft",
+            "totp_secret": "", "name": n})
+    monkeypatch.setattr(web, "_APARTMENTS", {})
+    monkeypatch.setattr(data, "get_apartments", lambda: [
+        {"id": 2748963, "name": "Cottaer Straße"},
+        {"id": 2960031, "name": "Wernerstraße"},
+        {"id": 3000001, "name": "Bergstraße"},
+    ])
+
+    tag = (date.today() + timedelta(days=4)).isoformat()
+    from app import data as _data
+
+    def _b(bid, apt_id, apt_name):
+        return {"id": bid, "type": "reservation", "is-blocked-booking": False,
+                "apartment": {"id": apt_id, "name": apt_name},
+                "arrival": (date.today() + timedelta(days=1)).isoformat(),
+                "departure": tag, "check-in": "15:00", "check-out": "10:00",
+                "adults": 2, "children": 0, "guest-name": f"Gast {bid}",
+                "channel": {"name": "Direct booking"}, "notice": ""}
+    monkeypatch.setattr(_data, "_reservations", lambda *a, **k: [
+        _b(501, 2748963, "Cottaer Straße"), _b(502, 2960031, "Wernerstraße"),
+        _b(503, 3000001, "Bergstraße")])
+    bk.set_assignment(501, "vale", "test")
+    bk.set_assignment(502, "mira", "test")
+
+    await _login(user)
+    await user.should_see("KOMMENDE TAGE")
+
+    # Texte je Kompakt-Karte einsammeln: die Zuordnung zählt, nicht das blosse
+    # Vorkommen beider Namen irgendwo auf der Seite.
+    def texte(el):
+        for kid in el:
+            if getattr(kid, "text", None):
+                yield kid.text
+            yield from texte(kid)
+
+    karten = [" | ".join(texte(c)) for c in user.find(_ui.card).elements]
+
+    def karte(wohnung):
+        treffer = [k for k in karten if wohnung in k]
+        assert treffer, f"keine Karte für {wohnung}: {karten}"
+        return treffer[0]
+
+    assert "Valeriya" in karte("Cottaer Straße"), karte("Cottaer Straße")
+    assert "Mira" not in karte("Cottaer Straße"), karte("Cottaer Straße")
+    assert "Mira" in karte("Wernerstraße"), karte("Wernerstraße")
+    assert "noch frei" in karte("Bergstraße"), karte("Bergstraße")
+
+
 def _texte_unter(user, marker):
     """Alle Texte unterhalb eines markierten Elements.
 

@@ -170,6 +170,8 @@ _EN = {
     "{n} Reinigungen": "{n} cleanings",
     "{n} frei": "{n} free",
     "{n} vergeben": "{n} assigned",
+    "noch frei": "still free",
+    "Du": "You",
     "{n} Reinigung noch niemandem zugewiesen": "{n} cleaning not assigned yet",
     "{n} Reinigungen noch niemandem zugewiesen": "{n} cleanings not assigned yet",
 

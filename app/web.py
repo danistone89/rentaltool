@@ -3519,12 +3519,18 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate, nur_eigene=False):
                                 .props("color=amber-8 text-color=white dense square") \
                                 .classes("text-xs !ml-0")
                         if vergeben:
-                            # Bei genau einem Namen den Namen zeigen – das ist die
-                            # Information, die man sonst durch Aufklappen sucht.
-                            ui.chip(namen[0] if len(namen) == 1
-                                    else t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
-                                .props("color=green-7 text-color=white dense square") \
-                                .classes("text-xs !ml-0")
+                            # Namen statt Zahl, solange es wenige sind – das ist die
+                            # Information, die man sonst durch Aufklappen sucht. Erst
+                            # ab drei Namen wird die Kopfzeile davon zu voll.
+                            if len(namen) <= 2:
+                                for nm in namen:
+                                    ui.chip(nm, icon="how_to_reg") \
+                                        .props("color=green-7 text-color=white dense square") \
+                                        .classes("text-xs !ml-0")
+                            else:
+                                ui.chip(t("{n} vergeben", n=len(vergeben)), icon="how_to_reg") \
+                                    .props("color=green-7 text-color=white dense square") \
+                                    .classes("text-xs !ml-0")
     with exp:
         for j in tagesjobs:
             _cleaning_compact(j, user, admin, staff, activate)
@@ -3794,6 +3800,18 @@ def _cleaning_compact(job, user, admin, staff, activate):
                         .classes("text-xs font-semibold text-green-700 truncate")
                 else:
                     ui.label(t("keine Folgebuchung")).classes("text-xs text-gray-400 truncate")
+                # Wer übernimmt DIESE Reinigung. Im Kopf der Tagesgruppe steht bei
+                # mehreren Buchungen nur "{n} vergeben" – ohne den Namen an der
+                # Karte lässt sich das Aufgeklappte keinem Mitarbeiter zuordnen.
+                who = bookings.assignee_of(job["id"])
+                with ui.row().classes("items-center gap-1 no-wrap min-w-0"):
+                    if who:
+                        ui.icon("how_to_reg").classes("text-green-700 text-sm shrink-0")
+                        ui.label(t("Du") if who == user else staff.get(who, who)) \
+                            .classes("text-xs font-medium text-green-700 truncate")
+                    else:
+                        ui.icon("person_off").classes("text-amber-700 text-sm shrink-0")
+                        ui.label(t("noch frei")).classes("text-xs font-medium text-amber-800 truncate")
             _status_chip(job)
             ui.icon("chevron_right").classes("text-gray-300 shrink-0")
 
