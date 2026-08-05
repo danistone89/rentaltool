@@ -23,9 +23,39 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 
 ## Architektur
 
-| Datei | Aufgabe |
+**Fachlogik** (`app/`) und **Oberfläche** (`app/ui/`) sind getrennt. Die
+Oberfläche hat ein Modul je Bereich:
+
+| Oberfläche | Aufgabe | Zeilen |
+|---|---|---:|
+| `app/web.py` | Einstieg: Zeitzone, Login-Schranke, Routen, Hauptseite mit Navigation | 353 |
+| `app/ui/basis.py` | Gemeinsame Grundlage: Konfiguration, Sprache, Rollen, Logo, Format- und Foto-Helfer | 337 |
+| `app/ui/standort.py` | GPS, IP, Geofence für die Zeiterfassung | 110 |
+| `app/ui/zugang.py` | Anmelden, Einladung, Passwort vergessen, Mein Konto, Benutzer | 644 |
+| `app/ui/einstellungen.py` | Einstellungs-Dialog (Betreiber, Steuer, E-Mail, Archiv, Standorte) | 398 |
+| `app/ui/steuer.py` | Beherbergungssteuer: Berechnung anzeigen, PDF erzeugen, Archiv | 356 |
+| `app/ui/zeiten.py` | Zeiterfassung: Liste, Kennzahlen, Abrechnungsstatus, CSV | 487 |
+| `app/ui/buchungen.py` | Reinigungslisten, Tagesgruppen, Reinigungskarten | 751 |
+| `app/ui/dialog.py` | Buchungs-Dialog samt Aktionen und Gast-Nachrichten | 413 |
+| `app/ui/kalender.py` | Zeitleiste über alle Wohnungen, Monatsblatt einer Wohnung | 241 |
+| `app/ui/reinigung.py` | Checklisten-Durchgang, Schäden, Bestand, Übersicht | 594 |
+| `app/ui/belege.py` | Belegscanner, Ablage, OCR, Liste | 441 |
+
+Die Abhängigkeiten laufen von `basis` (kennt keinen Bereich) nach außen. Wo zwei
+Bereiche einander brauchen – Buchungen, Dialog, Kalender, Reinigung –, wird das
+jeweils andere **Modul als Objekt** importiert und der Name erst beim Aufruf
+nachgeschlagen (`dialog.open_booking_dialog(…)`); ein `from X import name` würde
+sich beim Laden im Kreis drehen.
+
+> **Falle beim Registrieren von Seiten:** `/login` und `/invite` werden über
+> `zugang.seiten_registrieren()` angemeldet, nicht per `@ui.page`-Dekorator. Der
+> Testlauf führt `app/web.py` **je Test erneut** aus, während die Bereichsmodule
+> geladen bleiben – ein Dekorator dort liefe nur beim allerersten Import, und ab
+> dem zweiten Test wäre die Seite verschwunden (404). Aus demselben Grund leert
+> `web.py` beim Start die flüchtigen Zwischenspeicher.
+
+| Fachlogik | Aufgabe |
 |---|---|
-| `app/web.py` | NiceGUI-Oberfläche (Seite, Einstellungs-Dialog, Webhook), Entry-Point |
 | `app/data.py` | Config, Smoobu-Cache, Berechnungs-Glue |
 | `app/steuer.py` | Steuerberechnung (Golden-Tests) |
 | `app/smoobu.py` | Smoobu-API-Client |
@@ -39,6 +69,9 @@ herunterladen"**. Einstellungen oben rechts (⚙️).
 | `app/paths.py` | Wo die Betriebsdaten liegen (Datenordner, getrennt vom Code) |
 | `app/store.py` | Ein Weg für allen Dateizugriff: atomar schreiben, gesperrt ändern |
 | `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
+
+| Werkzeuge | Aufgabe |
+|---|---|
 | `tools/make_blank.py` | Blanko-Vorlage + Unterschrift aus eingereichter PDF |
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
 | `tools/migrate_data.py` | Betriebsdaten einmalig in einen eigenen Datenordner umziehen |

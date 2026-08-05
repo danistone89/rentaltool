@@ -121,9 +121,13 @@ def pruefe(pfad):
 
 def main(argv):
     hier = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    dateien = argv[1:] or [os.path.join(hier, "app", f)
-                           for f in sorted(os.listdir(os.path.join(hier, "app")))
-                           if f.endswith(".py")]
+    # app/ UND app/ui/ – die Oberfläche liegt seit der Aufteilung im Unterordner,
+    # und genau dort sind die langen Funktionen, in denen sich ein Name wie `t`
+    # überschatten lässt.
+    dateien = argv[1:] or [os.path.join(w, f)
+                           for w in (os.path.join(hier, "app"),
+                                     os.path.join(hier, "app", "ui"))
+                           for f in sorted(os.listdir(w)) if f.endswith(".py")]
     fehler, warnungen = [], []
     for f in dateien:
         fe, wa = pruefe(f)

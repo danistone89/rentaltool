@@ -46,15 +46,13 @@ Wechseln. Siehe README → „Ausrollen, Probe-Instanz, Wächter".
 
 ## Phase 1 — Struktur
 
-### AP4 · `web.py` aufteilen — offen
+### AP4 · `web.py` aufteilen — ✅ erledigt (6.8.2026)
 
-4.939 Zeilen in einer Datei (63 % des Codes). Schnitt entlang der bestehenden
-`build_*`-Funktionen in Bereichs-Module: Buchungen, Reinigung, Zeiten, Belege,
-Steuer, Benutzer, Einstellungen, geteilte Bausteine. Verhaltensgleich, die
-Testsuite ist das Netz. Ziel: Dateien von 300–700 Zeilen.
-
-*Abhängigkeit:* AP2 sollte vorher stehen (sonst wird der Datenzugriff zweimal
-angefasst). *Größe:* M–L.
+Aus 4.961 Zeilen in einer Datei wurden `app/web.py` (353 Zeilen Gerüst) und elf
+Bereichsmodule unter `app/ui/` von 110 bis 751 Zeilen. Der Schnitt lief
+zeilentreu: jede der 175 Definitionen wurde vorher/nachher verglichen, einzige
+inhaltliche Änderung sind zwei Seiten-Dekoratoren, die jetzt über
+`zugang.seiten_registrieren()` laufen. Siehe README → „Architektur".
 
 ### AP5 · SQLite statt JSON — offen
 
