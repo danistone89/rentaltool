@@ -629,6 +629,9 @@ Zeitpläne (`deploy/`, nach `/etc/systemd/system/`):
 | `rentaltool-backup.timer` | täglich 03:30 | sichern |
 | `rentaltool-backup-pruefen.timer` | montags 04:30 | Wiederherstellung üben |
 
+Beides in **UTC** – der Server läuft so, nur der App-Prozess stellt sich auf
+Berlin (`app/web.py`). 03:30 UTC = 05:30 Berlin im Sommer.
+
 Die wöchentliche Probe ist Absicht: eine Sicherung, die nie zurückgeholt wurde,
 ist keine Sicherung. Scheitert etwas, geht eine E-Mail an den
 Benachrichtigungs-Absender und der Timer meldet den Fehlschlag. Der letzte Lauf

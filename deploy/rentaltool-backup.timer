@@ -2,6 +2,10 @@
 Description=Taegliche Sicherung rentaltool
 
 [Timer]
+# Achtung: der Server laeuft in UTC (nur der App-Prozess setzt sich auf Berlin).
+# 03:30 UTC = 05:30 Berlin im Sommer, 04:30 im Winter. Fuer eine naechtliche
+# Sicherung passend – wer es genau will, braucht ein "Europe/Berlin" hinter der
+# Uhrzeit (systemd >= 252).
 OnCalendar=*-*-* 03:30
 # Nicht alle Dienste gleichzeitig auf die Cloud loslassen.
 RandomizedDelaySec=600
