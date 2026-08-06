@@ -16,7 +16,7 @@ def open_folder_picker(start, on_pick):
     state = {"dir": start if (start and os.path.isdir(start)) else os.path.expanduser("~")}
     with ui.dialog() as dlg, ui.card().classes("w-[680px] max-w-full"):
         ui.label("📁 Ordner wählen").classes("text-lg font-bold")
-        path_lbl = ui.label().classes("text-xs font-mono text-gray-600 break-all")
+        path_lbl = ui.label().classes("text-xs font-mono text-slate-600 break-all")
         listing = ui.column().classes("w-full gap-1").style("max-height:60vh;overflow:auto")
 
         def go(p):
@@ -74,7 +74,7 @@ def open_settings():
 
         with ui.tab_panels(tabs, value=t_betr).classes("w-full"):
             with ui.tab_panel(t_betr):
-                ui.label("Betreiberdaten (erscheinen im PDF)").classes("text-sm text-gray-500")
+                ui.label("Betreiberdaten (erscheinen im PDF)").classes("text-sm text-slate-500")
                 inputs = {}
                 with ui.grid(columns=2).classes("w-full gap-3"):
                     for key, lbl in data.BETREIBER_FIELDS:
@@ -90,7 +90,7 @@ def open_settings():
 
             with ui.tab_panel(t_arch):
                 ui.label("Jede Festschreibung wird revisionssicher abgelegt und zusätzlich "
-                         "in diesen Ordner auf dem Computer kopiert.").classes("text-sm text-gray-500")
+                         "in diesen Ordner auf dem Computer kopiert.").classes("text-sm text-slate-500")
                 cur = CFG.get("archiv_spiegel", "")
                 with ui.row().classes("w-full items-end gap-2 mt-1"):
                     spiegel = ui.input("Ablage-Ordner", value=cur) \
@@ -117,7 +117,7 @@ def open_settings():
 
                 ui.separator().classes("my-2")
                 ui.label("Reinigungs-Fotos (Soll/Ist) und Belege werden zusätzlich in diesen "
-                         "Ordner gespiegelt.").classes("text-sm text-gray-500")
+                         "Ordner gespiegelt.").classes("text-sm text-slate-500")
                 with ui.row().classes("w-full items-end gap-2 mt-1"):
                     reinigung_ordner = ui.input("Foto-Ordner (Reinigung)",
                                                 value=CFG.get("reinigung_ordner", "")) \
@@ -133,7 +133,7 @@ def open_settings():
                               on_click=browse_reinigung).props("outline no-caps")
 
                 ui.label("Belege/Rechnungen werden zusätzlich in diesen Ordner gespiegelt.") \
-                    .classes("text-sm text-gray-500 mt-2")
+                    .classes("text-sm text-slate-500 mt-2")
                 with ui.row().classes("w-full items-end gap-2 mt-1"):
                     belege_ordner = ui.input("Beleg-Ordner",
                                              value=CFG.get("belege_ordner", "")) \
@@ -153,18 +153,18 @@ def open_settings():
                                   value=_checklisten_an()).props("dense")
                 ui.label("Aus: Die Putzkraft startet die Arbeitszeit, meldet bei Bedarf "
                          "Schäden oder Verbrauch und beendet die Zeit – fertig. Das ist "
-                         "der einfache Einstieg.").classes("text-xs text-gray-500")
+                         "der einfache Einstieg.").classes("text-xs text-slate-500")
                 ui.label("An: Zusätzlich der Checklisten-Durchgang je Wohnung mit Soll-/"
                          "Ist-Fotos, der Fortschrittsbalken auf der Reinigungskarte, die "
                          "Aktion „Checkliste & Fotos“ sowie in der Übersicht der Tab "
                          "„Durchgänge“ und die Checklisten-Konfiguration.") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 ui.label("Umschalten löscht nichts: bereits erfasste Durchgänge, Fotos "
                          "und angelegte Checklisten bleiben erhalten und sind nach dem "
-                         "Wiedereinschalten wieder da.").classes("text-xs text-gray-400 mt-1")
+                         "Wiedereinschalten wieder da.").classes("text-xs text-slate-400 mt-1")
                 ui.label("Solange die Checklisten aus sind, gilt eine Reinigung als "
                          "„Fertig“, sobald die Arbeitszeit erfasst und beendet ist.") \
-                    .classes("text-xs text-gray-400")
+                    .classes("text-xs text-slate-400")
             with ui.tab_panel(t_orte):
                 geo_on = ui.switch("Standort bei der Zeiterfassung erfassen",
                                    value=_geo_enabled()).props("dense")
@@ -172,12 +172,12 @@ def open_settings():
                          "noch IP abgefragt oder gespeichert – die Mitarbeiter werden "
                          "nicht nach Ortungsfreigabe gefragt. Bereits erfasste Standorte "
                          "alter Einträge bleiben in worklog.json erhalten.") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 ui.separator().classes("my-2")
                 ui.label("Objekte für die GPS-Standortprüfung der Zeiterfassung. Adresse "
                          "eintragen und Lupe antippen (Koordinaten), Radius in Metern "
                          "(z. B. 150). Check-in außerhalb wird markiert.") \
-                    .classes("text-sm text-gray-500")
+                    .classes("text-sm text-slate-500")
                 _orte_hint = ui.label("Wirkt erst, wenn die Standorterfassung oben "
                                       "eingeschaltet ist.").classes("text-xs text-amber-700")
                 _orte_hint.bind_visibility_from(geo_on, "value", lambda v: not v)
@@ -248,7 +248,7 @@ def open_settings():
                     m_to = ui.input("Empfänger (fest)", value=ec.get("empfaenger", "")).props("outlined dense").classes("w-full")
                     m_cc = ui.input("Cc (optional)", value=ec.get("cc", "")).props("outlined dense").classes("w-full")
                 ui.label("Vorlage – Platzhalter: {monat} {jahr} {periode} {steuer} {umsatz} "
-                         "{kassenzeichen} {name}").classes("text-xs text-gray-400 mt-2")
+                         "{kassenzeichen} {name}").classes("text-xs text-slate-400 mt-2")
                 m_subj = ui.input("Betreff-Vorlage",
                                   value=ec.get("betreff_vorlage") or DEFAULT_BETREFF).props("outlined dense").classes("w-full")
                 m_body = ui.textarea("Text-Vorlage", value=ec.get("text_vorlage") or DEFAULT_TEXT) \
@@ -271,14 +271,14 @@ def open_settings():
                 with ui.row().classes("items-center gap-2 mt-1"):
                     ui.button("Test-E-Mail senden", icon="send", on_click=test_email).props("outline no-caps")
                     ui.label("kurze Test-Mail an den Empfänger (ohne Anhang, ohne Ablage)") \
-                        .classes("text-xs text-gray-400")
+                        .classes("text-xs text-slate-400")
 
                 ui.separator().classes("my-2")
                 nb = CFG.setdefault("notify_email", {})
                 ui.label("Benachrichtigungen an Mitarbeiter (Reinigungs-Tausch, Schäden). "
                          "Eigenes Gmail-Konto als Absender, z. B. d.steinhauss@gmail.com "
                          "(Gmail: 2FA + App-Passwort nötig). Leer = Absender oben nutzen.") \
-                    .classes("text-sm text-gray-500")
+                    .classes("text-sm text-slate-500")
                 with ui.grid(columns=2).classes("w-full gap-3"):
                     n_from = ui.input("Absender Benachrichtigungen (Gmail)",
                                       value=nb.get("absender", "")).props("outlined dense").classes("w-full")
@@ -298,12 +298,12 @@ def open_settings():
                         ui.notify(f"Test fehlgeschlagen: {ex}", type="negative", timeout=12000)
                 with ui.row().classes("items-center gap-2 mt-1"):
                     ui.button("Test-Benachrichtigung", icon="send", on_click=test_notify).props("outline no-caps")
-                    ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-gray-400")
+                    ui.label("Test-Mail an deine eigene E-Mail-Adresse").classes("text-xs text-slate-400")
 
                 ui.separator().classes("my-2")
                 ui.label("Adresse der App – wird für Links in E-Mails benutzt "
                          "(Einladungen, Reinigungs-Hinweise). Muss von außen erreichbar sein.") \
-                    .classes("text-sm text-gray-500")
+                    .classes("text-sm text-slate-500")
                 app_url_in = ui.input("Adresse der App", value=CFG.get("app_url", "") or DEFAULT_APP_URL,
                                       placeholder=DEFAULT_APP_URL) \
                     .props("outlined dense").classes("w-full max-w-[420px]")
@@ -312,13 +312,13 @@ def open_settings():
                 ui.label("Empfänger für den monatlichen Arbeitszeiten-Versand "
                          "(Zeiterfassung → Auswertung → An Steuerberater senden). "
                          "Unabhängig von der E-Mail für die Beherbergungssteuer.") \
-                    .classes("text-sm text-gray-500")
+                    .classes("text-sm text-slate-500")
                 stb = ui.input("E-Mail Steuerberater", value=CFG.get("steuerberater_email", "")) \
                     .props("outlined dense").classes("w-full max-w-[420px]")
                 ui.label("E-Mail-Vorlage (Platzhalter {monat}, {jahr}). Die Stunden je "
                          "Mitarbeiter und der Zeitraum werden automatisch eingefügt; eine "
                          "Notiz je Mitarbeiter kommt aus der Benutzerverwaltung.") \
-                    .classes("text-xs text-gray-500 mt-2")
+                    .classes("text-xs text-slate-500 mt-2")
                 stb_anrede = ui.input("Anrede", value=CFG.get("steuerberater_anrede", "")
                                       or "Sehr geehrte Damen und Herren,") \
                     .props("outlined dense").classes("w-full max-w-[420px]")
@@ -335,7 +335,7 @@ def open_settings():
                          "Wochenende/Feiertag greift nur bei Mitarbeitern, bei denen er in "
                          "der Benutzerverwaltung aktiviert ist. Wochenende/Feiertag = Sa, So "
                          "und die gesetzlichen Feiertage in Sachsen.") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 with ui.row().classes("items-center gap-2 flex-wrap"):
                     satz_wt = ui.number("Werktag", value=CFG.get("stundensatz_werktag") or None,
                                         format="%.2f", step=0.5, min=0) \

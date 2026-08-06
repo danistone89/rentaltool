@@ -100,13 +100,13 @@ def _inhalt(benutzer, neu_zeichnen):
     geraete = push.abos(benutzer)
     with ui.row().classes("w-full items-center gap-2 no-wrap"):
         ui.icon("notifications_active" if geraete else "notifications_off") \
-            .classes(("text-green-600" if geraete else "text-gray-400") + " text-xl")
+            .classes(("text-green-700" if geraete else "text-slate-400") + " text-xl")
         ui.label(t("Benachrichtigungen")).classes("font-medium text-slate-700")
         ui.space()
         if geraete:
             ui.label(t("{n} Gerät", n=len(geraete)) if len(geraete) == 1
                      else t("{n} Geräte", n=len(geraete))) \
-                .classes("text-xs text-gray-500")
+                .classes("text-xs text-slate-500")
 
     # Auf iOS ohne Home-Bildschirm-App ist der Knopf sinnlos: Safari meldet die
     # Erlaubnis zwar, zugestellt wird trotzdem nichts.
@@ -189,9 +189,9 @@ def _inhalt(benutzer, neu_zeichnen):
 
     for g in geraete:
         with ui.row().classes("w-full items-center gap-2 no-wrap text-sm"):
-            ui.icon("smartphone").classes("text-gray-400 text-base")
+            ui.icon("smartphone").classes("text-slate-400 text-base")
             ui.label(g.get("geraet") or "Gerät").classes("flex-grow truncate")
-            ui.label((g.get("erstellt") or "")[:10]).classes("text-xs text-gray-400")
+            ui.label((g.get("erstellt") or "")[:10]).classes("text-xs text-slate-400")
             ui.button(icon="delete", on_click=lambda _e=None, sid=g["id"]: (
                 push.abmelden(sid), neu_zeichnen())) \
                 .props("flat round dense size=sm color=negative")
@@ -205,12 +205,12 @@ def _arten(benutzer):
     u = USERS.get(benutzer, {})
     eigene = u.setdefault("push_arten", {})
     ui.label(t("Wobei möchtest du Bescheid bekommen?")) \
-        .classes("text-xs font-semibold text-gray-400 mt-2")
+        .classes("text-xs font-semibold text-slate-400 mt-2")
     for schluessel, titel, erklaerung in ARTEN_TEXT:
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             with ui.column().classes("gap-0 min-w-0 flex-grow"):
                 ui.label(t(titel)).classes("text-sm")
-                ui.label(t(erklaerung)).classes("text-xs text-gray-500 truncate")
+                ui.label(t(erklaerung)).classes("text-xs text-slate-500 truncate")
 
             def umschalten(e, k=schluessel):
                 eigene[k] = bool(e.value)

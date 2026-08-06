@@ -258,7 +258,7 @@ def einrichten_hinweis():
             .classes("w-full border border-slate-200 rounded-xl") as box:
         ui.label(t("Danach startest du die App über ein eigenes Symbol – ohne "
                    "Adressleiste, und Benachrichtigungen sind erst dann möglich.")) \
-            .classes("text-sm text-gray-600")
+            .classes("text-sm text-slate-600")
         for titel, schritte in (
                 ("iPhone / iPad (Safari)",
                  (t("Unten auf das Teilen-Symbol tippen (Viereck mit Pfeil)"),
@@ -268,7 +268,7 @@ def einrichten_hinweis():
                  (t("Oben rechts auf die drei Punkte tippen"),
                   t("„App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen")))):
             with ui.column().classes("gap-1 mt-2 w-full"):
-                ui.label(titel).classes("text-xs font-semibold text-gray-400")
+                ui.label(titel).classes("text-xs font-semibold text-slate-400")
                 for schritt in schritte:
                     with ui.row().classes("items-start gap-2 no-wrap"):
                         ui.icon("chevron_right") \
@@ -311,7 +311,7 @@ def einrichten_banner():
         with ui.column().classes("gap-0 min-w-0 flex-grow"):
             ui.label(t("Als App einrichten")).classes("text-sm font-medium text-slate-700")
             ui.label(t("Ein Symbol auf dem Home-Bildschirm – so geht es unter „Mein Konto“.")) \
-                .classes("text-xs text-gray-500 truncate")
+                .classes("text-xs text-slate-500 truncate")
         ui.button(icon="close", on_click=lambda: (
             ui.run_javascript("localStorage.setItem('livaro-hinweis','weg')"),
             box.set_visibility(False))).props("flat round dense size=sm")

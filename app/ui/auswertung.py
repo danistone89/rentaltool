@@ -15,6 +15,7 @@ from nicegui import ui
 
 from app import bookings, data, kennzahlen, receipts, timetrack
 from app.ui.basis import (CFG, USERS, _apts, _eur, _has_rates, _rate_defaults, t)
+from app.ui import ton
 
 MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
           "August", "September", "Oktober", "November", "Dezember"]
@@ -71,15 +72,15 @@ def block():
     return rumpf
 
 
-def _kachel(label, wert, zusatz="", icon="insights", ton="text-primary"):
-    with ui.card().classes("rounded-xl shadow-sm border border-slate-100 p-3 gap-0 "
+def _kachel(label, wert, zusatz="", icon="insights", farbe="text-primary"):
+    with ui.card().classes(ton.KARTENFLAECHE + " p-3 gap-0 "
                            "items-start min-w-[150px] flex-grow"):
         with ui.row().classes("items-center gap-1"):
-            ui.icon(icon).classes(ton + " text-lg")
-            ui.label(label).classes("text-xs text-gray-500")
+            ui.icon(icon).classes(farbe + " text-lg")
+            ui.label(label).classes("text-xs text-slate-500")
         ui.label(wert).classes("text-2xl font-bold text-slate-800 leading-tight")
         if zusatz:
-            ui.label(zusatz).classes("text-xs text-gray-400")
+            ui.label(zusatz).classes("text-xs text-slate-400")
 
 
 def _inhalt(stand):
@@ -101,17 +102,17 @@ def _inhalt(stand):
                 f"{_eur(s['umsatz_je_nacht'])} je Nacht", "payments")
         if _has_rates():
             _kachel("Reinigung", _eur(s["reinigung_kosten"]),
-                    _stunden(s["reinigung_minuten"]), "cleaning_services", "text-amber-600")
+                    _stunden(s["reinigung_minuten"]), "cleaning_services", "text-amber-700")
         else:
             _kachel("Reinigung", _stunden(s["reinigung_minuten"]),
-                    "keine Stundensätze hinterlegt", "cleaning_services", "text-amber-600")
+                    "keine Stundensätze hinterlegt", "cleaning_services", "text-amber-700")
         _kachel("Material", _eur(s["material"]), "aus den Belegen", "shopping_cart",
-                "text-amber-600")
+                "text-amber-700")
         _kachel("Deckungsbeitrag", _eur(s["deckungsbeitrag"]),
                 "Umsatz − Reinigung − Material", "savings",
-                "text-green-600" if s["deckungsbeitrag"] >= 0 else "text-red-600")
+                "text-green-700" if s["deckungsbeitrag"] >= 0 else "text-red-700")
 
-    ui.label("Je Wohnung").classes("text-sm font-semibold text-gray-500 mt-2")
+    ui.label("Je Wohnung").classes("text-sm font-semibold text-slate-500 mt-2")
     spalten = [
         {"name": "wohnung", "label": "Wohnung", "field": "wohnung", "align": "left"},
         {"name": "auslastung", "label": "Auslastung", "field": "auslastung_txt", "align": "right"},
@@ -139,8 +140,8 @@ def _inhalt(stand):
     ui.table(columns=spalten, rows=reihen, row_key="wohnung") \
         .props("flat dense bordered").classes("w-full").mark("kennzahlen-tabelle")
 
-    with ui.row().classes("w-full items-start gap-2 no-wrap text-xs text-gray-500 mt-1"):
-        ui.icon("info").classes("text-gray-400 text-base shrink-0 mt-0.5")
+    with ui.row().classes("w-full items-start gap-2 no-wrap text-xs text-slate-500 mt-1"):
+        ui.icon("info").classes("text-slate-400 text-base shrink-0 mt-0.5")
         ui.label("Umsatz ohne die durchlaufende Beherbergungssteuer – dieselbe "
                  "Regel wie in der Steueranmeldung. Nächte über den Monatswechsel "
                  "zählen dort, wo sie liegen; die Steueranmeldung ordnet dagegen "
@@ -158,18 +159,18 @@ def _teuerste_reinigungen(zeiten, buchungen):
     if not liste:
         return
     ui.label("Reinigungen mit erfasster Zeit").classes(
-        "text-sm font-semibold text-gray-500 mt-3")
+        "text-sm font-semibold text-slate-500 mt-3")
     teuerste = sorted(liste, key=lambda x: x[2], reverse=True)[:10]
     for b, minuten, kosten in teuerste:
         with ui.row().classes("w-full items-center gap-2 no-wrap text-sm border-b "
                               "border-slate-100 py-1"):
-            ui.icon("cleaning_services").classes("text-gray-400 text-base")
+            ui.icon("cleaning_services").classes("text-slate-400 text-base")
             with ui.column().classes("gap-0 min-w-0 flex-grow"):
                 ui.label((b.get("apartment") or {}).get("name", "")) \
                     .classes("truncate")
                 ui.label(f"{b.get('departure', '')} · "
                          + (bookings.assignee_of(b.get("id")) or "—")) \
-                    .classes("text-xs text-gray-500")
-            ui.label(_stunden(minuten)).classes("text-xs text-gray-500 shrink-0")
+                    .classes("text-xs text-slate-500")
+            ui.label(_stunden(minuten)).classes("text-xs text-slate-500 shrink-0")
             ui.label(_eur(kosten) if _has_rates() else "").classes(
                 "font-medium shrink-0 w-[80px] text-right")

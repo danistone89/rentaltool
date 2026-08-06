@@ -16,6 +16,7 @@ from app.ui.basis import (USERS, _checklisten_an, _cur_area, _cur_user, _is_admi
 from app.ui.standort import (_match_geofence, get_location)
 from app.ui import dialog, kalender, reinigung
 from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
+from app.ui import ton
 
 # ---------------------------------------------------------------- Buchungen
 _PENDING_REINIGUNG = {}   # {"apt": (id, name)} – Workflow-Sprung Buchung → Checkliste
@@ -85,17 +86,18 @@ def _prep_panel(nxt, same_day):
     das Putzteam nicht für die abreisenden statt für die anreisenden Gäste
     eindeckt."""
     if not nxt:
-        with ui.row().classes("w-full items-center gap-2 rounded-xl border border-slate-200 "
-                              "bg-slate-50 p-3"):
-            ui.icon("event_busy").classes("text-gray-400")
+        with ui.row().classes(f"w-full items-center gap-2 rounded-xl p-3 {ton.FLAECHE_RUHIG}"):
+            ui.icon("event_busy").classes("text-slate-400")
             with ui.column().classes("gap-0 min-w-0"):
                 ui.label(t("keine Folgebuchung")).classes("font-medium text-slate-600")
-                ui.label(t("Nichts vorzubereiten – nur reinigen.")).classes("text-xs text-gray-500")
+                ui.label(t("Nichts vorzubereiten – nur reinigen.")).classes("text-xs text-slate-500")
         return
     n = _pers_count(nxt)
-    tone, txt = (("bg-orange-50 border-orange-300", "text-orange-800") if same_day
-                 else ("bg-green-50 border-green-200", "text-green-800"))
-    with ui.column().classes(f"w-full gap-0 rounded-xl border p-3 {tone}").mark("prep-block"):
+    # Wechseltag ist die einzige Lage, die heute noch eilt – dafuer gibt es
+    # DRINGEND. Alles andere ist schlicht in Ordnung.
+    tone, txt = ((ton.FLAECHE_DRINGEND, ton.AUF_DRINGEND) if same_day
+                 else (ton.FLAECHE_ERFOLG, ton.AUF_ERFOLG))
+    with ui.column().classes(f"w-full gap-0 rounded-xl p-3 {tone}").mark("prep-block"):
         with ui.row().classes("w-full items-center gap-1 no-wrap"):
             ui.icon("login").classes(f"{txt} text-base shrink-0")
             ui.label(t("Vorbereiten für")).classes(
@@ -111,14 +113,14 @@ def _prep_panel(nxt, same_day):
             .classes("text-xs text-slate-500 leading-tight")
         if same_day:
             with ui.row().classes("w-full items-center gap-1 no-wrap mt-1"):
-                ui.icon("bolt").classes("text-orange-700 text-sm shrink-0")
+                ui.icon("bolt").classes(f"{ton.DRINGEND} text-sm shrink-0")
                 ui.label(t("Wechseltag – Anreise noch heute")).classes(
-                    "text-xs font-semibold text-orange-700")
+                    f"text-xs font-semibold {ton.DRINGEND}")
 
 
 def _depart_panel(job):
     """Abreise-Angaben – bewusst neutral/klein gehalten (siehe _prep_panel)."""
-    with ui.column().classes("w-full gap-0 rounded-xl border border-slate-200 bg-slate-50 p-3") \
+    with ui.column().classes(f"w-full gap-0 rounded-xl p-3 {ton.FLAECHE_RUHIG}") \
             .mark("depart-block"):
         with ui.row().classes("w-full items-center gap-1 no-wrap"):
             ui.icon("logout").classes("text-slate-500 text-base shrink-0")
@@ -398,7 +400,7 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
 
     # Überfällig – volle Karten
     if overdue:
-        ui.label(t("Überfällig ({n})", n=len(overdue))).classes("text-sm font-semibold text-red-600 mt-2")
+        ui.label(t("Überfällig ({n})", n=len(overdue))).classes("text-sm font-semibold text-red-700 mt-2")
         for j in overdue:
             _cleaning_card(j, user, admin, staff, activate)
     # Heute – volle Karten
@@ -408,20 +410,20 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
             _cleaning_card(j, user, admin, staff, activate)
     if not overdue and not todayj:
         ui.label(t("Für dich heute nichts zu tun. 🎉") if nur_eigene
-                 else t("Heute keine Reinigungen. 🎉")).classes("text-gray-500 mt-2")
+                 else t("Heute keine Reinigungen. 🎉")).classes("text-slate-500 mt-2")
 
     # Kommende Tage – kompakt, ausklappbar
     if future:
         groups = {}
         for j in future:
             groups.setdefault(j["departure"], []).append(j)
-        ui.label("KOMMENDE TAGE").classes("text-xs font-semibold tracking-wide text-gray-400 mt-4")
+        ui.label("KOMMENDE TAGE").classes("text-xs font-semibold tracking-wide text-slate-400 mt-4")
         offen_ges = 0
         for d in sorted(groups):
             offen_ges += sum(1 for j in groups[d] if not bookings.assignee_of(j["id"]))
         if offen_ges and not nur_eigene:
-            with ui.row().classes("w-full items-center gap-2 no-wrap text-amber-800 "
-                                  "bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"):
+            with ui.row().classes(f"w-full items-center gap-2 no-wrap rounded-lg px-3 py-2 "
+                                  f"{ton.AUF_HINWEIS} {ton.FLAECHE_HINWEIS}"):
                 ui.icon("person_off").classes("text-amber-700 text-base shrink-0")
                 ui.label(t("{n} Reinigung noch niemandem zugewiesen", n=offen_ges)
                          if offen_ges == 1 else
@@ -465,15 +467,15 @@ def _tagesgruppe(d, tagesjobs, user, admin, staff, activate, nur_eigene=False):
         # Quasars Pfeil bleibt trotz eigenem Header-Slot erhalten – keinen
         # zweiten ergänzen.
         with ui.row().classes("w-full items-start gap-2 no-wrap"):
-            ui.icon("event").classes(("text-amber-600" if (offen and not nur_eigene)
-                                      else "text-gray-400")
+            ui.icon("event").classes(("text-amber-700" if (offen and not nur_eigene)
+                                      else "text-slate-400")
                                      + " text-xl shrink-0 mt-0.5")
             with ui.column().classes("gap-1 min-w-0 flex-grow"):
                 with ui.column().classes("gap-0 min-w-0"):
                     ui.label(f"{wd} {dd.strftime('%d.%m.')}") \
                         .classes("font-medium leading-tight whitespace-nowrap")
                     ui.label(t("{n} Reinigung", n=n) if n == 1 else t("{n} Reinigungen", n=n)) \
-                        .classes("text-xs text-gray-500 leading-tight whitespace-nowrap")
+                        .classes("text-xs text-slate-500 leading-tight whitespace-nowrap")
                 with ui.row().classes("items-center gap-1 flex-wrap"):
                     if nur_eigene:
                         for wohnung in sorted({j["apartment_name"] for j in tagesjobs}):
@@ -573,7 +575,7 @@ def _step_button(label, icon, cb):
         with ui.row().classes("w-full items-center gap-3 no-wrap"):
             ui.icon(icon).classes("text-primary")
             ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
-            ui.icon("chevron_right").classes("text-gray-300")
+            ui.icon("chevron_right").classes("text-slate-300")
 
 
 def _note_dialog(job, on_saved=None):
@@ -596,7 +598,7 @@ def _note_dialog(job, on_saved=None):
 def _restock_dialog(job, user, on_close=None):
     with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
         ui.label(t("Verbrauch / Wäsche – {wohnung}", wohnung=job["apartment_name"])).classes("text-lg font-bold")
-        ui.label(t("Was muss nachgekauft werden?")).classes("text-sm text-gray-500")
+        ui.label(t("Was muss nachgekauft werden?")).classes("text-sm text-slate-500")
         for it in housekeeping.get_inventory(job["apartment_id"]):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.label(it["name"]).classes("flex-grow")
@@ -670,7 +672,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                     with ui.row().classes("w-full items-center gap-1 text-sm text-slate-600 no-wrap"):
                         ui.icon("logout").classes("text-deep-orange text-base")
                         ui.label(f"{t('Check-out')} {job['checkout_time'] or '—'}")
-                        ui.icon("arrow_forward").classes("text-gray-400 text-sm")
+                        ui.icon("arrow_forward").classes("text-slate-400 text-sm")
                         ui.icon("login").classes("text-green-700 text-base")
                         ui.label(f"{t('Check-in')} {nxt['checkin_time'] if nxt else '—'}")
 
@@ -692,7 +694,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                         complete = True     # ohne Checkliste direkt zu den Schritten
                     with ui.card().classes("w-full bg-violet-50 rounded-xl p-3 gap-1 shadow-none"):
                         with ui.row().classes("w-full items-center"):
-                            ui.label(t("Arbeitszeit läuft")).classes("text-xs text-gray-500")
+                            ui.label(t("Arbeitszeit läuft")).classes("text-xs text-slate-500")
                             ui.space()
                             if not complete:
                                 ui.button(t("Beenden"), icon="stop_circle", on_click=_do_out) \
@@ -707,7 +709,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                         with ui.row().classes("w-full items-center"):
                             ui.label(t("Checkliste")).classes("font-medium text-sm")
                             ui.space()
-                            ui.label(f"{dprog}/{tprog} erledigt").classes("text-xs text-gray-500")
+                            ui.label(f"{dprog}/{tprog} erledigt").classes("text-xs text-slate-500")
                         ui.linear_progress(value=(dprog / tprog if tprog else 0), show_value=False) \
                             .props(f"color={'green' if complete else 'primary'} rounded track-color=grey-3").classes("w-full")
                     if not complete:
@@ -719,7 +721,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                             with ui.row().classes("w-full items-center gap-1 text-sm text-green-700"):
                                 ui.icon("check_circle").classes("text-base")
                                 ui.label(t("Alle Aufgaben abgeschlossen"))
-                        ui.label(t("Nächste Schritte")).classes("text-xs font-semibold text-gray-400 mt-1")
+                        ui.label(t("Nächste Schritte")).classes("text-xs font-semibold text-slate-400 mt-1")
                         with ui.column().classes("w-full gap-1"):
                             _step_button("Schaden melden", "report_problem",
                                          lambda: reinigung.open_damage_dialog(job["apartment_id"], job["apartment_name"], user, booking_id=job["id"]))
@@ -740,7 +742,7 @@ def _cleaning_card(job, user, admin, staff, activate):
                             ui.label(t("Fertig · {dauer}", dauer=timetrack.fmt_dur(total_min)))
                 else:
                     if total_min:
-                        ui.label(t("Erfasst {dauer}", dauer=timetrack.fmt_dur(total_min))).classes("text-xs text-gray-500")
+                        ui.label(t("Erfasst {dauer}", dauer=timetrack.fmt_dur(total_min))).classes("text-xs text-slate-500")
                     ui.button(t("Arbeitszeit starten"), icon="play_arrow", on_click=_do_in) \
                         .props("unelevated no-caps size=lg").classes("w-full")
     render()
@@ -748,7 +750,7 @@ def _cleaning_card(job, user, admin, staff, activate):
 
 def _cleaning_compact(job, user, admin, staff, activate):
     nxt = job.get("next")
-    card = ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 p-3 cursor-pointer")
+    card = ui.card().classes(ton.KARTE_ENG + " cursor-pointer")
     card.on("click", lambda: dialog.open_booking_dialog(job, user, admin, staff, activate))
     with card:
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
@@ -757,7 +759,7 @@ def _cleaning_compact(job, user, admin, staff, activate):
                 ui.label(job["apartment_name"]).classes("font-medium truncate")
                 ui.label(f"{t('Check-out')} {job['checkout_time'] or '—'} → "
                          f"{t('Check-in')} {nxt['checkin_time'] if nxt else '—'}") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 # Nur die Anreise-Zahl – die Abreise-Personen stehen im Detail-Dialog,
                 # nebeneinander werden sie zu leicht verwechselt.
                 if nxt:
@@ -766,7 +768,7 @@ def _cleaning_compact(job, user, admin, staff, activate):
                              + (t("Person") if n == 1 else t("Personen"))) \
                         .classes("text-xs font-semibold text-green-700 truncate")
                 else:
-                    ui.label(t("keine Folgebuchung")).classes("text-xs text-gray-400 truncate")
+                    ui.label(t("keine Folgebuchung")).classes("text-xs text-slate-400 truncate")
                 # Wer übernimmt DIESE Reinigung. Im Kopf der Tagesgruppe steht bei
                 # mehreren Buchungen nur "{n} vergeben" – ohne den Namen an der
                 # Karte lässt sich das Aufgeklappte keinem Mitarbeiter zuordnen.
@@ -778,27 +780,27 @@ def _cleaning_compact(job, user, admin, staff, activate):
                             .classes("text-xs font-medium text-green-700 truncate")
                     else:
                         ui.icon("person_off").classes("text-amber-700 text-sm shrink-0")
-                        ui.label(t("noch frei")).classes("text-xs font-medium text-amber-800 truncate")
+                        ui.label(t("noch frei")).classes(f"text-xs font-medium {ton.AUF_HINWEIS} truncate")
             _status_chip(job)
-            ui.icon("chevron_right").classes("text-gray-300 shrink-0")
+            ui.icon("chevron_right").classes("text-slate-300 shrink-0")
 
 
 def _event_card(ev, user, admin, staff, activate):
     is_out = ev["kind"] == "out"
     who = bookings.assignee_of(ev["id"])
     who_name = staff.get(who, who) if who else None
-    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-3"):
+    with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-center gap-2 flex-wrap"):
             if is_out:
                 ui.chip(t("Abreise"), icon="logout").props("color=deep-orange text-color=white dense")
             else:
                 ui.chip(t("Anreise"), icon="login").props("color=green text-color=white dense")
             ui.label(ev["apartment_name"]).classes("font-semibold")
-            with ui.row().classes("items-center gap-1 text-sm text-gray-500"):
+            with ui.row().classes("items-center gap-1 text-sm text-slate-500"):
                 ui.icon("schedule").classes("text-base")
                 ui.label(ev["time"] or "—")
             if ev.get("nights") is not None:
-                with ui.row().classes("items-center gap-1 text-sm text-gray-500") \
+                with ui.row().classes("items-center gap-1 text-sm text-slate-500") \
                         .tooltip(t("Nächte")):
                     ui.icon("dark_mode").classes("text-base")
                     ui.label(f"{ev['nights']}")
@@ -808,7 +810,7 @@ def _event_card(ev, user, admin, staff, activate):
                     ui.chip(who_name, icon="person").props("color=primary text-color=white dense")
                 else:
                     ui.chip(t("nicht zugewiesen"), icon="person_off").props("color=grey-4 dense")
-        with ui.row().classes("w-full items-center gap-2 flex-wrap text-sm text-gray-500"):
+        with ui.row().classes("w-full items-center gap-2 flex-wrap text-sm text-slate-500"):
             ui.label(f"{ev['guest'] or t('Gast')} · {ev['channel']}")
             ui.label(_persons_text(ev, True))
         with ui.row().classes("w-full items-center gap-2 flex-wrap mt-1"):

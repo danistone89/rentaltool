@@ -10,6 +10,7 @@ from nicegui import ui
 from app import housekeeping, mode, receipts
 from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _esc_attr, _is_admin,
                           _photo_thumb, _read_upload, bereichskopf, leer, t)
+from app.ui import ton
 
 def _beleg_mirror():
     if mode.STAGING:
@@ -314,7 +315,7 @@ def render_belege():
             with ui.column().classes("w-full gap-2 beleg-edit").style("display:none"):
                 ui.label(t("Ziehe die vier Punkte auf die Ecken des Belegs. Der Bereich "
                            "wird geradegezogen und als PDF gespeichert.")) \
-                    .classes("text-[11px] text-gray-500 text-center")
+                    .classes("text-[11px] text-slate-500 text-center")
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.button(t("Neu aufnehmen"), icon="replay",
                               on_click=lambda: js("window.__belegRetake&&window.__belegRetake()")) \
@@ -335,11 +336,11 @@ def render_belege():
         box.clear()
         with box:
             # Upload-Karte
-            with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-4"):
+            with ui.card().classes(ton.KARTE_WEIT):
                 ui.label(t("Neuen Beleg hinzufügen")).classes("font-medium")
                 ui.label(t("Live scannen (Rand wird erkannt) oder Foto/Datei wählen. "
                    "Das Dokument wird als PDF abgelegt und per OCR ausgelesen.")) \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 apt_sel = ui.select({None: t("— keine Wohnung —"), **apts}, value=sc["apt"],
                                     label=t("Für welche Wohnung?")).props("outlined dense") \
                     .classes("min-w-[220px]")
@@ -385,7 +386,7 @@ def render_belege():
 
 
 def _beleg_card(r, apts, user, admin, rerender):
-    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
+    with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-start gap-3 no-wrap"):
             if r.get("photo"):
                 _photo_thumb(f"/media/{r['photo']}", "w-20 h-20")
@@ -399,16 +400,16 @@ def _beleg_card(r, apts, user, admin, rerender):
                         .props("dense borderless").classes("w-20 text-right")
                     amount.on("blur", lambda e, i=r["id"], f=amount:
                               receipts.update_receipt(i, amount=f.value or ""))
-                    ui.label("€").classes("text-sm text-gray-400")
+                    ui.label("€").classes("text-sm text-slate-400")
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    ui.icon("home").classes("text-gray-400 text-sm shrink-0")
+                    ui.icon("home").classes("text-slate-400 text-sm shrink-0")
                     apt_sel = ui.select({None: "— keine Wohnung —", **apts},
                                         value=r.get("apartment_id")).props("dense borderless") \
                         .classes("min-w-0")
                     apt_sel.on_value_change(lambda e, i=r["id"]:
                                             receipts.update_receipt(i, apartment_id=e.value,
                                                                     apartment_name=apts.get(e.value, "")))
-                ui.label(f"{_d(r['ts'])} · {r.get('uploader', '')}").classes("text-xs text-gray-400")
+                ui.label(f"{_d(r['ts'])} · {r.get('uploader', '')}").classes("text-xs text-slate-400")
                 note = ui.input(placeholder=t("Notiz (z. B. wofür)"),
                                 value=r.get("note", "")).props("dense borderless").classes("w-full")
                 note.on("blur", lambda e, i=r["id"], f=note:
@@ -423,7 +424,7 @@ def _beleg_card(r, apts, user, admin, rerender):
                         .props("flat round dense color=negative").tooltip(t("Beleg löschen"))
         if r.get("ocr_text"):
             with ui.expansion(t("Erkannter Text (OCR)"), icon="document_scanner").classes("w-full"):
-                ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-gray-600")
+                ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-slate-600")
 
 
 def _del_beleg(receipt_id, rerender):

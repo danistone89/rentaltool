@@ -13,6 +13,7 @@ import base64
 from nicegui import app, ui
 from datetime import date
 from app import auth, data, housekeeping, i18n, mode, smoobu, timetrack
+from app.ui import ton
 
 CFG = data.CONFIG
 AUTH = CFG.setdefault("auth", {})
@@ -315,11 +316,11 @@ def bereichskopf(icon, titel, unterzeile="", aktion=None):
         ui.icon(icon).classes("text-2xl sm:text-3xl text-primary shrink-0")
         with ui.column().classes("gap-0 min-w-0"):
             ui.label(titel).classes(
-                "text-lg sm:text-2xl font-bold text-slate-800 leading-tight") \
+                f"text-lg sm:text-2xl font-bold {ton.TITEL} leading-tight") \
                 .mark("bereich-titel")
             if unterzeile:
                 ui.label(unterzeile).classes(
-                    "hidden sm:block text-sm text-gray-500").mark("bereich-unterzeile")
+                    f"hidden sm:block text-sm {ton.LEISE}").mark("bereich-unterzeile")
         ui.space()
         if aktion:
             aktion()
@@ -334,10 +335,10 @@ def leer(icon, text, hinweis="", aktion=None):
     `stoerung()` – die Unterscheidung ist der Sinn der Sache.
     """
     with ui.column().classes("w-full items-center gap-1 py-8"):
-        ui.icon(icon).classes("text-5xl text-gray-300")
-        ui.label(text).classes("text-gray-500 text-center px-4")
+        ui.icon(icon).classes(f"text-5xl {ton.SYMBOL_LEER}")
+        ui.label(text).classes(f"{ton.LEISE} text-center px-4")
         if hinweis:
-            ui.label(hinweis).classes("text-xs text-gray-400 text-center px-4")
+            ui.label(hinweis).classes(f"text-xs {ton.STILL} text-center px-4")
         if aktion:
             aktion()
 
@@ -351,10 +352,10 @@ def stoerung(text, hinweis="", nochmal=None):
     dastehen.
     """
     with ui.column().classes("w-full items-center gap-1 py-8"):
-        ui.icon("cloud_off").classes("text-5xl text-red-200")
-        ui.label(text).classes("text-red-700 font-medium text-center px-4")
+        ui.icon("cloud_off").classes(f"text-5xl {ton.SYMBOL_STOERUNG}")
+        ui.label(text).classes(f"{ton.STOERUNG} font-medium text-center px-4")
         if hinweis:
-            ui.label(hinweis).classes("text-xs text-gray-500 text-center px-4")
+            ui.label(hinweis).classes(f"text-xs {ton.LEISE} text-center px-4")
         if nochmal:
             ui.button(t("Nochmal versuchen"), icon="refresh", on_click=nochmal) \
                 .props("outline no-caps").classes("mt-2")
@@ -364,7 +365,7 @@ def laedt(text=""):
     """„Wird geholt." – damit Warten nicht wie Leere aussieht."""
     with ui.column().classes("w-full items-center gap-2 py-8"):
         ui.spinner(size="lg").classes("text-primary")
-        ui.label(text or t("Wird geladen …")).classes("text-sm text-gray-500")
+        ui.label(text or t("Wird geladen …")).classes(f"text-sm {ton.LEISE}")
 
 
 def _probe_hinweis():

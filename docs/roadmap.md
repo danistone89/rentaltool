@@ -190,11 +190,34 @@ Block mit großem Symbol wäre in einer Karte von drei Zeilen unangemessen.
 
 *Größe:* M.
 
-### AP-D3 · Farb- und Abstandsrollen festschreiben — offen
+### AP-D3 · Farb- und Abstandsrollen festschreiben — ✅ erledigt (6.8.2026)
 
-Farben stehen heute als Tailwind-Klassen verstreut im Code (`text-amber-800`,
-`bg-violet-50`). Als benannte Rollen – Hinweis, Warnung, Erfolg, ruhig – an einer
-Stelle, damit der nächste Bereich von allein passt. Optional, lohnt erst nach D1.
+Die Rollen stehen in `app/ui/ton.py`. Beim Aufräumen kamen zwei Befunde heraus,
+die man einzelnen Bildschirmen nicht ansieht:
+
+**Zwei Neutral-Skalen für eine Aufgabe.** Die hellen Stufen kamen aus `gray`
+(191 Stellen: `text-gray-400`, `text-gray-500`), die dunklen aus `slate`. `gray`
+ist neutral, `slate` blaustichig – in derselben Karte untereinander sieht man
+den Bruch. Jetzt gibt es nur `slate`, mit Namen von `TITEL` bis `ZART`.
+
+**Gleiche Bedeutung in zufälligen Stufen.** „Hinweis" war je nach Fundstelle
+`amber-600`, `-700` oder `-800`. Vier Bedeutungen sind übrig: `HINWEIS`,
+`DRINGEND` (nur der Wechseltag), `ERFOLG`, `STOERUNG` – jeweils mit `AUF_…` für
+Text auf getönter Fläche, wo die hellere Stufe den Kontrast nicht trägt.
+
+Dazu die Karte: ein Rezept, das an 18 Stellen Wort für Wort neu geschrieben
+stand, mit Innenabständen zwischen `p-3` und `p-4`. Jetzt `KARTE_ENG` (Normal‑
+fall) und `KARTE_WEIT`.
+
+**Was das Paket hält, ist `tests/test_ton.py`** (120 Prüfungen über alle
+Module): `gray` darf nirgends mehr vorkommen, Bedeutungsfarben nur in den
+Stufen 700/800, das Kartenrezept nur an einer Stelle. Ein einmal aufgeräumtes
+System ist nach drei Bereichen wieder unaufgeräumt – der Test ist der Grund,
+warum es diesmal hält.
+
+Nebenbefund: Der Namensprüfer (`tools/check_shadowing.py`) meldete sofort zwei
+Funktionen mit einem Parameter `ton`, der das neue Modul überschattete. Sie
+heißen jetzt `farbe`.
 
 *Größe:* S–M.
 

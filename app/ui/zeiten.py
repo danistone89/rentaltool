@@ -9,6 +9,7 @@ from datetime import date
 from app import feiertage, mailer, timetrack
 from app.ui.basis import (CFG, USERS, _MONATE, _billing_month, _billing_period, _cur_user, _d, _eur, _has_rates, _hours_num, _month_label, _rate_defaults, _t, _zeit_aggregat, t)
 from app.ui.standort import (_presence)
+from app.ui import ton
 
 def _export_csv(rows, show_user):
     import csv
@@ -49,7 +50,7 @@ def _zeit_table(container, rows, show_user, title, export=False):
         "dur": timetrack.fmt_dur(timetrack.duration_minutes(e)),
     } for e in rows]
     with container:
-        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
+        with ui.card().classes(ton.KARTE):
             with ui.row().classes("w-full items-center"):
                 ui.label(title).classes("font-medium")
                 ui.space()
@@ -59,7 +60,7 @@ def _zeit_table(container, rows, show_user, title, export=False):
             if trows:
                 ui.table(columns=cols, rows=trows, row_key="id").props("dense flat").classes("w-full")
             else:
-                ui.label(t("Noch keine Einträge.")).classes("text-sm text-gray-400")
+                ui.label(t("Noch keine Einträge.")).classes("text-sm text-slate-400")
 
 
 def _zeit_csv_bytes(rows, show_user):
@@ -132,7 +133,7 @@ def _time_edit_dialog(default_user, apts, admin, staff, entry=None, on_saved=Non
 
 
 def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
-    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-1 p-3"):
+    with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-center"):
             ui.label(title).classes("font-medium")
             ui.space()
@@ -142,7 +143,7 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                               _zeit_csv_bytes(rows, show_user), "arbeitszeiten.csv",
                               media_type="text/csv")).props("flat dense no-caps")
         if not rows:
-            ui.label(t("Noch keine Einträge.")).classes("text-sm text-gray-400"); return
+            ui.label(t("Noch keine Einträge.")).classes("text-sm text-slate-400"); return
         for e in rows:
             with ui.row().classes("w-full items-center gap-2 no-wrap border-b border-slate-50 py-1"):
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
@@ -166,13 +167,13 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                     if e.get("manual") or e.get("edited"):
                         sub.append("manuell")
                     if sub:
-                        ui.label(" · ".join(sub)).classes("text-xs text-gray-400 truncate")
+                        ui.label(" · ".join(sub)).classes("text-xs text-slate-400 truncate")
                 ui.label(timetrack.fmt_dur(timetrack.duration_minutes(e))) \
                     .classes("text-sm font-medium shrink-0")
                 # Gemeldete Zeiten darf nur der Admin noch anfassen – sonst weicht
                 # das, was beim Steuerbüro liegt, von dem hier ab.
                 if timetrack.is_billed(e) and not admin:
-                    ui.icon("lock").classes("text-gray-300 shrink-0") \
+                    ui.icon("lock").classes("text-slate-300 shrink-0") \
                         .tooltip(t("Ans Steuerbüro gemeldet – nicht mehr änderbar."))
                 else:
                     ui.button(icon="edit", on_click=lambda ev=e:
@@ -183,15 +184,15 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                                on_change())).props("flat round dense color=negative").tooltip(t("Löschen"))
 
 
-def _mini_kpi(label, wert, zusatz="", icon="schedule", ton="primary"):
+def _mini_kpi(label, wert, zusatz="", icon="schedule", farbe="primary"):
     """Kachel für die Mitarbeiter-Übersicht."""
-    with ui.card().classes("rounded-xl shadow-sm border border-slate-100 p-3 gap-0 min-w-[136px] flex-grow"):
+    with ui.card().classes(ton.KARTENFLAECHE + " p-3 gap-0 min-w-[136px] flex-grow"):
         with ui.row().classes("items-center gap-1 no-wrap"):
-            ui.icon(icon).classes(f"text-{ton} text-base shrink-0")
-            ui.label(label).classes("text-[11px] text-gray-500 leading-tight")
-        ui.label(wert).classes(f"text-2xl font-bold text-{ton} leading-tight mt-1")
+            ui.icon(icon).classes(f"text-{farbe} text-base shrink-0")
+            ui.label(label).classes("text-[11px] text-slate-500 leading-tight")
+        ui.label(wert).classes(f"text-2xl font-bold text-{farbe} leading-tight mt-1")
         if zusatz:
-            ui.label(zusatz).classes("text-[11px] text-gray-400 leading-tight")
+            ui.label(zusatz).classes("text-[11px] text-slate-400 leading-tight")
 
 
 def _meine_kennzahlen(user):
@@ -220,13 +221,13 @@ def _meine_kennzahlen(user):
     money = _has_rates()
     st, en = _billing_period(akt)
 
-    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
+    with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-center gap-2"):
             ui.icon("insights").classes("text-primary text-xl")
             ui.label(t("Meine Übersicht")).classes("font-medium")
             ui.space()
             ui.label(f"{_month_label(akt)} · {st.strftime('%d.%m.')}–{en.strftime('%d.%m.')}") \
-                .classes("text-xs text-gray-500")
+                .classes("text-xs text-slate-500")
         with ui.row().classes("w-full gap-2 flex-wrap"):
             _mini_kpi(t("Stunden dieser Monat"), _hours_num(s_akt["minutes"]),
                       t("{n} Einsätze", n=s_akt["count"]), "schedule")
@@ -256,23 +257,23 @@ def _meine_kennzahlen(user):
                     "text-xs font-semibold uppercase tracking-wide text-slate-500")
             with ui.row().classes("w-full items-center gap-4 flex-wrap"):
                 with ui.column().classes("gap-0"):
-                    ui.label(t("noch offen")).classes("text-[11px] text-gray-500")
+                    ui.label(t("noch offen")).classes("text-[11px] text-slate-500")
                     ui.label(_hours_num(offen) + " " + t("Std")) \
                         .classes("text-lg font-bold text-amber-700 leading-tight")
                     if money and s_ges["open_amount"]:
-                        ui.label(_eur(s_ges["open_amount"])).classes("text-[11px] text-gray-500")
+                        ui.label(_eur(s_ges["open_amount"])).classes("text-[11px] text-slate-500")
                 ui.element("div").classes("w-px h-10 bg-slate-200")
                 with ui.column().classes("gap-0"):
-                    ui.label(t("abgerechnet")).classes("text-[11px] text-gray-500")
+                    ui.label(t("abgerechnet")).classes("text-[11px] text-slate-500")
                     ui.label(_hours_num(abger) + " " + t("Std")) \
                         .classes("text-lg font-bold text-green-700 leading-tight")
                     if money and s_ges["billed_amount"]:
-                        ui.label(_eur(s_ges["billed_amount"])).classes("text-[11px] text-gray-500")
+                        ui.label(_eur(s_ges["billed_amount"])).classes("text-[11px] text-slate-500")
             if offen + abger:
                 ui.linear_progress(value=abger / (offen + abger), show_value=False) \
                     .props("color=green rounded track-color=amber-3 size=8px").classes("w-full")
             ui.label(t("„Abgerechnet“ heißt: ans Steuerbüro gemeldet. Diese Einträge "
-                       "lassen sich nicht mehr ändern.")).classes("text-[11px] text-gray-400")
+                       "lassen sich nicht mehr ändern.")).classes("text-[11px] text-slate-400")
 
 
 def _stb_email_body(ym, rows, staff):
@@ -367,7 +368,7 @@ def _abrechnen_block(rows, ym, on_change, dlg_slot):
                 ui.chip("teilweise abgerechnet", icon="incomplete_circle") \
                     .props("color=orange-8 text-color=white dense")
         if not rows:
-            ui.label("Keine Zeiten in diesem Zeitraum.").classes("text-sm text-gray-400")
+            ui.label("Keine Zeiten in diesem Zeitraum.").classes("text-sm text-slate-400")
             return
         ui.label(f"{len(fertig)} von {len(rows)} Einträgen abgerechnet · "
                  f"offen {_hours_num(o_min)} Std · abgerechnet {_hours_num(f_min)} Std"
@@ -395,7 +396,7 @@ def _abrechnen_block(rows, ym, on_change, dlg_slot):
                               "Aufheben", "negative", zuruecknehmen)) \
                     .props("outline no-caps color=negative")
         ui.label("Der Filter „Mitarbeiter“ oben wirkt mit – so lässt sich auch einzeln "
-                 "abrechnen.").classes("text-[11px] text-gray-400")
+                 "abrechnen.").classes("text-[11px] text-slate-400")
 
 
 def _admin_zeiten(apts, staff, on_change, dlg_slot):
@@ -420,7 +421,7 @@ def _admin_zeiten(apts, staff, on_change, dlg_slot):
             st, en = _billing_period(state["month"])
             ui.label(f"Zeitraum {st.strftime('%d.%m.')}–{en.strftime('%d.%m.%Y')} "
                      "(Meldung zum 19., spätere Stunden im Folgemonat)") \
-                .classes("text-xs text-gray-500")
+                .classes("text-xs text-slate-500")
             rows = [e for e in all_entries
                     if _billing_month(e["checkin"]) == state["month"]
                     and (state["user"] is None or e["user"] == state["user"])]
@@ -440,11 +441,11 @@ def _admin_zeiten(apts, staff, on_change, dlg_slot):
                         if we > 0:
                             ui.label(f"Werktags {_hours_num(a['minutes'][feiertage.WERKTAG])} · "
                                      f"Wochenende/Feiertag {_hours_num(we)} Std") \
-                                .classes("text-xs text-gray-400")
+                                .classes("text-xs text-slate-400")
                     with ui.column().classes("gap-0 items-end shrink-0"):
                         ui.label(f"{_hours_num(a['total_minutes'])} Std").classes("font-medium")
                         if money and a["total_amount"]:
-                            ui.label(_eur(a["total_amount"])).classes("text-xs text-gray-500")
+                            ui.label(_eur(a["total_amount"])).classes("text-xs text-slate-500")
 
             def send_stb():
                 stb = (CFG.get("steuerberater_email") or "").strip()

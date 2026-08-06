@@ -32,7 +32,7 @@ from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402,F401
                  bookings, receipts, feiertage, i18n, ical, mode)
-from app.ui import basis, belege, buchungen, dialog, einstellungen  # noqa: E402,F401
+from app.ui import basis, belege, buchungen, dialog, einstellungen, ton  # noqa: E402,F401
 from app.ui import pwa  # noqa: E402,F401
 from app.ui import kalender, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
 from app.ui.basis import (AREAS, AUTH, BAR_PLAETZE, CFG, ROLE_AREAS, ROLES,  # noqa: E402,F401
@@ -181,7 +181,7 @@ def main_page():
         schublade = ui.column().classes("w-full gap-0 grow")
         with ui.column().classes("px-4 pb-3 gap-0"):
             ui.label(_cur_user()).classes("text-sm font-medium text-slate-700")
-            ui.label(_role_label(role)).classes("text-xs text-gray-400")
+            ui.label(_role_label(role)).classes("text-xs text-slate-400")
 
     # Das Menue faehrt von unten aus und bleibt damit in Daumennaehe.
     menue_blatt = ui.dialog().props("position=bottom")
@@ -200,7 +200,7 @@ def main_page():
                         lambda: ui.button("Archiv", icon="inventory_2",
                                           on_click=open_archive).props("outline no-caps")
                         .mark("steuer-archiv"))
-        with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
+        with ui.card().classes(ton.KARTE):
             with ui.row().classes("items-end gap-4 flex-wrap"):
                 year = ui.select(list(range(2023, today.year + 2)), label="Jahr",
                                  value=today.year).props("outlined dense")
@@ -219,9 +219,9 @@ def main_page():
             with ui.row().classes("items-center gap-2"):
                 ui.label("Zuordnung nach Abreisedatum (§6) · nur bereits stattgefundene "
                          "Buchungen · Airbnb wird berechnet, nicht besteuert.") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
                 ui.space()
-                status = ui.label("").classes("text-xs text-gray-400")
+                status = ui.label("").classes("text-xs text-slate-400")
         results = ui.column().classes("w-full gap-4")
 
         def do_compute(force=False):
@@ -291,7 +291,7 @@ def main_page():
         def render():
             body.clear()
             with body:
-                with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 items-start gap-2"):
+                with ui.card().classes(ton.KARTE + " items-start gap-2"):
                     oe = timetrack.get_open(user)
                     if oe:
                         ui.label(t("Eingecheckt seit {zeit} Uhr", zeit=_t(oe["checkin"]))) \
@@ -299,11 +299,11 @@ def main_page():
                         _nachweis = _presence(oe.get("checkin_ort"), oe.get("checkin_dist"),
                                               oe.get("checkin_loc"), oe.get("checkin_ip"))
                         if _nachweis:
-                            ui.label(t("Nachweis: ") + _nachweis).classes("text-xs text-gray-500")
+                            ui.label(t("Nachweis: ") + _nachweis).classes("text-xs text-slate-500")
                         ui.button(t("Check-out"), icon="logout", on_click=do_checkout) \
                             .props("unelevated size=lg color=negative")
                     else:
-                        ui.label(t("Nicht eingecheckt")).classes("text-gray-500")
+                        ui.label(t("Nicht eingecheckt")).classes("text-slate-500")
                         ui.button(t("Check-in"), icon="login", on_click=do_checkin) \
                             .props("unelevated size=lg")
                 ui.button(t("Zeit manuell erfassen"), icon="add",
@@ -371,7 +371,7 @@ def main_page():
 
     def _gruppe(titel):
         ui.label(t(titel)).classes(
-            "text-[11px] uppercase tracking-wider text-gray-400 px-5 pt-3 pb-1")
+            "text-[11px] uppercase tracking-wider text-slate-400 px-5 pt-3 pb-1")
 
     def _menue_inhalt(bereiche, gruppentitel, praefix, danach=None):
         """Menue-Inhalt – einmal fuer das Blatt von unten, einmal fuer die

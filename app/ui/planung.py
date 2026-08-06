@@ -47,10 +47,10 @@ def offene_zuweisen_dialog(jobs, staff, on_saved=None, tage=14):
             with ui.column().classes("gap-0"):
                 ui.label(t("Offene Reinigungen zuweisen")).classes("text-lg font-bold")
                 ui.label(t("Nächste {n} Tage · Vorschlag ist änderbar", n=tage)) \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
         if not offen:
             ui.label(t("Nichts offen – alles ist zugewiesen. 🎉")) \
-                .classes("text-gray-500 py-4")
+                .classes("text-slate-500 py-4")
             with ui.row().classes("w-full justify-end"):
                 ui.button(t("Schließen"), on_click=dlg.close).props("flat")
             dlg.open()
@@ -62,7 +62,7 @@ def offene_zuweisen_dialog(jobs, staff, on_saved=None, tage=14):
                                   "border-slate-100 py-1"):
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
                     ui.label(job["apartment_name"]).classes("text-sm font-medium truncate")
-                    ui.label(_dfmt(job["departure"])).classes("text-xs text-gray-500")
+                    ui.label(_dfmt(job["departure"])).classes("text-xs text-slate-500")
                 weg = planung.abwesend_am(job["departure"], abw)
                 # Wer an dem Tag weg ist, steht mit Hinweis in der Liste – aber
                 # er steht drin: manchmal weiß der Mensch mehr als der Kalender.
@@ -136,18 +136,18 @@ def _abwesenheiten_inhalt(benutzer, neu, titel):
             ui.icon("beach_access").classes("text-primary text-xl")
             ui.label(t("Abwesenheiten")).classes("font-medium text-slate-700")
             ui.space()
-            ui.label(t("Urlaub, krank, frei")).classes("text-xs text-gray-400")
+            ui.label(t("Urlaub, krank, frei")).classes("text-xs text-slate-400")
 
     heute = date.today().isoformat()
     eintraege = planung.abwesenheiten(benutzer, ab=heute)
     if not eintraege:
         ui.label(t("Kein Eintrag – du giltst als verfügbar.")) \
-            .classes("text-sm text-gray-500")
+            .classes("text-sm text-slate-500")
     for a in eintraege:
         with ui.row().classes("w-full items-center gap-2 no-wrap text-sm"):
-            ui.icon("event_busy").classes("text-gray-400 text-base")
+            ui.icon("event_busy").classes("text-slate-400 text-base")
             ui.label(f"{_dfmt(a['von'])} – {_dfmt(a['bis'])}").classes("shrink-0")
-            ui.label(a.get("grund") or "").classes("text-gray-500 truncate flex-grow")
+            ui.label(a.get("grund") or "").classes("text-slate-500 truncate flex-grow")
             ui.button(icon="delete", on_click=lambda _e=None, sid=a["id"]: (
                 planung.abwesenheit_loeschen(sid), neu())) \
                 .props("flat round dense size=sm color=negative")
@@ -178,9 +178,9 @@ def stammkraefte_block():
     """Wer macht welche Wohnung normalerweise (Übersicht → Konfiguration)."""
     staff = _staff()
     with ui.column().classes("w-full gap-1"):
-        ui.label("Stammzuständigkeit").classes("text-sm font-semibold text-gray-500")
+        ui.label("Stammzuständigkeit").classes("text-sm font-semibold text-slate-500")
         ui.label("Grundlage für den Vorschlag beim Zuweisen. Wer im Urlaub ist, "
-                 "wird übersprungen.").classes("text-xs text-gray-400")
+                 "wird übersprungen.").classes("text-xs text-slate-400")
         for aid, name in _apts().items():
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.icon("home").classes("text-primary text-base")

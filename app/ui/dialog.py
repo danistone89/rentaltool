@@ -103,7 +103,7 @@ def _open_swap(bk, user, staff, on_saved):
     with ui.dialog() as dlg, ui.card().classes("w-[360px] max-w-full gap-2"):
         ui.label(t("Zuweisen / Tauschen – {wohnung}", wohnung=bk["apartment_name"])).classes("font-bold")
         if not others:
-            ui.label(t("Keine weiteren Mitarbeiter.")).classes("text-sm text-gray-500")
+            ui.label(t("Keine weiteren Mitarbeiter.")).classes("text-sm text-slate-500")
         sel = ui.select(beschriftet, label=t("Mitarbeiter"), value=vorgeschlagen) \
             .props("dense outlined").classes("w-full")
         if vorgeschlagen:
@@ -112,7 +112,7 @@ def _open_swap(bk, user, staff, on_saved):
                      else t("Hat an dem Tag am wenigsten zu tun"))
             ui.label(t("Vorschlag: {name} – {grund}",
                        name=staff.get(vorgeschlagen, vorgeschlagen), grund=grund)) \
-                .classes("text-xs text-gray-500")
+                .classes("text-xs text-slate-500")
 
         def go():
             if not sel.value:
@@ -132,7 +132,7 @@ def _reset_dialog(bk, user, admin, staff, activate):
         ui.label(t("Setzt Zuweisung und Checklisten-Abschluss zurück und entfernt die für "
                    "diese Buchung erfassten Arbeitszeiten. Status wird wieder Nicht "
                    "zugewiesen. Die interne Notiz bleibt erhalten.")) \
-            .classes("text-sm text-gray-500")
+            .classes("text-sm text-slate-500")
 
         def do():
             bookings.reset(bk["id"])
@@ -174,7 +174,7 @@ def _booking_log(bk):
                  + (t(" ({n} Einträge)", n=len(entries)) if entries else "")).classes("text-sm font-medium")
     for e in entries:
         ui.label(f"· {_d(e['checkin'])} {_t(e['checkin'])}–{_t(e['checkout'])}"
-                 + (t(" (nachgetragen)") if e.get("manual") else "")).classes("text-xs text-gray-500 pl-6")
+                 + (t(" (nachgetragen)") if e.get("manual") else "")).classes("text-xs text-slate-500 pl-6")
     # Checkliste
     with ui.row().classes("w-full items-center gap-2 mt-1"):
         ui.icon("checklist").classes("text-primary")
@@ -182,24 +182,24 @@ def _booking_log(bk):
                    done=dprog, total=tprog, fotos=photos)).classes("text-sm font-medium")
     # Schäden
     with ui.row().classes("w-full items-center gap-2 mt-1"):
-        ui.icon("report_problem").classes("text-red-600")
+        ui.icon("report_problem").classes("text-red-700")
         ui.label(t("Schäden gemeldet: {n}", n=len(dmgs))).classes("text-sm font-medium")
     for d in dmgs:
         with ui.row().classes("w-full items-start gap-2 pl-6 no-wrap"):
             if d.get("photo"):
                 _photo_thumb(f"/media/{d['photo']}", "w-12 h-12")
             ui.label(f"{d.get('room') or '—'} · {d['desc']} ({d['urgency']})"
-                     + ("" if d["status"] == "offen" else " ✓")).classes("text-xs text-gray-600")
+                     + ("" if d["status"] == "offen" else " ✓")).classes("text-xs text-slate-600")
     # Verbrauch / Wäsche
     with ui.row().classes("w-full items-center gap-2 mt-1"):
         ui.icon("inventory_2").classes("text-primary")
         ui.label(t("Nachbestellt: {n}", n=len(rst))).classes("text-sm font-medium")
     for r in rst:
         ui.label(f"· {r['menge']}× {r['item']}" + ("" if r["status"] == "offen" else " ✓")) \
-            .classes("text-xs text-gray-600 pl-6")
+            .classes("text-xs text-slate-600 pl-6")
 
     if not something:
-        ui.label(t("Für diese Buchung wurde noch nichts erfasst.")).classes("text-sm text-gray-400 mt-2")
+        ui.label(t("Für diese Buchung wurde noch nichts erfasst.")).classes("text-sm text-slate-400 mt-2")
 
 
 def _msg_time(s):
@@ -220,8 +220,8 @@ def _confirm_send_guest(bk, textarea, reload_cb):
         return
     with ui.dialog() as cd, ui.card().classes("w-[420px] max-w-full gap-2"):
         ui.label(t("Nachricht an den Gast senden?")).classes("text-lg font-bold")
-        ui.label(t("Gast: {name}", name=bk.get("guest") or "—")).classes("text-sm text-gray-500")
-        with ui.column().classes("w-full bg-gray-50 rounded p-2 max-h-[30vh] overflow-auto"):
+        ui.label(t("Gast: {name}", name=bk.get("guest") or "—")).classes("text-sm text-slate-500")
+        with ui.column().classes("w-full bg-slate-50 rounded p-2 max-h-[30vh] overflow-auto"):
             ui.label(text).classes("text-sm whitespace-pre-wrap")
         ui.label(t("Die Nachricht wird sofort über Smoobu an den Gast zugestellt.")) \
             .classes("text-xs text-amber-700")
@@ -257,7 +257,7 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
     with box:
         # --- Kopf (fix) -----------------------------------------------------
         with ui.row().classes("w-full items-center shrink-0 pb-1"):
-            ui.label(t("Gästekommunikation")).classes("text-xs font-semibold text-gray-400")
+            ui.label(t("Gästekommunikation")).classes("text-xs font-semibold text-slate-400")
             ui.space()
             ui.button(icon="refresh", on_click=lambda: reload_cb(True)) \
                 .props("flat round dense size=sm").tooltip(t("Aktualisieren"))
@@ -267,12 +267,12 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
         with thread:
             if err:
                 with ui.row().classes("w-full items-center gap-2 bg-red-50 rounded p-2"):
-                    ui.icon("error_outline").classes("text-red-500")
+                    ui.icon("error_outline").classes("text-red-700")
                     ui.label(t("Nachrichten konnten nicht geladen werden: {fehler}", fehler=err)) \
                         .classes("text-xs text-red-700")
             elif not msgs:
                 ui.label(t("Noch keine Nachrichten zu dieser Buchung.")) \
-                    .classes("text-sm text-gray-400 m-auto")
+                    .classes("text-sm text-slate-400 m-auto")
             for m in msgs:
                 mine = m.get("type") == 2
                 with ui.row().classes("w-full no-wrap "
@@ -280,17 +280,17 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
                     with ui.column().classes(
                             "gap-0 rounded-2xl px-3 py-2 max-w-[82%] "
                             + ("bg-primary text-white rounded-br-sm" if mine
-                               else "bg-gray-100 rounded-bl-sm")):
+                               else "bg-slate-100 rounded-bl-sm")):
                         subj = (m.get("subject") or "").strip()
                         if subj:
                             ui.label(subj).classes(
                                 "text-xs font-semibold "
-                                + ("text-white/90" if mine else "text-gray-600"))
+                                + ("text-white/90" if mine else "text-slate-600"))
                         ui.label((m.get("message") or "").strip() or "—") \
                             .classes("text-sm whitespace-pre-wrap break-words")
                         ui.label(_msg_time(m.get("createdAt"))).classes(
                             "text-[10px] self-end "
-                            + ("text-white/70" if mine else "text-gray-400"))
+                            + ("text-white/70" if mine else "text-slate-400"))
         # neueste Nachricht sichtbar: Verlauf ans Ende scrollen
         if msgs:
             thread_id = thread.id
@@ -299,13 +299,13 @@ def _render_guest_thread(box, msgs, err, reload_cb, bk):
                 f" if(e) e.scrollTop=e.scrollHeight;"), once=True)
         # --- Antwortfeld (fix, unten) --------------------------------------
         if not err:
-            with ui.column().classes("w-full gap-1 shrink-0 pt-2 border-t border-gray-100"):
+            with ui.column().classes("w-full gap-1 shrink-0 pt-2 border-t border-slate-100"):
                 ta = ui.textarea(placeholder=t("Antwort an den Gast …")) \
                     .props("outlined autogrow dense").classes("w-full") \
                     .style("max-height:96px;overflow-y:auto")
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.label(t("Wird direkt über Smoobu an den Gast gesendet.")) \
-                        .classes("text-[11px] text-gray-400 flex-grow")
+                        .classes("text-[11px] text-slate-400 flex-grow")
                     ui.button(t("Senden"), icon="send",
                               on_click=lambda: _confirm_send_guest(bk, ta, reload_cb)) \
                         .props("unelevated no-caps")
@@ -337,43 +337,43 @@ def open_booking_dialog(bk, user, admin, staff, activate):
         with ui.tab_panels(tabs, value=t_b).classes("w-full"):
             with ui.tab_panel(t_b):
                 with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1 text-sm"):
-                    ui.label(t("Anreise")).classes("text-gray-500")
+                    ui.label(t("Anreise")).classes("text-slate-500")
                     ui.label(f"{buchungen._dfmt(bk['arrival'])} · {bk['checkin_time'] or '—'}")
-                    ui.label(t("Abreise")).classes("text-gray-500")
+                    ui.label(t("Abreise")).classes("text-slate-500")
                     ui.label(f"{buchungen._dfmt(bk['departure'])} · {bk['checkout_time'] or '—'}")
-                    ui.label(t("Personen")).classes("text-gray-500")
+                    ui.label(t("Personen")).classes("text-slate-500")
                     ui.label(buchungen._persons_text(bk, True))
-                    ui.label(t("Gast")).classes("text-gray-500")
+                    ui.label(t("Gast")).classes("text-slate-500")
                     ui.label(bk["guest"] or "—")
-                    ui.label(t("Buchungskanal")).classes("text-gray-500")
+                    ui.label(t("Buchungskanal")).classes("text-slate-500")
                     ui.label(bk["channel"] or "—")
                 if nxt:
                     with ui.column().classes("w-full gap-0 rounded-lg p-2 mt-2 "
                                              + ("bg-red-50" if same_day else "bg-green-50")):
                         ui.label(t("Anreise vorbereiten für")).classes(
-                            "text-xs " + ("text-red-500" if same_day else "text-gray-500"))
+                            "text-xs " + ("text-red-700" if same_day else "text-slate-500"))
                         ui.label(buchungen._guest_persons(nxt, True)).classes(
                             "text-sm font-semibold " + ("text-red-700" if same_day else "text-green-700"))
                         ui.label(t("Nächste Anreise: {datum} · {zeit}",
                                     datum=buchungen._dfmt(nxt["arrival"]), zeit=nxt["checkin_time"] or "")
-                                 + (f" ({t('Wechseltag')})" if same_day else "")).classes("text-xs text-gray-500")
+                                 + (f" ({t('Wechseltag')})" if same_day else "")).classes("text-xs text-slate-500")
             with ui.tab_panel(t_log):
                 _booking_log(bk)
             with ui.tab_panel(t_g):
                 with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-1 text-sm"):
-                    ui.label(t("Name")).classes("text-gray-500")
+                    ui.label(t("Name")).classes("text-slate-500")
                     ui.label(bk["guest"] or "—")
-                    ui.label(t("E-Mail")).classes("text-gray-500")
+                    ui.label(t("E-Mail")).classes("text-slate-500")
                     ui.label(bk.get("email") or "—")
-                    ui.label(t("Telefon")).classes("text-gray-500")
+                    ui.label(t("Telefon")).classes("text-slate-500")
                     ui.label(bk.get("phone") or "—")
             with ui.tab_panel(t_n):
                 intern = bookings.get_record(bk["id"]).get("note", "")
                 if intern:
-                    ui.label(t("Interne Notiz")).classes("text-xs text-gray-500")
+                    ui.label(t("Interne Notiz")).classes("text-xs text-slate-500")
                     ui.label(intern).classes("text-sm whitespace-pre-wrap")
                     ui.separator().classes("my-1")
-                ui.label(t("Buchungsdetails (Smoobu)")).classes("text-xs text-gray-500")
+                ui.label(t("Buchungsdetails (Smoobu)")).classes("text-xs text-slate-500")
                 ui.label(bk["notice"] or "—").classes("text-sm whitespace-pre-wrap")
             if mgr:
                 with ui.tab_panel(t_msg).classes("p-2"):
@@ -406,7 +406,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
         footer_box = ui.column().classes("w-full gap-0 p-0")
         with footer_box:
             ui.separator()
-            ui.label(t("Aktionen")).classes("text-xs font-semibold text-gray-400 px-3 pt-1")
+            ui.label(t("Aktionen")).classes("text-xs font-semibold text-slate-400 px-3 pt-1")
 
             def action(label, icon, cb, color="primary"):
                 b = ui.button(on_click=cb).props("flat no-caps align=left").classes("w-full")
@@ -414,7 +414,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                     with ui.row().classes("w-full items-center gap-3 no-wrap"):
                         ui.icon(icon).classes(f"text-{color}")
                         ui.label(label).classes("flex-grow text-left normal-case text-slate-700")
-                        ui.icon("chevron_right").classes("text-gray-300")
+                        ui.icon("chevron_right").classes("text-slate-300")
             if who != user:
                 action(t("Ich übernehme diesen Auftrag"), "how_to_reg",
                        lambda: (dlg.close(), _assign(bk, user, user, staff, reopen)))

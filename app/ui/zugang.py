@@ -137,7 +137,7 @@ def open_forgot_password(vorbelegt=""):
     with ui.dialog() as dlg, ui.card().classes("w-[380px] max-w-full gap-2"):
         ui.label(t("Passwort zurücksetzen")).classes("text-lg font-bold")
         ui.label(t("Wir schicken dir einen Link, mit dem du dir ein neues Passwort "
-                   "setzt.")).classes("text-sm text-gray-500")
+                   "setzt.")).classes("text-sm text-slate-500")
         feld = ui.input(t("Benutzername oder E-Mail"), value=(vorbelegt or "").strip()) \
             .classes("w-full").mark("forgot-input")
 
@@ -198,7 +198,7 @@ def invite_page(token: str = ""):
             if not u:
                 ui.label(t("Link ungültig oder abgelaufen.")).classes("font-semibold")
                 ui.label(t("Bitte fordere bei deinem Administrator eine neue Einladung an.")) \
-                    .classes("text-sm text-gray-500")
+                    .classes("text-sm text-slate-500")
                 ui.button(t("Zur Anmeldung"), on_click=lambda: ui.navigate.to("/login")) \
                     .props("unelevated").classes("w-full")
                 _lang_select().classes("w-full")
@@ -207,9 +207,9 @@ def invite_page(token: str = ""):
             reset = (u.get("invite", {}) or {}).get("zweck") == "reset"
             ui.label(t("Neues Passwort vergeben") if reset else t("Zugang einrichten")) \
                 .classes("font-semibold")
-            ui.label(t("Konto: {benutzer}", benutzer=username)).classes("text-sm text-gray-500")
+            ui.label(t("Konto: {benutzer}", benutzer=username)).classes("text-sm text-slate-500")
             ui.label(t("Vergib hier dein Passwort – danach bist du direkt angemeldet.")) \
-                .classes("text-xs text-gray-400")
+                .classes("text-xs text-slate-400")
             p1 = ui.input(t("Passwort"), password=True,
                           password_toggle_button=True).classes("w-full").mark("invite-pw1")
             p2 = ui.input(t("Passwort wiederholen"), password=True) \
@@ -250,7 +250,7 @@ def open_2fa_setup(on_done=None):
         ui.label(t("🔐 Google Authenticator einrichten")).classes("text-lg font-bold")
         ui.label(t("1. QR-Code in der Authenticator-App scannen:")).classes("text-sm")
         ui.image(auth.qr_data_uri(uri)).classes("w-48 h-48")
-        ui.label(t("oder Secret manuell eintippen:")).classes("text-xs text-gray-500")
+        ui.label(t("oder Secret manuell eintippen:")).classes("text-xs text-slate-500")
         ui.label(secret).classes("text-xs font-mono break-all")
         ui.label(t("2. Zur Bestätigung den aktuellen 6-stelligen Code eingeben:")).classes("text-sm")
         code = ui.input(t("Code")).classes("w-full")
@@ -278,7 +278,7 @@ def open_account():
         ui.label(t("Mein Konto")).classes("text-xl font-bold")
         ui.label(t("Angemeldet als {user} · {rolle}",
                    user=username, rolle=_role_label(u.get("role")))) \
-            .classes("text-sm text-gray-500")
+            .classes("text-sm text-slate-500")
         _lang_select().classes("w-full")
         email_in = ui.input(t("E-Mail (für Benachrichtigungen)"),
                             value=u.get("email", "")).classes("w-full")
@@ -352,8 +352,8 @@ def _show_invite_link(username, link, hinweis=""):
             ui.label(hinweis).classes("text-sm text-amber-700")
         ui.label("Nur einmal verwendbar, 7 Tage gültig. Dieser Link ist danach nicht "
                  "mehr abrufbar – bei Bedarf einfach neu einladen.") \
-            .classes("text-xs text-gray-500")
-        ui.label(link).classes("text-xs font-mono break-all bg-gray-100 p-2 rounded")
+            .classes("text-xs text-slate-500")
+        ui.label(link).classes("text-xs font-mono break-all bg-slate-100 p-2 rounded")
         with ui.row().classes("w-full justify-end"):
             ui.button("Kopieren", icon="content_copy",
                       on_click=lambda: (ui.clipboard.write(link),
@@ -397,7 +397,7 @@ def _confirm_reset(username, on_ok):
         ui.label(f"Zugang von {username} zurücksetzen?").classes("text-lg font-bold")
         ui.label("Der Mitarbeiter bekommt eine E-Mail mit einem Einmal-Link und setzt "
                  "sich damit selbst ein neues Passwort. Das bisherige Passwort bleibt "
-                 "gültig, bis der Link benutzt wird.").classes("text-sm text-gray-500")
+                 "gültig, bis der Link benutzt wird.").classes("text-sm text-slate-500")
         with ui.row().classes("w-full justify-end"):
             ui.button("Abbrechen", on_click=dlg.close).props("flat")
             ui.button("Link senden", icon="mail",
@@ -503,7 +503,7 @@ def _user_saetze(uname, u):
         f.bind_visibility_from(sw, "value")
     ui.label("Leer lassen = globaler Vorgabewert aus Einstellungen → Steuerberater. "
              "Wochenende/Feiertag umfasst Sa, So und die sächsischen Feiertage.") \
-        .classes("text-[11px] text-gray-400")
+        .classes("text-[11px] text-slate-400")
 
 
 def open_users():
@@ -532,7 +532,7 @@ def open_users():
                                 ui.label(f"Einladung offen – Link gültig bis {bis}") \
                                     .classes("text-xs text-amber-700")
                             elif zustand == "abgelaufen":
-                                ui.label("Einladung abgelaufen").classes("text-xs text-red-600")
+                                ui.label("Einladung abgelaufen").classes("text-xs text-red-700")
                             ui.space()
                             sel = ui.select(ROLES, value=u.get("role", "putzkraft")) \
                                 .props("dense outlined").classes("w-40")
@@ -620,7 +620,7 @@ def open_users():
         ui.label("Neuen Benutzer einladen").classes("font-medium")
         ui.label("Der Mitarbeiter bekommt eine E-Mail mit einem Link (7 Tage gültig) und "
                  "vergibt sich darüber selbst ein Passwort – du musst keines vorgeben.") \
-            .classes("text-xs text-gray-500")
+            .classes("text-xs text-slate-500")
         with ui.row().classes("w-full items-end gap-2 flex-wrap"):
             nu = ui.input("Benutzername").props("dense outlined").mark("new-user")
             nem = ui.input("E-Mail").props("dense outlined") \

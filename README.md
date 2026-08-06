@@ -226,6 +226,15 @@ Alles Weitere – Zeiterfassung, Beherbergungssteuer, Benutzer, Einstellungen,
 Archiv, Mein Konto, Sprache, Abmelden – liegt im Menü. `nav_plan` sortiert nur;
 freigeschaltet wird ausschließlich über `ROLE_AREAS`.
 
+**Farben und Abstände:** Sie stehen benannt in `app/ui/ton.py` – neutrale Töne
+von `TITEL` bis `ZART`, vier Bedeutungen (`HINWEIS`, `DRINGEND`, `ERFOLG`,
+`STOERUNG`, jeweils mit `AUF_…` für getönte Flächen) sowie die Karte
+(`KARTE_ENG`, `KARTE_WEIT`). **In neuem Code steht keine Farbklasse mehr
+direkt.** Was dort fehlt, ist entweder keine eigene Bedeutung – oder gehört dort
+ergänzt. `tests/test_ton.py` hält die Regel fest und meldet, sobald wieder eine
+Farbe von Hand hingeschrieben wird; ohne diesen Test wäre die Oberfläche nach
+drei Bereichen erneut uneinheitlich.
+
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.

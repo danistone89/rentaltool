@@ -114,9 +114,9 @@ def _timeline(state, user, admin, staff, activate, rerender):
                             .style(f"width:{CELL}px; flex:0 0 {CELL}px"):
                         ui.label(buchungen._WD[d.weekday()]).classes(
                             "text-[10px] leading-none " + ("text-primary font-bold" if is_today
-                            else ("text-blue-500" if weekend else "text-gray-400")))
+                            else ("text-blue-500" if weekend else "text-slate-400")))
                         ui.label(str(d.day)).classes(
-                            "text-xs leading-tight " + ("text-primary font-bold" if is_today else "text-gray-600"))
+                            "text-xs leading-tight " + ("text-primary font-bold" if is_today else "text-slate-600"))
             # Zeile je Wohnung
             grid_bg = ("background-image:repeating-linear-gradient(to right,"
                        "#eef2f7 0 1px,transparent 1px %dpx)" % CELL)
@@ -150,7 +150,7 @@ def _timeline(state, user, admin, staff, activate, rerender):
                                 .tooltip(t("Reinigung übernommen") if taken else "")
                             bar.on("click", lambda _e, bk=b: dialog.open_booking_dialog(bk, user, admin, staff, activate))
             if not apts:
-                ui.label(t("Keine Wohnungen geladen.")).classes("text-gray-500 p-4")
+                ui.label(t("Keine Wohnungen geladen.")).classes("text-slate-500 p-4")
 
 
 def _single_month(state, user, admin, staff, activate, rerender):
@@ -159,7 +159,7 @@ def _single_month(state, user, admin, staff, activate, rerender):
     from datetime import timedelta
     aid = state["apt"]
     if not aid:
-        ui.label(t("Keine Wohnung gewählt.")).classes("text-gray-500 mt-2")
+        ui.label(t("Keine Wohnung gewählt.")).classes("text-slate-500 mt-2")
         return
     name = _apts().get(aid, "")
     hexc = _apt_hex(aid)
@@ -194,7 +194,7 @@ def _single_month(state, user, admin, staff, activate, rerender):
     # Wochentags-Kopf
     with ui.row().classes("no-wrap w-full gap-0"):
         for wd in buchungen._WD:
-            ui.label(wd).classes("text-xs font-medium text-gray-400 text-center").style("width:14.2857%")
+            ui.label(wd).classes("text-xs font-medium text-slate-400 text-center").style("width:14.2857%")
 
     today = date.today()
     colpct = 100 / 7
@@ -212,7 +212,7 @@ def _single_month(state, user, admin, staff, activate, rerender):
                     with ui.element("div").classes(cc).style("width:14.2857%; min-height:78px"):
                         ui.label(str(d.day)).classes(
                             "text-xs px-1 pt-1 " + ("font-bold text-primary" if is_today
-                            else ("text-gray-300" if other else "text-gray-500")))
+                            else ("text-slate-300" if other else "text-slate-500")))
             # Balken (durchgehend über die Woche)
             for b in bks:
                 a = date.fromisoformat(b["arrival"])

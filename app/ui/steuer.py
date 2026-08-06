@@ -51,14 +51,14 @@ def open_archive():
             badge = "✓ Integrität geprüft" if all_ok else "⚠️ Integrität verletzt!"
             ui.label(badge).classes("text-sm " + ("text-green-700" if all_ok else "text-red-700"))
         if not entries:
-            ui.label("Noch keine Dokumente abgelegt.").classes("text-gray-500")
+            ui.label("Noch keine Dokumente abgelegt.").classes("text-slate-500")
         for e in entries:
             res = status_by_seq.get(e["seq"], {"ok": True, "issues": []})
             with ui.card().classes("w-full p-3"):
                 with ui.row().classes("w-full items-center gap-3"):
                     ok_icon = "✅" if res["ok"] else "❌"
                     ui.label(f"{ok_icon} {e['period']} · Revision {e['revision']}").classes("font-semibold")
-                    ui.label(e["ts"].replace("T", " ")).classes("text-xs text-gray-500")
+                    ui.label(e["ts"].replace("T", " ")).classes("text-xs text-slate-500")
                     ui.label(f"Steuer {data.euro(e['values'].get('beherbergungssteuer', 0))} €") \
                         .classes("text-xs")
                     ui.space()
@@ -71,7 +71,7 @@ def open_archive():
                         except FileNotFoundError:
                             ui.notify("Datei fehlt im Archiv!", type="negative")
                     ui.button("PDF", on_click=_dl).props("flat dense")
-                ui.label(f"SHA-256: {e['sha256']}").classes("text-xs text-gray-400 font-mono")
+                ui.label(f"SHA-256: {e['sha256']}").classes("text-xs text-slate-400 font-mono")
                 if not res["ok"]:
                     ui.label("⚠️ " + "; ".join(res["issues"])).classes("text-xs text-red-700")
         with ui.row().classes("w-full justify-between items-center"):
@@ -89,7 +89,7 @@ def open_archive():
                 ui.button(f"🔁 Alles nach {archive.mirror_label(CFG)} spiegeln",
                           on_click=do_mirror_all).props("flat")
             else:
-                ui.label("Kein externer Spiegel gesetzt (→ Einstellungen)").classes("text-xs text-gray-400")
+                ui.label("Kein externer Spiegel gesetzt (→ Einstellungen)").classes("text-xs text-slate-400")
             ui.button("Schließen", on_click=dialog.close).props("flat")
     dialog.open()
 
@@ -102,7 +102,7 @@ def _kpi(container, label, value, icon="analytics", accent=False):
         with ui.card().classes(cls):
             with ui.row().classes("items-center gap-2 no-wrap"):
                 ui.icon(icon).classes("text-xl " + ("text-[#C8A96E]" if accent else "text-primary"))
-                ui.label(label).classes("text-xs text-gray-500")
+                ui.label(label).classes("text-xs text-slate-500")
             ui.label(value).classes("text-2xl font-bold mt-1 text-primary")
 
 
@@ -154,7 +154,7 @@ def _summen_tabelle(r, satz):
     with ui.card().classes("w-full").mark("summen"):
         ui.label("Summen dieser Anmeldung").classes("font-medium")
         ui.label("Welche Summe wofür – die rechte Spalte zeigt, was ins amtliche "
-                 "Formular eingetragen wird.").classes("text-xs text-gray-500")
+                 "Formular eingetragen wird.").classes("text-xs text-slate-500")
         with ui.element("div").classes(
                 "w-full grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-0 mt-2 "
                 "border border-slate-200 rounded-lg overflow-hidden"):
@@ -181,14 +181,14 @@ def _summen_tabelle(r, satz):
                 }[art]
                 zelle(bez, basis[0])
                 zelle(wert, basis[1] + " text-right")
-                zelle(herkunft, "text-xs text-gray-400 self-center whitespace-nowrap"
+                zelle(herkunft, "text-xs text-slate-400 self-center whitespace-nowrap"
                       + (" bg-[#faf7f0]" if art == "result" else ""))
 
         if s_zeilen != r["beherbergungssteuer"]:
             ui.label(f"Hinweis: Die Steuer-Spalte der Buchungstabelle aufsummiert ergibt "
                      f"{e(s_zeilen)} €. Der Cent-Unterschied entsteht, weil die Steuer auf die "
                      f"Gesamtsumme gerechnet wird und nicht je Buchung – angemeldet wird "
-                     f"{e(r['beherbergungssteuer'])} €.").classes("text-xs text-gray-500 mt-2")
+                     f"{e(r['beherbergungssteuer'])} €.").classes("text-xs text-slate-500 mt-2")
 
 
 def render_result(container, result):
@@ -203,7 +203,7 @@ def render_result(container, result):
              icon="account_balance", accent=True)
 
         ui.label(f"Airbnb-ÜN (berechnet): {r['uebernachtungen_airbnb']} – fließen nicht in die "
-                 f"Steuer ein (Airbnb meldet selbst).").classes("text-xs text-gray-500")
+                 f"Steuer ein (Airbnb meldet selbst).").classes("text-xs text-slate-500")
 
         satz = _satz_label(r["steuersatz"])
 
@@ -244,15 +244,15 @@ def render_result(container, result):
             # Legende zu den vier Betragsspalten. Bewusst NICHT "Bruttopreis" für die
             # Basis – das liest sich wie "alles inklusive" und ist genau die
             # Verwechslung, die hier droht.
-            with ui.row().classes("w-full items-center gap-2 flex-wrap text-xs text-gray-600 "
+            with ui.row().classes("w-full items-center gap-2 flex-wrap text-xs text-slate-600 "
                                   "bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"):
                 ui.icon("functions").classes("text-slate-400 text-base")
                 ui.label("Rechnungsbetrag (was der Gast zahlt)").classes("font-medium")
-                ui.label("−").classes("text-gray-400")
+                ui.label("−").classes("text-slate-400")
                 ui.label("darin enthaltene Beherbergungssteuer (Durchlaufposten)")
-                ui.label("=").classes("text-gray-400")
+                ui.label("=").classes("text-slate-400")
                 ui.label("Bemessungsgrundlage (Beherbergungsentgelt inkl. 7 % USt)").classes("font-medium")
-                ui.label(f"× {satz} =").classes("text-gray-400")
+                ui.label(f"× {satz} =").classes("text-slate-400")
                 ui.label("Steuer").classes("font-medium")
             ui.table(columns=cols, rows=rows, row_key="departure").classes("w-full").props("dense flat")
 
@@ -314,13 +314,13 @@ def render_result(container, result):
                 ui.label("✉️ Anmeldung per E-Mail senden").classes("text-xl font-bold")
                 cc = f" · Cc: {ec['cc']}" if ec.get("cc") else ""
                 ui.label(f"An: {ec['empfaenger']}{cc}   (Absender: {ec['absender']})") \
-                    .classes("text-sm text-gray-600")
+                    .classes("text-sm text-slate-600")
                 subj = ui.input("Betreff", value=mailer.render(ec.get("betreff_vorlage") or DEFAULT_BETREFF, ctx)) \
                     .classes("w-full")
                 body = ui.textarea("Text", value=mailer.render(ec.get("text_vorlage") or DEFAULT_TEXT, ctx)) \
                     .classes("w-full").props("autogrow outlined")
                 ui.label(f"📎 Anhang: Beherbergungssteuer_{period}_v(neu).pdf") \
-                    .classes("text-xs text-gray-500")
+                    .classes("text-xs text-slate-500")
 
                 def do_send():
                     pdf = build_pdf()
