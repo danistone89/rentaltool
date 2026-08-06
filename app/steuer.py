@@ -53,6 +53,31 @@ def month_range(year, month):
     return date(year, month, 1), date(year, month, last)
 
 
+def ohne_citytax(booking, steuersatz=0.06, airbnb_channel="Airbnb"):
+    """(Betrag ohne durchlaufende Beherbergungssteuer, enthaltene Steuer).
+
+    Der Smoobu-"price" ist immer der Bruttobetrag INKLUSIVE der vom Gast
+    gezahlten Beherbergungssteuer – die muss raus, sonst besteuern wir die
+    Steuer. Steht sie als Zeile in "price-details", nehmen wir den echten
+    Betrag (deckt auch ab, dass Booking.com für die Wernerstraße mit 7 %
+    rechnet). Fehlt die Zeile – bei Direktbuchungen IMMER, bei Booking.com
+    zeitweise auch – steckt sie trotzdem im Preis und wird herausgerechnet.
+    Belegt durch Rechnung 60 (Anja Ernst, Direktbuchung): 400,07 € brutto =
+    312,42 Übernachtung + 65,00 Reinigung + 22,65 Übernachtungssteuer;
+    400,07 / 1,06 = 377,42 = genau die Basis der Rechnung.
+
+    Eine einzige Stelle für diese Regel: die Steueranmeldung und die
+    Auswertung (app/kennzahlen.py) müssen dieselbe Zahl bekommen.
+    """
+    price = float(booking.get("price") or 0.0)
+    citytax = _pricedetail(booking.get("price-details"), "Übernachtungssteuer")
+    is_airbnb = (booking.get("channel") or {}).get("name", "") == airbnb_channel
+    if citytax or is_airbnb:
+        return round(price - citytax, 2), round(citytax, 2)
+    base = round(price / (1.0 + steuersatz), 2)
+    return base, round(price - base, 2)
+
+
 def classify(booking, year, month, airbnb_channel="Airbnb", today=None,
              steuersatz=0.06):
     """Eine Buchung für den Zielmonat aufbereiten oder None, wenn irrelevant.
@@ -77,25 +102,11 @@ def classify(booking, year, month, airbnb_channel="Airbnb", today=None,
         return None  # Buchung hat noch nicht stattgefunden
 
     persons = (booking.get("adults") or 0) + (booking.get("children") or 0)
-    citytax = _pricedetail(booking.get("price-details"), "Übernachtungssteuer")
     price = float(booking.get("price") or 0.0)
     channel = (booking.get("channel") or {}).get("name", "")
     is_airbnb = channel == airbnb_channel
-
-    # Der Smoobu-"price" ist immer der Bruttobetrag INKLUSIVE der vom Gast
-    # gezahlten Beherbergungssteuer – die muss raus, sonst besteuern wir die
-    # Steuer. Steht sie als Zeile in "price-details", nehmen wir den echten
-    # Betrag (deckt auch ab, dass Booking.com für die Wernerstraße mit 7 %
-    # rechnet). Fehlt die Zeile – bei Direktbuchungen IMMER, bei Booking.com
-    # zeitweise auch – steckt sie trotzdem im Preis und wird herausgerechnet.
-    # Belegt durch Rechnung 60 (Anja Ernst, Direktbuchung): 400,07 € brutto =
-    # 312,42 Übernachtung + 65,00 Reinigung + 22,65 Übernachtungssteuer;
-    # 400,07 / 1,06 = 377,42 = genau die Basis der Rechnung.
-    if citytax or is_airbnb:
-        base = price - citytax
-    else:
-        base = round(price / (1.0 + steuersatz), 2)
-        citytax = round(price - base, 2)
+    base, citytax = ohne_citytax(booking, steuersatz=steuersatz,
+                                 airbnb_channel=airbnb_channel)
 
     return {
         "id": booking.get("id"),

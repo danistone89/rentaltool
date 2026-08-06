@@ -11,7 +11,7 @@ from nicegui import ui
 from datetime import date
 from app import bookings, data, housekeeping, mailer, push, timetrack
 from app.ui.basis import (CFG, USERS, _apts, _checklisten_an, _cur_user, _d, _is_admin, _photo_button, _photo_thumb, _run_ist, t)
-from app.ui import buchungen, dialog
+from app.ui import auswertung, buchungen, dialog
 from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 def _due_today():
@@ -336,6 +336,7 @@ def reinigung_uebersicht(activate=None):
     listen = _checklisten_an()
     with ui.tabs().props("dense no-caps align=left").classes("w-full") as tabs:
         t_sum = ui.tab("Zusammenfassung", icon="insights")
+        t_kpi = ui.tab("Kennzahlen", icon="query_stats")
         t_runs = ui.tab("Durchgänge", icon="fact_check") if listen else None
         t_dmg = ui.tab("Schäden", icon="report_problem")
         t_shop = ui.tab("Einkaufsliste", icon="shopping_cart")
@@ -343,6 +344,8 @@ def reinigung_uebersicht(activate=None):
     with ui.tab_panels(tabs, value=t_sum).classes("w-full"):
         with ui.tab_panel(t_sum):
             _admin_summary(activate)
+        with ui.tab_panel(t_kpi):
+            auswertung.block()
         if t_runs is not None:
             with ui.tab_panel(t_runs):
                 _admin_runs()
