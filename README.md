@@ -89,9 +89,41 @@ sich beim Laden im Kreis drehen.
 | `tools/staging_refresh.py` | Probe-Instanz mit entschärfter Kopie der Echtdaten füllen |
 | `tools/watchdog.py` | Wächter: Oberfläche, Smoobu, Daten, Sicherung |
 | `tools/erinnerung.py` | Abendliche Erinnerung: was morgen ansteht |
+| `tools/uishot.py` | Bildschirmfotos der laufenden Oberfläche – auch hinter dem Login |
 | `tools/check_shadowing.py` | Findet überschattete Modulnamen (läuft als Test mit) |
 
 Der Fahrplan für den weiteren Ausbau steht in [`docs/roadmap.md`](docs/roadmap.md).
+
+## Oberfläche prüfen lassen
+
+Eine Oberfläche lässt sich nicht aus dem Quelltext beurteilen. `tools/uishot.py`
+startet die App mit einem **Wegwerf-Datenordner** (eigene Konten, eigene
+Datenbank, erfundene Buchungen), steuert Chrome über das DevTools-Protokoll,
+meldet sich an und klickt sich durch die Bereiche:
+
+```bash
+.venv/bin/python tools/uishot.py --ziel /tmp/ui          # Handy, 390 × 844
+.venv/bin/python tools/uishot.py --ziel /tmp/ui --breit  # zusätzlich 1280 px
+```
+
+Der Echtbetrieb wird dabei nicht berührt. Ein einfaches `chrome --screenshot`
+reicht nicht: NiceGUI baut die Oberfläche erst über eine offene Verbindung auf,
+und ohne Anmeldung sieht man nur die Login-Seite.
+
+Darauf setzt der Prüf-Agent **`ui-design`** auf
+([`.claude/agents/ui-design.md`](.claude/agents/ui-design.md)). Er sieht sich die
+Bilder an und misst sie an den Festlegungen dieses README und des
+Navigationskonzepts: Erreichbarkeit am Daumen, wie viel Platz das Rahmenwerk
+frisst, Überlauf am rechten Rand, Ablesbarkeit des Zustands, Verständlichkeit der
+Texte, Einheitlichkeit, Zahlen, englische Fassung. Einsetzen **nachdem** etwas an
+der Oberfläche gebaut wurde und **bevor** es in den Echtbetrieb geht.
+
+> Zwei Fallstricke beim Fernsteuern von Chrome, beide beim Bauen aufgelaufen:
+> Quasar setzt Knopf-Beschriftungen per CSS in **Großbuchstaben**, `innerText`
+> liefert die gerenderte Fassung – ein Vergleich mit „Anmelden" findet
+> „ANMELDEN" nicht. Und die umgebende **Karte enthält den Text des Knopfes
+> ebenfalls** und steht im Dokument davor; ein Klick auf sie löst nichts aus.
+> Deshalb gewinnt das Element mit dem **kürzesten** Text.
 
 ## Amtliches PDF-Formular
 
