@@ -43,6 +43,10 @@ BETREIBER_FIELDS = [
 _CACHE = {}
 _CACHE_TTL = 300
 LAST_FETCH = None  # Zeitpunkt des letzten echten API-Zugriffs (datetime)
+# Die Rohbuchungen der letzten Rechnung. Die Vollstaendigkeitspruefung (AP11)
+# braucht auch das, was `steuer.classify` wegwirft – eine Buchung ohne
+# Abreisedatum faellt sonst still aus der Summe.
+LAST_BOOKINGS = []
 
 
 def save_config():
@@ -85,6 +89,8 @@ def compute(year, month, *, apt_ids=None, airbnb_override=None, befreit=0.0):
     if apt_ids:
         ids = set(apt_ids)
         bookings = [b for b in bookings if (b.get("apartment") or {}).get("id") in ids]
+    global LAST_BOOKINGS
+    LAST_BOOKINGS = bookings
     return steuer.compute(
         bookings, year, month,
         steuersatz=CONFIG.get("steuersatz", 0.06),

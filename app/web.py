@@ -49,7 +49,8 @@ from app.ui.einstellungen import open_settings  # noqa: E402,F401
 from app.ui.reinigung import reinigung_uebersicht, render_reinigung  # noqa: E402,F401
 from app.ui.standort import (_geo_enabled, _match_geofence, _presence,  # noqa: E402,F401
                              get_ip, get_location)
-from app.ui.steuer import open_archive, render_result  # noqa: E402,F401
+from app.ui.steuer import (open_archive, render_meldungen,  # noqa: E402,F401
+                           render_result)
 from app.ui.zeiten import (_admin_zeiten, _meine_kennzahlen,  # noqa: E402,F401
                            _time_edit_dialog, _zeit_list)
 from app.ui.zugang import (_RESET_THROTTLE, logout, open_account,  # noqa: E402,F401
@@ -200,6 +201,9 @@ def main_page():
                         lambda: ui.button("Archiv", icon="inventory_2",
                                           on_click=open_archive).props("outline no-caps")
                         .mark("steuer-archiv"))
+        # Zuerst, was ansteht – erst danach der Rechner. Wer den Bereich
+        # oeffnet, will meistens wissen, ob noch etwas offen ist.
+        render_meldungen(lambda: activate("beherbergungssteuer"))
         with ui.card().classes(ton.KARTE):
             with ui.row().classes("items-end gap-4 flex-wrap"):
                 year = ui.select(list(range(2023, today.year + 2)), label="Jahr",

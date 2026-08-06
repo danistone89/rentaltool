@@ -58,6 +58,8 @@ AUFNAHMEN = [
     # kein Befund, sondern erwartet.
     ("11-menue", ["@login", "?Menü"]),
     ("12-monatsabschluss", ["@login", "Belege", "Monatsabschluss"]),
+    ("13-steuer-meldungen", ["@login", "@menue:Beherbergungssteuer"]),
+    ("14-steuer-pruefung", ["@login", "@menue:Beherbergungssteuer", "Berechnen"]),
 ]
 
 

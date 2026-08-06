@@ -5,6 +5,8 @@
   "port": 3001,
   "steuersatz": 0.06,
   "airbnb_channel_name": "Airbnb",
+  "meldungen_ab": "",
+
   "app_url": "https://app.ds-apartments.de",
   "unterschrift_x": 210,
   "archiv_spiegel": "",

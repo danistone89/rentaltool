@@ -265,10 +265,36 @@ zeigt das Prüfbild nur den guten Fall.
 
 *Größe:* M.
 
-### AP11 · Steuer-Workflow zu Ende — offen
+### AP11 · Steuer-Workflow zu Ende — ✅ erledigt (6.8.2026)
 
-Status je Monat (offen → erzeugt → gesendet → bezahlt), Fristenerinnerung,
-Vollständigkeitsprüfung vor dem Erzeugen.
+Fachlogik in `app/meldung.py`, Anzeige oben im Steuer-Bereich.
+
+**Status je Monat.** Bisher war das Archiv der einzige Merker, und es kennt nur
+„für 2026-05 liegt ein PDF". Ein Monat, der berechnet, aber nie abgeschickt
+wurde, sah aus wie einer, den nie jemand angefasst hat. Jetzt: offen → erzeugt →
+gesendet → bezahlt. „erzeugt" und „gesendet" setzt die App selbst (sie legt ab
+und verschickt), „bezahlt" bestätigt ein Mensch – sie sieht das Bankkonto nicht.
+Ein Dokument im Archiv zählt als „erzeugt", damit auch Anmeldungen von vor AP11
+richtig dastehen.
+
+**Frist: der 7. des Folgemonats**, für Meldung *und* Überweisung. Fällt sie auf
+Wochenende oder Feiertag, zeigt die App den nächsten Werktag (§ 108 Abs. 3 AO);
+die Feiertage kommen aus `app/feiertage.py` und gelten für Sachsen. Überfälliges
+steht rot mit Tageszahl.
+
+**Vollständigkeitsprüfung** zwischen Ergebnis und „Erzeugen": läuft der Monat
+noch, reisen Buchungen erst später ab, fehlt irgendwo ein Abreisedatum (die
+fallen sonst still aus der Summe), ist der Monat leer – und ob für den Zeitraum
+schon eine Anmeldung raus ist, ein zweites PDF also eine Korrekturmeldung wäre.
+Gesperrt wird nichts: manchmal weiß der Mensch mehr als die Prüfung.
+
+**`config.meldungen_ab`** begrenzt, ab wann die App zuständig ist. Ohne das
+meldete eine frisch aufgesetzte Instanz zwölf überfällige Monate für Zeiträume,
+die längst außerhalb erledigt wurden – im Prüfbild eine Wand aus Rot, die danach
+niemand mehr liest. Ohne Einstellung zählt der älteste Monat im Archiv, sonst
+der laufende.
+
+32 Tests in `tests/test_meldung.py`.
 
 **Offene Sachfrage ohne Code:** Die Wernerstraße rechnet mit **7 % statt 6 %**
 Beherbergungssteuer. Die Gäste zahlen dort zu viel (Rechnung 71: 47,56 € statt

@@ -246,6 +246,15 @@ und Dubletten; danach ist der Monat fest (wieder zu öffnen geht, steht aber im
 Eintrag). Die CSV hat die acht Spalten des Kontenjournals und wird von Hand
 angehängt – dabei die Bereichsgrenze der SUMIF nachziehen.
 
+**Steuer-Workflow (AP11):** Oben im Steuer-Bereich steht, was ansteht: je Monat
+offen → erzeugt → gesendet → bezahlt, mit Frist. **Fällig ist der 7. des
+Folgemonats** – Meldung *und* Überweisung; fällt er auf Wochenende oder
+Feiertag, zeigt die App den nächsten Werktag (§ 108 Abs. 3 AO). „bezahlt"
+bestätigen Sie von Hand, die App sieht das Bankkonto nicht. Vor dem Erzeugen des
+PDF prüft sie, ob der Monat wirklich vollständig ist. **`config.meldungen_ab`**
+("JJJJ-MM") sagt, ab wann diese Instanz zuständig ist – sonst stünden Monate in
+der Liste, die längst außerhalb der App erledigt wurden.
+
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.

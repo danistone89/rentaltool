@@ -7,9 +7,10 @@ belastbare englische Entsprechung, und diesen Bereich bedient nur der Betreiber.
 import os
 from nicegui import ui
 from datetime import date
-from app import archive, data, mailer
+from app import archive, data, mailer, meldung
 
-from app.ui.basis import (CFG, t)
+from app.ui.basis import (CFG, _cur_user, t)
+from app.ui import ton
 
 try:
     from app import pdf_form
@@ -293,6 +294,7 @@ def render_result(container, result):
             if pdf is None:
                 return
             entry, extra = _archive_and_mirror(pdf)
+            meldung.erzeugt(period, _cur_user())
             ui.download.content(pdf, f"Beherbergungssteuer_{period}_v{entry['revision']}.pdf",
                                 media_type="application/pdf")
             ui.notify(f"Revisionssicher abgelegt: Revision {entry['revision']} · "
@@ -337,6 +339,7 @@ def render_result(container, result):
                                   f"fehlgeschlagen: {ex}", type="negative", timeout=11000)
                         dlg.close()
                         return
+                    meldung.gesendet(period, _cur_user(), an=ec["empfaenger"])
                     ui.notify(f"✅ Gesendet an {ec['empfaenger']} · abgelegt als "
                               f"Revision {entry['revision']}{extra}", type="positive", timeout=8000)
                     dlg.close()
@@ -346,6 +349,8 @@ def render_result(container, result):
                     ui.button("Senden", on_click=do_send).props("unelevated")
             dlg.open()
 
+        _vor_dem_erzeugen(r, period)
+
         with ui.row().classes("gap-2 items-center flex-wrap"):
             ui.button("📥 Erzeugen & ablegen", on_click=festschreiben).props("unelevated")
             ui.button("✉️ Ablegen & per E-Mail senden", on_click=open_send).props("unelevated")
@@ -354,3 +359,95 @@ def render_result(container, result):
             if existing:
                 ui.label(f"⚠️ Für {period} bereits {existing} Ablage(n) – Erzeugen legt "
                          "eine neue Revision an.").classes("text-xs text-amber-700")
+
+
+# ------------------------------------------------------- Meldungs-Workflow (AP11)
+def _vor_dem_erzeugen(r, period):
+    """Was gegen ein Erzeugen spricht – sichtbar, bevor das PDF entsteht.
+
+    Das amtliche Formular ist ein Nachweis. Wer erst hinterher merkt, dass der
+    Monat noch lief, muss eine Korrekturmeldung schicken; davor genügt ein
+    Blick. Gesperrt wird nichts: manchmal weiß der Mensch mehr als die Prüfung
+    (Nachmeldung, Sonderfall) – aber er soll es dann bewusst tun.
+    """
+    befund = meldung.vollstaendigkeit(r, data.LAST_BOOKINGS)
+    if not befund:
+        return
+    with ui.column().classes(f"w-full gap-1 rounded-lg p-3 {ton.FLAECHE_HINWEIS}") \
+            .mark("vollstaendigkeit"):
+        with ui.row().classes(f"items-center gap-2 no-wrap {ton.AUF_HINWEIS}"):
+            ui.icon("fact_check").classes("text-base shrink-0")
+            ui.label("Vor dem Erzeugen prüfen").classes("text-sm font-semibold")
+        for zeile in befund:
+            with ui.row().classes(f"w-full items-start gap-2 no-wrap {ton.AUF_HINWEIS}"):
+                ui.icon("chevron_right").classes("text-sm shrink-0 mt-0.5")
+                ui.label(zeile).classes("text-xs")
+
+
+_STATUS_ANZEIGE = {
+    meldung.OFFEN:    ("offen", "grey-6", "radio_button_unchecked"),
+    meldung.ERZEUGT:  ("erzeugt", "blue-6", "description"),
+    meldung.GESENDET: ("gesendet", "indigo-6", "outgoing_mail"),
+    meldung.BEZAHLT:  ("bezahlt", "green-7", "task_alt"),
+}
+
+
+def render_meldungen(neu_laden=None):
+    """Eine Zeile je Monat: wo er steht und wann er fällig ist.
+
+    Die Frist ist der 7. des Folgemonats – für Meldung **und** Überweisung.
+    Fällt sie auf ein Wochenende oder einen Feiertag, zeigt die App den
+    nächsten Werktag (§ 108 Abs. 3 AO).
+    """
+    offene = meldung.offene()
+    with ui.card().classes(ton.KARTE_ENG).mark("meldungen"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("event_repeat").classes("text-primary text-xl shrink-0")
+            ui.label("Offene Meldungen").classes("text-lg font-bold text-slate-800")
+        if not offene:
+            with ui.row().classes(f"items-center gap-2 {ton.ERFOLG}"):
+                ui.icon("task_alt").classes("text-base")
+                ui.label("Alles gemeldet und bezahlt.").classes("text-sm font-medium")
+            return
+        for e in offene:
+            _meldungszeile(e, neu_laden)
+
+
+def _meldungszeile(e, neu_laden):
+    p = e["periode"]
+    tage = meldung.tage_bis_frist(p)
+    label, farbe, icon = _STATUS_ANZEIGE[e["status"]]
+    frist_txt = date.fromisoformat(e["frist"]).strftime("%d.%m.%Y")
+    with ui.row().classes("w-full items-center gap-2 no-wrap py-1 border-b border-slate-50") \
+            .mark(f"meldung-{p}"):
+        ui.chip(label, icon=icon).props(f"color={farbe} text-color=white dense square") \
+            .classes("text-xs shrink-0")
+        with ui.column().classes("gap-0 min-w-0 flex-grow"):
+            ui.label(f"{data.MONATE[int(p[5:7])]} {p[:4]}").classes("font-medium text-sm")
+            if tage < 0:
+                ui.label(f"seit {abs(tage)} Tag(en) überfällig – Frist war {frist_txt}") \
+                    .classes(f"text-xs font-medium {ton.STOERUNG}")
+            elif tage == 0:
+                ui.label(f"heute fällig ({frist_txt})") \
+                    .classes(f"text-xs font-medium {ton.DRINGEND}")
+            else:
+                ui.label(f"fällig am {frist_txt} – noch {tage} Tag(e)") \
+                    .classes(f"text-xs {ton.LEISE}")
+        if e["status"] == meldung.GESENDET:
+            ui.button("bezahlt", icon="check",
+                      on_click=lambda per=p: _bezahlt_setzen(per, neu_laden)) \
+                .props("outline dense no-caps").classes("shrink-0").mark(f"bezahlt-{p}")
+
+
+def _bezahlt_setzen(p, neu_laden):
+    """Überwiesen – das kann nur ein Mensch bestätigen: die App sieht das
+    Bankkonto nicht.
+
+    Danach wird die Seite neu geladen und NICHT der Bereich neu gezeichnet: der
+    Knopf steckt selbst in dem, was neu entstünde, und NiceGUI zöge sich dabei
+    die Ereignis-Empfänger unter den Füßen weg („dictionary changed size during
+    iteration") – im Betrieb wie im Test. Dieselbe Stelle gab es schon beim
+    Monatsabschluss der Belege.
+    """
+    meldung.bezahlt(p, _cur_user())
+    ui.navigate.reload()
