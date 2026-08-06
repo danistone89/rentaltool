@@ -181,8 +181,11 @@ class Browser:
         self.ws = await websockets.connect(ziel, max_size=60 * 1024 * 1024)
         await self("Page.enable")
         await self("Runtime.enable")
+        # Maßstab 1, nicht 2: Beurteilt wird die Anordnung, nicht die Schärfe –
+        # und doppelte Auflösung vervierfacht die Dateigröße. Zehn Bilder in
+        # Retina-Größe sprengten den Prüf-Agenten reproduzierbar.
         await self("Emulation.setDeviceMetricsOverride", width=self.breite,
-                   height=self.hoehe, deviceScaleFactor=2, mobile=self.breite < 700)
+                   height=self.hoehe, deviceScaleFactor=1, mobile=self.breite < 700)
         return self
 
     async def __aexit__(self, *a):
