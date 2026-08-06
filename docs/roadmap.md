@@ -100,14 +100,13 @@ README → „Zuweisen mit Vorschlag".
 
 ## Phase 3 — Betreiber-Auswertung
 
-### AP9 · Kennzahlen-Dashboard — offen
+### AP9 · Kennzahlen-Dashboard — ✅ erledigt (6.8.2026)
 
-Führt zusammen, was heute nebeneinanderliegt: Auslastung, Umsatz je
-Wohnung/Monat, Reinigungsminuten und -kosten je Buchung, Materialkosten aus den
-Belegen, Deckungsbeitrag je Wohnung. Die Verknüpfung Zeit ↔ Buchung existiert
-bereits (`booking_id` am Zeiteintrag).
-
-*Abhängigkeit:* profitiert stark von AP5. *Größe:* M–L.
+Übersicht → Kennzahlen: Auslastung, Umsatz (ohne durchlaufende Steuer),
+Reinigungs- und Materialkosten sowie Deckungsbeitrag je Wohnung und Monat,
+dazu die teuersten Reinigungen. Rechnung in `app/kennzahlen.py` (ohne
+Oberfläche, 20 Tests); die Preisregel teilt sie sich mit der Steueranmeldung
+(`steuer.ohne_citytax`). Siehe README → „Kennzahlen: was bleibt übrig?".
 
 ---
 

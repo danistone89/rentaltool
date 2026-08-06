@@ -72,6 +72,17 @@ def test_ausgewiesene_steuer_schlaegt_die_umrechnung():
     assert kennzahlen.umsatz_je_monat(b) == {"2026-08": 316.40}
 
 
+def test_bei_airbnb_steckt_die_steuer_nicht_im_preis():
+    """Airbnb weist „Airbnb Collected Tax" getrennt aus und zieht sie beim Gast
+    ZUSÄTZLICH ein: In der Dezember-Fixture ist der Betrag exakt 6 % **auf** den
+    Preis (12,12 von 202,00), nicht darin enthalten. Es darf deshalb nichts
+    abgezogen werden – sonst wäre der Umsatz dort zu niedrig."""
+    b = _buchung(1, 2748963, "Cottaer Straße", "2026-08-01", "2026-08-03", 202.0,
+                 kanal="Airbnb",
+                 details="Airbnb Collected Tax - EUR 12.12")
+    assert kennzahlen.umsatz_je_monat(b) == {"2026-08": 202.0}
+
+
 def test_umsatz_folgt_den_naechten_ueber_den_monatswechsel():
     b = _buchung(1, 2748963, "Cottaer Straße", "2025-10-30", "2025-11-03", 424.0)
     verteilt = kennzahlen.umsatz_je_monat(b)

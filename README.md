@@ -43,6 +43,7 @@ Oberfläche hat ein Modul je Bereich:
 | `app/ui/pwa.py` | Handy-App: Manifest, Icons, Service Worker, Einricht-Anleitung | 290 |
 | `app/ui/benachrichtigungen.py` | Push einschalten, Geräte verwalten, Meldearten | 210 |
 | `app/ui/planung.py` | Sammelzuweisung, Abwesenheiten, Stammzuständigkeit | 200 |
+| `app/ui/auswertung.py` | Kennzahlen-Blatt (Reiter in der Übersicht) | 175 |
 
 Die Abhängigkeiten laufen von `basis` (kennt keinen Bereich) nach außen. Wo zwei
 Bereiche einander brauchen – Buchungen, Dialog, Kalender, Reinigung –, wird das
@@ -75,6 +76,7 @@ sich beim Laden im Kreis drehen.
 | `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
 | `app/push.py` | Web Push: VAPID-Schlüssel, Geräte-Anmeldungen, Versand |
 | `app/planung.py` | Stammzuständigkeit, Abwesenheiten, Zuweisungs-Vorschläge |
+| `app/kennzahlen.py` | Auslastung, Umsatz, Reinigungs- und Materialkosten je Wohnung |
 
 | Werkzeuge | Aufgabe |
 |---|---|
@@ -436,6 +438,53 @@ März 2024 zurückgenommen. Safari kennt aber **keinen** Installations-Dialog �
 daher die Anleitung – und **Push-Benachrichtigungen kommen nur an, wenn die App
 auf dem Home-Bildschirm liegt**; im Safari-Tab nicht. Genau deshalb steht dieses
 Paket vor den Benachrichtigungen (AP7).
+
+## Kennzahlen: was bleibt übrig?
+
+**Übersicht → Kennzahlen.** Ein Monat, vier Zahlen, eine Tabelle je Wohnung.
+Die Daten lagen längst da – Buchungen in Smoobu, Arbeitszeiten im Zeitkonto,
+Belege in der Ablage –, nur zusammengeführt hatte sie niemand.
+
+| Größe | Woraus |
+|---|---|
+| **Auslastung** | belegte Nächte ÷ Nächte des Monats (je Wohnung) |
+| **Umsatz** | Rechnungsbetrag **ohne** durchlaufende Beherbergungssteuer |
+| **Reinigung** | erfasste Arbeitszeit × Stundensatz des Mitarbeiters |
+| **Material** | Belege, die dieser Wohnung zugeordnet sind |
+| **Deckungsbeitrag** | Umsatz − Reinigung − Material |
+
+Drei Dinge, die man wissen muss, sonst deutet man die Zahlen falsch:
+
+**Der Deckungsbeitrag ist kein Gewinn.** Portalprovisionen, Nebenkosten,
+Abschreibung, Zinsen und die eigene Arbeitszeit stecken nicht darin. Er
+beantwortet „trägt diese Wohnung ihren laufenden Betrieb?", nicht „was
+verdiene ich?".
+
+**Die Zahl passt bewusst nicht zur Steueranmeldung.** Hier werden Nächte dem
+Monat zugeordnet, in dem sie liegen (eine Buchung vom 29.10. bis 2.11. bringt
+drei Nächte in den Oktober und zwei in den November, der Umsatz im selben
+Verhältnis). Die Steueranmeldung ordnet dagegen die **ganze Buchung dem
+Abreisemonat** zu (§ 6 der Satzung) und lässt Airbnb außen vor. Beides ist
+richtig – für verschiedene Fragen. Wer die Zahlen nebeneinanderlegt und
+Gleichheit erwartet, sucht lange.
+
+**Die Preisregel steht nur an einer Stelle** (`steuer.ohne_citytax`): dieselbe
+Funktion beliefert Steueranmeldung und Auswertung. Zwei Rechenwege für „was
+bleibt vom Rechnungsbetrag" wären der sichere Weg in zwei widersprüchliche
+Zahlen. Bei **Airbnb** wird nichts abgezogen: dort steht die Steuer als „Airbnb
+Collected Tax" getrennt und wird beim Gast **zusätzlich** eingezogen (in der
+Dezember-Fixture exakt 6 % *auf* den Preis, nicht darin) – abzuziehen wäre
+schlicht falsch.
+
+Weitere Festlegungen: Belege **ohne** Wohnung landen unter „ohne Zuordnung"
+statt still verteilt zu werden (eine erfundene Aufteilung sähe genauer aus, als
+sie ist). Eine Wohnung ohne Buchungen bleibt mit 0 % in der Tabelle – das ist
+eine Aussage, keine Leerstelle. **Stornierte Buchungen zählen nicht**, auch
+nicht mit Airbnb-Ausfallzahlung; wer die sehen will, findet sie in Smoobu.
+
+Darunter stehen die zehn **teuersten Reinigungen** mit Dauer, Kosten und
+Zuständigem – die Frage „was kostet mich eine Reinigung in der Wernerstraße?"
+brauchte bisher Zettel und Stift.
 
 ## Zuweisen mit Vorschlag
 
