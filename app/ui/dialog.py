@@ -95,7 +95,10 @@ def _open_swap(bk, user, staff, on_saved):
     weg = planung.abwesend_am(bk["departure"])
     beschriftet = {u: (n + (" · " + t("abwesend") if u in weg else ""))
                    for u, n in others.items()}
-    vorgeschlagen = planung.vorschlag(bk, others)
+    # Vorschlag nur aus denen, die tatsächlich putzen – wählbar bleiben alle.
+    vorgeschlagen = planung.vorschlag(
+        bk, {u: n for u, n in others.items()
+             if planung.macht_reinigungen(USERS.get(u))})
     with ui.dialog() as dlg, ui.card().classes("w-[360px] max-w-full gap-2"):
         ui.label(t("Zuweisen / Tauschen – {wohnung}", wohnung=bk["apartment_name"])).classes("font-bold")
         if not others:

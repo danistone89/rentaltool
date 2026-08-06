@@ -28,6 +28,28 @@ from app import data, db
 TABELLE = "abwesenheiten"
 
 
+# ------------------------------------------------------------ Wer putzt überhaupt
+def macht_reinigungen(benutzer_cfg):
+    """Kommt dieser Mitarbeiter für Reinigungen in Frage?
+
+    Vorgabe nach Rolle: Putzkräfte und Manager ja, der Betreiber-Zugang nein –
+    ein Vorschlag, der dem Chef-Konto oder einem Testkonto Arbeit zuteilt, ist
+    Rauschen. Über den Schalter in der Benutzerverwaltung lässt sich beides
+    umdrehen; manchmal putzt der Betreiber selbst.
+    """
+    u = benutzer_cfg or {}
+    eigene = u.get("macht_reinigungen")
+    if eigene is not None:
+        return bool(eigene)
+    return u.get("role") in ("putzkraft", "manager")
+
+
+def reinigungskraefte(users):
+    """{benutzername: anzeigename} aller, die Reinigungen übernehmen."""
+    return {u: (info.get("name") or u) for u, info in users.items()
+            if macht_reinigungen(info)}
+
+
 # ------------------------------------------------------------ Stammzuständigkeit
 def _cfg():
     return data.CONFIG.setdefault("zustaendigkeit", {})

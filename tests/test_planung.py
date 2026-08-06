@@ -175,3 +175,19 @@ async def test_offene_zuweisen_verteilt_alles_auf_einmal(user, mock_backend,  # 
     # Die Stammkraft hat ihre Wohnung bekommen, die andere ist auch vergeben.
     assert bookings.assignee_of(601) == "vale"
     assert bookings.assignee_of(602)
+
+
+# ------------------------------------------------------------ Wer putzt überhaupt
+def test_betreiberkonto_bekommt_keine_vorschlaege():
+    """Ein Vorschlag, der dem Chef-Konto oder einem Testkonto Arbeit zuteilt,
+    ist Rauschen – aufgefallen auf der Probe-Instanz mit echten Daten."""
+    users = {"admin": {"role": "admin", "name": "Daniel"},
+             "vale": {"role": "putzkraft", "name": "Valeriya"},
+             "chefin": {"role": "manager", "name": "Chefin"}}
+    assert set(planung.reinigungskraefte(users)) == {"vale", "chefin"}
+
+
+def test_schalter_dreht_die_vorgabe_um():
+    """Manchmal putzt der Betreiber selbst – und manche Putzkraft nie."""
+    assert planung.macht_reinigungen({"role": "admin", "macht_reinigungen": True})
+    assert not planung.macht_reinigungen({"role": "putzkraft", "macht_reinigungen": False})

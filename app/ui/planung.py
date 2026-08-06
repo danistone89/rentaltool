@@ -24,8 +24,7 @@ from app.ui.basis import USERS, _apts, _cur_user, t
 
 def _staff():
     """{benutzername: anzeigename} aller, die Reinigungen übernehmen."""
-    return {u: (info.get("name") or u) for u, info in USERS.items()
-            if info.get("role") in ("putzkraft", "manager", "admin")}
+    return planung.reinigungskraefte(USERS)
 
 
 def _dfmt(iso):

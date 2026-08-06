@@ -369,7 +369,8 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
                 # Alle auf einem Blatt statt Buchung für Buchung (app/ui/planung.py)
                 ui.button(t("Offene zuweisen"), icon="assignment_ind",
                           on_click=lambda: ui_planung.offene_zuweisen_dialog(
-                              jobs, staff, on_saved=lambda: activate(_cur_area()))) \
+                              jobs, ui_planung._staff(),
+                              on_saved=lambda: activate(_cur_area()))) \
                     .props("unelevated dense no-caps size=sm").classes("shrink-0")
         for d in sorted(groups):
             _tagesgruppe(d, groups[d], user, admin, staff, activate, nur_eigene)

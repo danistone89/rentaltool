@@ -9,6 +9,7 @@ import time as _time
 from nicegui import app, ui
 from app import auth, data, i18n, mailer
 from app.ui import benachrichtigungen, pwa
+from app import planung as _planung
 from app.ui import planung as ui_planung
 from app.ui.basis import (CFG, ROLES, USERS, _app_url, _cur_user, _is_admin, _lang, _lang_select, _probe_hinweis, _role_label, logo, t)
 
@@ -470,6 +471,16 @@ def _user_saetze(uname, u):
                 USERS[uname].pop(key, None)
             data.save_config()
         return h
+
+    with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+        # Steuert, wem die Planung Reinigungen vorschlägt (app/planung.py).
+        mr = ui.switch("Übernimmt Reinigungen",
+                       value=_planung.macht_reinigungen(u)).props("dense")
+
+        def _toggle_mr(e):
+            USERS[uname]["macht_reinigungen"] = bool(e.value)
+            data.save_config()
+        mr.on_value_change(_toggle_mr)
 
     with ui.row().classes("w-full items-center gap-2 flex-wrap"):
         w = ui.number("Stundensatz Werktag (€)", value=u.get("stundensatz_werktag"),
