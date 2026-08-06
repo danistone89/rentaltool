@@ -9,6 +9,7 @@ import time as _time
 from nicegui import app, ui
 from app import auth, data, i18n, mailer
 from app.ui import benachrichtigungen, pwa
+from app.ui import planung as ui_planung
 from app.ui.basis import (CFG, ROLES, USERS, _app_url, _cur_user, _is_admin, _lang, _lang_select, _probe_hinweis, _role_label, logo, t)
 
 # ---------------------------------------------------------------- Login
@@ -295,6 +296,8 @@ def open_account():
                           on_click=lambda: (dlg.close(), open_2fa_setup())).props("outline no-caps")
         ui.separator().classes("my-1")
         benachrichtigungen.block()
+        ui.separator().classes("my-1")
+        ui_planung.abwesenheiten_block()
         ui.separator().classes("my-1")
         # Die Anleitung gehört hierher: „Wie kriege ich das aufs Handy?“ sucht
         # man beim eigenen Konto, nicht in den Einstellungen des Betreibers.

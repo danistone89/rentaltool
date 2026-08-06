@@ -13,7 +13,8 @@ from datetime import date
 from app import bookings, data, housekeeping, i18n, ical, smoobu, timetrack
 from app.ui.basis import (USERS, _checklisten_an, _cur_area, _cur_user, _is_admin, t)
 from app.ui.standort import (_match_geofence, get_location)
-from app.ui import dialog, kalender, reinigung  # noqa: F401  (Ringschluss, siehe Kopf)
+from app.ui import dialog, kalender, reinigung
+from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 # ---------------------------------------------------------------- Buchungen
 _PENDING_REINIGUNG = {}   # {"apt": (id, name)} – Workflow-Sprung Buchung → Checkliste
@@ -364,6 +365,12 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
                          if offen_ges == 1 else
                          t("{n} Reinigungen noch niemandem zugewiesen", n=offen_ges)) \
                     .classes("text-sm font-medium")
+                ui.space()
+                # Alle auf einem Blatt statt Buchung für Buchung (app/ui/planung.py)
+                ui.button(t("Offene zuweisen"), icon="assignment_ind",
+                          on_click=lambda: ui_planung.offene_zuweisen_dialog(
+                              jobs, staff, on_saved=lambda: activate(_cur_area()))) \
+                    .props("unelevated dense no-caps size=sm").classes("shrink-0")
         for d in sorted(groups):
             _tagesgruppe(d, groups[d], user, admin, staff, activate, nur_eigene)
 

@@ -42,6 +42,7 @@ Oberfläche hat ein Modul je Bereich:
 | `app/ui/belege.py` | Belegscanner, Ablage, OCR, Liste | 441 |
 | `app/ui/pwa.py` | Handy-App: Manifest, Icons, Service Worker, Einricht-Anleitung | 290 |
 | `app/ui/benachrichtigungen.py` | Push einschalten, Geräte verwalten, Meldearten | 210 |
+| `app/ui/planung.py` | Sammelzuweisung, Abwesenheiten, Stammzuständigkeit | 200 |
 
 Die Abhängigkeiten laufen von `basis` (kennt keinen Bereich) nach außen. Wo zwei
 Bereiche einander brauchen – Buchungen, Dialog, Kalender, Reinigung –, wird das
@@ -73,6 +74,7 @@ sich beim Laden im Kreis drehen.
 | `app/store.py` | Dateizugriff für `config.json`: atomar schreiben, gesperrt ändern |
 | `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
 | `app/push.py` | Web Push: VAPID-Schlüssel, Geräte-Anmeldungen, Versand |
+| `app/planung.py` | Stammzuständigkeit, Abwesenheiten, Zuweisungs-Vorschläge |
 
 | Werkzeuge | Aufgabe |
 |---|---|
@@ -434,6 +436,49 @@ März 2024 zurückgenommen. Safari kennt aber **keinen** Installations-Dialog �
 daher die Anleitung – und **Push-Benachrichtigungen kommen nur an, wenn die App
 auf dem Home-Bildschirm liegt**; im Safari-Tab nicht. Genau deshalb steht dieses
 Paket vor den Benachrichtigungen (AP7).
+
+## Zuweisen mit Vorschlag
+
+Jede Zuweisung war Handarbeit: Buchung öffnen, „Tauschen/Zuweisen", Person
+wählen. Bei zwei Wohnungen geht das; bei zehn ist es jeden Sonntagabend eine
+halbe Stunde, und der eine übersehene Tag fällt erst am Morgen auf.
+
+**„Offene zuweisen"** steht jetzt im gelben Hinweis über der Liste „Alle
+Reinigungen": alle unverteilten Reinigungen der nächsten 14 Tage auf einem
+Blatt, je Zeile ein Vorschlag, den man ändern kann, ein Knopf am Ende.
+
+Der Vorschlag (`app/planung.py`, ohne Oberfläche und damit prüfbar):
+
+1. **Stammzuständigkeit** der Wohnung (Übersicht → Konfiguration) – wer macht
+   sie normalerweise? Das beantwortet die meisten Fälle.
+2. Ist diese Person **abwesend**, fällt sie raus.
+3. Sonst: wer bis dahin **am wenigsten** zu tun hat, damit sich kein Stapel auf
+   einer Person häuft. Bereits vergebene Reinigungen zählen mit.
+
+Festlegungen, die im Alltag zählen:
+
+* **Die Stammzuständigkeit schlägt die Last.** Sonst wandert eine Wohnung bei
+  jedem Stapel zu jemand anderem – und mit ihr das Wissen, wo der Schlüssel
+  hängt und welcher Rollladen klemmt.
+* **Ist niemand verfügbar, gibt es keinen Vorschlag** statt eines falschen. Die
+  Lücke muss auffallen.
+* **Wer abwesend ist, steht trotzdem in der Auswahl** – mit dem Zusatz
+  „abwesend". Manchmal weiß der Mensch mehr als der Kalender.
+* **Gespeichert wird nie automatisch.** Man sieht den Vorschlag, ändert ihn,
+  bestätigt. Automatisches Zuweisen macht genau die Fehler, die niemand sucht –
+  weil ja „das System" zugewiesen hat.
+* Beim Sammelzuweisen bekommt jeder **eine** Benachrichtigung mit allen seinen
+  Reinigungen, nicht zehn hintereinander.
+
+**Abwesenheiten** trägt jeder selbst ein: Mein Konto → Abwesenheiten (von, bis,
+Grund). Die Verwaltung sieht die nächsten 14 Tage unter Übersicht →
+Konfiguration. Der letzte Tag zählt als abwesend – der klassische Fehler an
+dieser Stelle, deshalb mit eigenem Test.
+
+> **Falle, die dabei hochkam:** Der Dialog hängt in der Liste, die er nach dem
+> Zuweisen neu aufbaut. Ein direkter Aufruf löscht ihn mitten in seinem eigenen
+> Klick-Handler – dieselbe Falle wie beim Abrechnungs-Dialog. Der Neuaufbau
+> läuft deshalb über `ui.timer(..., once=True)`, also erst nach dem Klick.
 
 ## Benachrichtigungen (Web Push)
 

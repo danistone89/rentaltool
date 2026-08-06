@@ -11,7 +11,8 @@ from nicegui import ui
 from datetime import date
 from app import bookings, data, housekeeping, mailer, push, timetrack
 from app.ui.basis import (CFG, USERS, _apts, _checklisten_an, _cur_user, _d, _is_admin, _photo_button, _photo_thumb, _run_ist, t)
-from app.ui import buchungen, dialog  # noqa: F401  (Ringschluss, siehe Kopf)
+from app.ui import buchungen, dialog
+from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 def _due_today():
     from datetime import date, timedelta
@@ -487,6 +488,16 @@ def render_reinigung_refresh():
 
 
 def _admin_config(apts):
+    # Zuerst die Planungsgrundlagen: wer macht welche Wohnung, wer ist weg.
+    with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100 gap-2 p-3"):
+        ui_planung.stammkraefte_block()
+        kommende = ui_planung.naechste_abwesenheiten()
+        ui.label("Abwesenheiten (14 Tage)").classes("text-sm font-semibold text-gray-500 mt-2")
+        if not kommende:
+            ui.label("Niemand abgemeldet.").classes("text-xs text-gray-400")
+        for name, von, bis, grund in kommende:
+            ui.label(f"{name}: {von[8:10]}.{von[5:7]}. – {bis[8:10]}.{bis[5:7]}."
+                     + (f" ({grund})" if grund else "")).classes("text-xs text-gray-600")
     listen = _checklisten_an()
     ui.label("Checkliste & Bestand je Wohnung. Pro Aufgabe ein Beispielfoto (Soll-Zustand) "
              "aufnehmen – die Putzkraft sieht es dann in der Checkliste."

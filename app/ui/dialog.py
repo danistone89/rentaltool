@@ -5,7 +5,7 @@ tauschen, Zeit nachtragen, Schaden melden, Gast anschreiben.
 """
 
 from nicegui import ui
-from app import bookings, housekeeping, mailer, push, smoobu, timetrack
+from app import bookings, housekeeping, mailer, planung, push, smoobu, timetrack
 from app.ui.basis import (CFG, USERS, _app_url, _checklisten_an, _cur_area, _cur_role, _cur_user, _d, _photo_thumb, _t, t)
 from app.ui import buchungen, reinigung  # noqa: F401  (Ringschluss, siehe Kopf)
 
@@ -90,11 +90,25 @@ def _notify_nachtragen(job, staff):
 def _open_swap(bk, user, staff, on_saved):
     who = bookings.assignee_of(bk["id"])
     others = {u: n for u, n in staff.items() if u != who}
+    # Wer an dem Tag weg ist, steht mit Hinweis in der Liste – aber er steht
+    # drin: manchmal weiß der Mensch mehr als der Kalender.
+    weg = planung.abwesend_am(bk["departure"])
+    beschriftet = {u: (n + (" · " + t("abwesend") if u in weg else ""))
+                   for u, n in others.items()}
+    vorgeschlagen = planung.vorschlag(bk, others)
     with ui.dialog() as dlg, ui.card().classes("w-[360px] max-w-full gap-2"):
         ui.label(t("Zuweisen / Tauschen – {wohnung}", wohnung=bk["apartment_name"])).classes("font-bold")
         if not others:
             ui.label(t("Keine weiteren Mitarbeiter.")).classes("text-sm text-gray-500")
-        sel = ui.select(others, label=t("Mitarbeiter")).props("dense outlined").classes("w-full")
+        sel = ui.select(beschriftet, label=t("Mitarbeiter"), value=vorgeschlagen) \
+            .props("dense outlined").classes("w-full")
+        if vorgeschlagen:
+            grund = (t("Stammzuständig für diese Wohnung")
+                     if planung.stammkraft(bk.get("apartment_id")) == vorgeschlagen
+                     else t("Hat an dem Tag am wenigsten zu tun"))
+            ui.label(t("Vorschlag: {name} – {grund}",
+                       name=staff.get(vorgeschlagen, vorgeschlagen), grund=grund)) \
+                .classes("text-xs text-gray-500")
 
         def go():
             if not sel.value:

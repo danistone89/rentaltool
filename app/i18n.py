@@ -168,6 +168,32 @@ _EN = {
     "Für dich heute nichts zu tun. \U0001F389": "Nothing for you today. \U0001F389",
     "{n} Reinigung": "{n} cleaning",
     "{n} Reinigungen": "{n} cleanings",
+    # ------------------------------------------- Zuweisung & Planung
+    "Offene Reinigungen zuweisen": "Assign open cleanings",
+    "Nächste {n} Tage · Vorschlag ist änderbar":
+        "Next {n} days · you can change the suggestion",
+    "Nichts offen – alles ist zugewiesen. 🎉":
+        "Nothing open – everything is assigned. 🎉",
+    "Für diese Tage ist niemand verfügbar – Abwesenheiten prüfen.":
+        "Nobody is available on these days – check the absences.",
+    "{n} Reinigung(en) zugewiesen ✓": "{n} cleaning(s) assigned ✓",
+    "Nichts ausgewählt.": "Nothing selected.",
+    "abwesend": "away",
+    "Vorschlag: {name} – {grund}": "Suggestion: {name} – {grund}",
+    "Stammzuständig für diese Wohnung": "Usually looks after this apartment",
+    "Hat an dem Tag am wenigsten zu tun": "Has the least to do that day",
+    "1 neue Reinigung für dich": "1 new cleaning for you",
+    "{n} neue Reinigungen für dich": "{n} new cleanings for you",
+    "Abwesenheiten": "Absences",
+    "Urlaub, krank, frei": "Holiday, sick, day off",
+    "Kein Eintrag – du giltst als verfügbar.":
+        "No entry – you count as available.",
+    "Von": "From",
+    "Bis": "To",
+    "Grund (optional)": "Reason (optional)",
+    "Eintragen": "Add",
+    "Eingetragen ✓": "Added ✓",
+
     # ------------------------------------------- Benachrichtigungen
     "Benachrichtigungen": "Notifications",
     "Auf diesem Gerät einschalten": "Turn on for this device",

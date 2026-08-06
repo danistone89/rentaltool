@@ -88,13 +88,13 @@ sichtbar samt Testnachricht. Verschlüsselung über `pywebpush`; der Test macht
 die Nachricht mit dem Schlüssel des Geräts wieder auf. Siehe README →
 „Benachrichtigungen".
 
-### AP8 · Zuweisung mit Kopf — offen
+### AP8 · Zuweisung mit Kopf — ✅ erledigt (6.8.2026)
 
-Standard-Zuständigkeit je Wohnung, Abwesenheiten/Urlaub, Vorschlag beim Öffnen,
-Wochenplanung statt Buchung-für-Buchung, „alle offenen zuweisen". Heute ist
-jede Zuweisung Handarbeit.
-
-*Größe:* M.
+Stammzuständigkeit je Wohnung, Abwesenheiten zur Selbsteintragung, Vorschlag im
+Einzeldialog und „Offene zuweisen" für alle unverteilten Reinigungen der
+nächsten 14 Tage auf einem Blatt. Der Vorschlag nimmt die Stammkraft, überspringt
+Abwesende und verteilt sonst nach Last; gespeichert wird nie automatisch. Siehe
+README → „Zuweisen mit Vorschlag".
 
 ---
 
