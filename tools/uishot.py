@@ -265,7 +265,10 @@ class Browser:
         })()""" % json.dumps(symbol))
 
     async def foto(self, pfad):
-        r = await self("Page.captureScreenshot", format="png", captureBeyondViewport=True)
+        # Genau EIN Bildschirm, nicht die ganze Seite: Die Frage „was sieht man,
+        # ohne zu scrollen" ist die wichtigste bei der Beurteilung – ein Bild der
+        # kompletten Seite beantwortet sie nicht.
+        r = await self("Page.captureScreenshot", format="png", captureBeyondViewport=False)
         with open(pfad, "wb") as f:
             f.write(base64.b64decode(r["data"]))
         return pfad
@@ -287,6 +290,12 @@ async def aufnehmen(app_port, ziel, breite, hoehe, suffix=""):
                     await asyncio.sleep(0.8)
                     if not await b.klick(schritt[5:]):
                         fehlend.append(schritt)
+                    # …und sie bleibt nach der Auswahl offen, liegt also über dem
+                    # Inhalt. Derselbe Griff klappt sie wieder zu. (Dass sie sich
+                    # nicht von allein schliesst, ist ein Befund für die
+                    # Gestaltung – kein Problem dieses Werkzeugs.)
+                    await b.symbolklick("menu")
+                    await asyncio.sleep(1.0)
                 else:
                     if not await b.klick(schritt):
                         fehlend.append(schritt)
