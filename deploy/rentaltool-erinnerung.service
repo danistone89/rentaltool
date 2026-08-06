@@ -1,0 +1,10 @@
+[Unit]
+Description=Abendliche Erinnerung rentaltool (was morgen ansteht)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rentaltool
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool
+ExecStart=/opt/rentaltool/.venv/bin/python tools/erinnerung.py

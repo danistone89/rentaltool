@@ -40,7 +40,8 @@ Oberfläche hat ein Modul je Bereich:
 | `app/ui/kalender.py` | Zeitleiste über alle Wohnungen, Monatsblatt einer Wohnung | 241 |
 | `app/ui/reinigung.py` | Checklisten-Durchgang, Schäden, Bestand, Übersicht | 594 |
 | `app/ui/belege.py` | Belegscanner, Ablage, OCR, Liste | 441 |
-| `app/ui/pwa.py` | Handy-App: Manifest, Icons, Service Worker, Einricht-Anleitung | 250 |
+| `app/ui/pwa.py` | Handy-App: Manifest, Icons, Service Worker, Einricht-Anleitung | 290 |
+| `app/ui/benachrichtigungen.py` | Push einschalten, Geräte verwalten, Meldearten | 210 |
 
 Die Abhängigkeiten laufen von `basis` (kennt keinen Bereich) nach außen. Wo zwei
 Bereiche einander brauchen – Buchungen, Dialog, Kalender, Reinigung –, wird das
@@ -71,6 +72,7 @@ sich beim Laden im Kreis drehen.
 | `app/db.py` | Betriebsdaten in SQLite (Sätze als JSON, generierte Spalten, Transaktionen) |
 | `app/store.py` | Dateizugriff für `config.json`: atomar schreiben, gesperrt ändern |
 | `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
+| `app/push.py` | Web Push: VAPID-Schlüssel, Geräte-Anmeldungen, Versand |
 
 | Werkzeuge | Aufgabe |
 |---|---|
@@ -82,6 +84,7 @@ sich beim Laden im Kreis drehen.
 | `tools/deploy.sh` | Ausrollen mit Tests, Rauchprobe und Rückweg |
 | `tools/staging_refresh.py` | Probe-Instanz mit entschärfter Kopie der Echtdaten füllen |
 | `tools/watchdog.py` | Wächter: Oberfläche, Smoobu, Daten, Sicherung |
+| `tools/erinnerung.py` | Abendliche Erinnerung: was morgen ansteht |
 | `tools/check_shadowing.py` | Findet überschattete Modulnamen (läuft als Test mit) |
 
 Der Fahrplan für den weiteren Ausbau steht in [`docs/roadmap.md`](docs/roadmap.md).
@@ -431,6 +434,58 @@ März 2024 zurückgenommen. Safari kennt aber **keinen** Installations-Dialog �
 daher die Anleitung – und **Push-Benachrichtigungen kommen nur an, wenn die App
 auf dem Home-Bildschirm liegt**; im Safari-Tab nicht. Genau deshalb steht dieses
 Paket vor den Benachrichtigungen (AP7).
+
+## Benachrichtigungen (Web Push)
+
+Eine neue Zuweisung landete bisher per E-Mail in einem Postfach, das am
+Arbeitstag niemand aufmacht. Jetzt kommt sie auf dem **Sperrbildschirm** an –
+wie eine Nachricht. E-Mail bleibt daneben bestehen, weil nicht jeder die App
+eingerichtet hat.
+
+Einschalten: **Mein Konto → Benachrichtigungen → „Auf diesem Gerät
+einschalten"**. Dort stehen auch die angemeldeten Geräte, ein Knopf für eine
+**Testnachricht** und die Schalter, wobei man Bescheid bekommen möchte.
+
+| Meldeart | Wann | An wen |
+|---|---|---|
+| `zuweisung` | jemand weist eine Reinigung zu | den Zugewiesenen |
+| `erinnerung` | täglich 18:00 (`rentaltool-erinnerung.timer`) | jeden mit Reinigungen am Folgetag; die Verwaltung zusätzlich, wenn für morgen etwas **niemandem** zugewiesen ist |
+| `nachtragen` | Reinigung nach Check-out ohne erfasste Zeit | den Zugewiesenen |
+| `schaden` | jemand meldet einen Schaden | Admin und Manager |
+
+Wer für morgen nichts hat, bekommt auch nichts – eine Erinnerung, die jeden
+Abend „nichts zu tun" sagt, wird nach einer Woche weggewischt, und dann auch die
+wichtige.
+
+**Verschlüsselung und VAPID übernimmt `pywebpush`.** Das ist bewusst keine
+Eigenbau-Stelle: Web Push verlangt ECDH, HKDF und AES-GCM nach RFC 8291, und ein
+Fehler darin zeigt sich nicht als Absturz, sondern als „kommt bei manchen
+Geräten still nicht an". Der Test dazu verschlüsselt wie im Betrieb und macht
+die Nachricht mit dem privaten Schlüssel des „Geräts" wieder auf.
+
+Die **VAPID-Schlüssel** liegen in `config.json` unter `push` und entstehen beim
+ersten Einschalten. Sie identifizieren unseren Server gegenüber Apple und
+Google: **werden sie ausgetauscht, sind alle bestehenden Anmeldungen wertlos** –
+deshalb werden sie nie stillschweigend neu erzeugt, und wenn doch
+(`schluessel_erzeugen(neu=True)`), werden die Anmeldungen gleich mit aufgeräumt.
+
+Weitere Festlegungen:
+
+* **Die Anmeldung läuft über die bestehende Sitzung**, nicht über eine eigene
+  API-Route. Eine solche Route müsste ohne Login erreichbar sein – und dann
+  könnte jeder fremde Geräte auf fremde Konten anmelden.
+* **Antwortet der Push-Dienst mit 404/410, wird die Anmeldung gelöscht** (App
+  entfernt, Erlaubnis entzogen). Ein Netzausfall löscht dagegen nichts, sonst
+  müsste sich nach jeder Störung jeder neu anmelden.
+* **Dasselbe Gerät zweimal bleibt ein Eintrag** – sonst kommt jede Meldung
+  doppelt. Meldet sich jemand anders auf demselben Gerät an, wechselt der
+  Eintrag den Besitzer.
+* Der Service Worker zeigt **jede** Push-Nachricht an (`userVisibleOnly`); tut er
+  das nicht, entziehen die Browser die Erlaubnis wieder.
+
+> **iOS:** Benachrichtigungen kommen **nur an, wenn die App auf dem
+> Home-Bildschirm liegt** (siehe oben). Im Safari-Tab nicht. Steht die App dort
+> nicht, zeigt „Mein Konto" statt des Knopfes einen Hinweis mit der Anleitung.
 
 ## Sprache (Deutsch / Englisch)
 

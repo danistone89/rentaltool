@@ -168,6 +168,46 @@ _EN = {
     "Für dich heute nichts zu tun. \U0001F389": "Nothing for you today. \U0001F389",
     "{n} Reinigung": "{n} cleaning",
     "{n} Reinigungen": "{n} cleanings",
+    # ------------------------------------------- Benachrichtigungen
+    "Benachrichtigungen": "Notifications",
+    "Auf diesem Gerät einschalten": "Turn on for this device",
+    "Testnachricht": "Test message",
+    "Test": "Test",
+    "Wenn du das siehst, kommen Benachrichtigungen an.":
+        "If you can see this, notifications are working.",
+    "An {n} Gerät(e) geschickt.": "Sent to {n} device(s).",
+    "Kein Gerät erreicht – Anmeldung erneuern?":
+        "No device reached – set it up again?",
+    "Benachrichtigungen sind an ✓": "Notifications are on ✓",
+    "Ohne Erlaubnis geht es nicht. Du kannst sie in den "
+    "Einstellungen deines Handys wieder freigeben.":
+        "It does not work without permission. You can allow it again in your "
+        "phone settings.",
+    "Dieser Browser kann keine Benachrichtigungen.":
+        "This browser cannot show notifications.",
+    "Einschalten fehlgeschlagen: {fehler}": "Could not turn it on: {fehler}",
+    "Auf dem iPhone kommen Benachrichtigungen erst an, wenn die "
+    "App auf dem Home-Bildschirm liegt.":
+        "On iPhone, notifications only arrive once the app is on your Home Screen.",
+    "{n} Gerät": "{n} device",
+    "{n} Geräte": "{n} devices",
+    "Wobei möchtest du Bescheid bekommen?": "What would you like to hear about?",
+    "Neue Reinigung für mich": "New cleaning for me",
+    "Wenn mir jemand eine Reinigung zuweist": "When someone assigns me a cleaning",
+    "Erinnerung am Vorabend": "Reminder the evening before",
+    "Abends: was morgen ansteht": "In the evening: what is coming up tomorrow",
+    "Arbeitszeit fehlt": "Working time missing",
+    "Wenn zu einer Reinigung keine Zeit erfasst wurde":
+        "When no time was recorded for a cleaning",
+    "Nur für Verwaltung: wenn jemand einen Schaden meldet":
+        "Management only: when someone reports damage",
+    # … Texte der Benachrichtigungen selbst
+    "Neue Reinigung für dich": "New cleaning for you",
+    "Arbeitszeit fehlt noch": "Working time still missing",
+    "Schaden gemeldet": "Damage reported",
+    "{wohnung} · {datum}": "{wohnung} · {datum}",
+    "{wohnung}: {text}": "{wohnung}: {text}",
+
     # ------------------------------------------- Handy-App einrichten
     "Als App einrichten": "Set up as an app",
     "Danach startest du die App über ein eigenes Symbol – ohne "

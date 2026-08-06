@@ -18,3 +18,9 @@ segno>=1.6
 # gross ist und die App ohne es lauffaehig bleibt.
 # opencv-python-headless
 # numpy
+
+# Web Push an die Handys (AP7). Verschluesselung nach RFC 8291 (ECDH + HKDF +
+# AES-GCM) und VAPID – bewusst keine Eigenbau-Stelle: ein Fehler darin zeigt
+# sich nicht als Absturz, sondern als "kommt bei manchen Geraeten still nicht
+# an". Zieht cryptography nach.
+pywebpush>=2.0

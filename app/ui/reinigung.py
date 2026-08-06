@@ -9,8 +9,8 @@ einander brauchen.
 
 from nicegui import ui
 from datetime import date
-from app import bookings, data, housekeeping, mailer, timetrack
-from app.ui.basis import (CFG, _apts, _checklisten_an, _cur_user, _d, _is_admin, _photo_button, _photo_thumb, _run_ist, t)
+from app import bookings, data, housekeeping, mailer, push, timetrack
+from app.ui.basis import (CFG, USERS, _apts, _checklisten_an, _cur_user, _d, _is_admin, _photo_button, _photo_thumb, _run_ist, t)
 from app.ui import buchungen, dialog  # noqa: F401  (Ringschluss, siehe Kopf)
 
 def _due_today():
@@ -33,6 +33,14 @@ def _due_today():
 
 
 def _notify_damage(d):
+    # Push an alle, die den Schaden bearbeiten – Putzkräfte melden, Verwaltung
+    # kümmert sich.
+    for name, u in USERS.items():
+        if u.get("role") in ("admin", "manager") and push.will(u, "schaden"):
+            push.senden_im_hintergrund(
+                name, t("Schaden gemeldet"),
+                t("{wohnung}: {text}", wohnung=d["apartment_name"],
+                  text=(d["desc"] or "")[:80]), "/", "schaden")
     ec = CFG.get("email", {})
     if not (ec.get("absender") and ec.get("app_password")):
         return

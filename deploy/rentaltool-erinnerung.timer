@@ -1,0 +1,12 @@
+[Unit]
+Description=Abendliche Erinnerung rentaltool
+
+[Timer]
+# Server laeuft in UTC: 16:00 UTC = 18:00 Berlin (Sommer), 17:00 (Winter).
+OnCalendar=*-*-* 16:00
+RandomizedDelaySec=300
+# Kein Persistent=true: eine Erinnerung fuer "morgen", die nach einem Ausfall
+# mitten in der Nacht nachgeholt wird, weckt Leute ohne Nutzen.
+
+[Install]
+WantedBy=timers.target

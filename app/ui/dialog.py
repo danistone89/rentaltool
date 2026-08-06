@@ -5,9 +5,14 @@ tauschen, Zeit nachtragen, Schaden melden, Gast anschreiben.
 """
 
 from nicegui import ui
-from app import bookings, housekeeping, mailer, smoobu, timetrack
-from app.ui.basis import (CFG, _app_url, _checklisten_an, _cur_area, _cur_role, _cur_user, _d, _photo_thumb, _t, t)
+from app import bookings, housekeeping, mailer, push, smoobu, timetrack
+from app.ui.basis import (CFG, USERS, _app_url, _checklisten_an, _cur_area, _cur_role, _cur_user, _d, _photo_thumb, _t, t)
 from app.ui import buchungen, reinigung  # noqa: F401  (Ringschluss, siehe Kopf)
+
+def _dfmt_kurz(iso):
+    """„05.08." – in einer Benachrichtigung ist kein Platz für mehr."""
+    return f"{iso[8:10]}.{iso[5:7]}." if iso and len(iso) >= 10 else (iso or "")
+
 
 def _assign(bk, assignee, by, staff, after, note=""):
     bookings.set_assignment(bk["id"], assignee, by, note)
@@ -21,6 +26,13 @@ def _assign(bk, assignee, by, staff, after, note=""):
 
 
 def _notify_assignee(bk, assignee, by, staff):
+    # Push zuerst: das kommt auf dem Sperrbildschirm an, die Mail liegt im
+    # Postfach. Beides, weil nicht jeder die App eingerichtet hat.
+    if push.will(USERS.get(assignee), "zuweisung"):
+        push.senden_im_hintergrund(
+            assignee, t("Neue Reinigung für dich"),
+            t("{wohnung} · {datum}", wohnung=bk["apartment_name"],
+              datum=_dfmt_kurz(bk["departure"])), "/", "zuweisung")
     to = buchungen._user_email(assignee)
     if not to:
         ui.notify(t("Hinweis: {name} hat keine E-Mail hinterlegt – "
@@ -62,6 +74,11 @@ def _notify_nachtragen(job, staff):
             f"Abreise: {job['departure']}, Check-out {job.get('checkout_time') or '—'}\n"
             f"Gast: {job.get('guest') or '—'}\n\n"
             f"App: {_app_url()}  →  Buchungen → Reinigungen\n")
+    if who and push.will(USERS.get(who), "nachtragen"):
+        push.senden_im_hintergrund(
+            who, t("Arbeitszeit fehlt noch"),
+            t("{wohnung} · {datum}", wohnung=job["apartment_name"],
+              datum=_dfmt_kurz(job["departure"])), "/", "nachtragen")
     try:
         mailer.send_notify(CFG, to,
                            f"Bitte nachtragen: {job['apartment_name']} ({job['departure']})", body)

@@ -79,12 +79,14 @@ statischen Dateien. Siehe README → „Als App auf dem Handy".
 Februar 2024 wurde im März 2024 zurückgenommen, und seit iOS 26 gibt es gar
 keine Anforderungen an die Installierbarkeit mehr.
 
-### AP7 · Benachrichtigungen, die ankommen — offen
+### AP7 · Benachrichtigungen, die ankommen — ✅ erledigt (6.8.2026)
 
-Web-Push statt nur E-Mail: neue Zuweisung, Erinnerung am Vorabend, „bitte Zeit
-nachtragen", Schaden gemeldet. Je Nutzer einstellbar, welcher Kanal.
-
-*Größe:* M.
+Web Push auf den Sperrbildschirm, zusätzlich zur E-Mail: neue Zuweisung,
+Erinnerung am Vorabend (`tools/erinnerung.py`, täglich 18:00), „Arbeitszeit
+fehlt", Schaden gemeldet. Je Mitarbeiter abschaltbar, Geräte in „Mein Konto"
+sichtbar samt Testnachricht. Verschlüsselung über `pywebpush`; der Test macht
+die Nachricht mit dem Schlüssel des Geräts wieder auf. Siehe README →
+„Benachrichtigungen".
 
 ### AP8 · Zuweisung mit Kopf — offen
 

@@ -45,7 +45,7 @@ STATISCH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 NAME = "LIVARO Suites"
 # Hochzählen, sobald sich die statischen Dateien ändern: der Service Worker
 # räumt beim Aktivieren jeden älteren Zwischenspeicher weg.
-VERSION = "1"
+VERSION = "2"
 
 
 def manifest():
@@ -105,6 +105,42 @@ self.addEventListener('fetch', (e) => {
   if (e.request.mode === 'navigate') {
     e.respondWith(fetch(e.request).catch(() => caches.match('/offline')));
   }
+});
+
+// ---------------------------------------------------------------- Push
+self.addEventListener('push', (e) => {
+  let n = {};
+  try { n = e.data ? e.data.json() : {}; } catch (_) { n = {}; }
+  const titel = n.titel || 'LIVARO';
+  // userVisibleOnly: iOS und Chrome verlangen, dass JEDE Push-Nachricht auch
+  // sichtbar wird. Ohne showNotification entzieht der Browser die Erlaubnis.
+  e.waitUntil(self.registration.showNotification(titel, {
+    body: n.text || '',
+    icon: '/static/icon-192.png',
+    badge: '/static/icon-192.png',
+    data: { url: n.url || '/' },
+    // Gleiche Art ersetzt die vorherige Meldung, statt den Sperrbildschirm
+    // zuzupflastern.
+    tag: n.art || 'allgemein',
+    renotify: true,
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const ziel = (e.notification.data && e.notification.data.url) || '/';
+  // Ist die App schon offen, wird das Fenster nach vorn geholt statt ein
+  // zweites zu oeffnen.
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((fenster) => {
+      for (const f of fenster) {
+        if (f.url.includes(location.origin) && 'focus' in f) {
+          f.navigate && f.navigate(ziel);
+          return f.focus();
+        }
+      }
+      return clients.openWindow(ziel);
+    }));
 });
 """
 
