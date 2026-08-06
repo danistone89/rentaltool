@@ -235,6 +235,17 @@ ergänzt. `tests/test_ton.py` hält die Regel fest und meldet, sobald wieder ein
 Farbe von Hand hingeschrieben wird; ohne diesen Test wäre die Oberfläche nach
 drei Bereichen erneut uneinheitlich.
 
+**Belege bis zur EÜR (AP10):** Im Reiter „Monatsabschluss" (nur Verwaltung)
+steht jeder Monat einzeln: was drin ist, was ihn aufhält, und die beiden
+Ausgaben. Die Kategorien in `app/buchhaltung.py` sind **wörtlich die
+SUMIF-Kriterien** des EÜR-Workbooks – die EÜR vergleicht Text, ein Buchstabe
+daneben lässt die Summe still auf null fallen. Eigene Kategorien kommen über
+`config.beleg_kategorien` dazu. Gebucht wird nach dem **Belegdatum**, nicht nach
+dem Upload. Vor dem Abschluss prüft die App Pflichtfelder, ungeklärte Kategorien
+und Dubletten; danach ist der Monat fest (wieder zu öffnen geht, steht aber im
+Eintrag). Die CSV hat die acht Spalten des Kontenjournals und wird von Hand
+angehängt – dabei die Bereichsgrenze der SUMIF nachziehen.
+
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
 6-stelligem Code.

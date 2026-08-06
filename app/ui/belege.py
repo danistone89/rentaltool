@@ -7,9 +7,10 @@ OpenCV.js traf Belege zu unzuverlaessig und lud 10 MB WebAssembly (siehe README)
 import os
 import base64
 from nicegui import ui
-from app import housekeeping, mode, receipts
-from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _esc_attr, _is_admin,
-                          _photo_thumb, _read_upload, bereichskopf, leer, t)
+from app import buchhaltung, housekeeping, mode, receipts
+from app.ui.basis import (CFG, _MONATE, _apts, _cur_role, _cur_user, _d, _esc_attr,
+                          _is_admin, _photo_thumb, _read_upload, bereichskopf,
+                          leer, stoerung, t)
 from app.ui import ton
 
 def _beleg_mirror():
@@ -297,7 +298,7 @@ def render_belege():
                     ui.notify(t("Beleg wird verarbeitet (PDF, OCR) …"), type="info", timeout=3000)
                     await run.io_bound(_process_and_add, raw, "jpg", False, corners)
                     ui.notify(t("Beleg gescannt ✓"), type="positive")
-                    render()
+                    render_alles()
                 finally:
                     state["busy"] = False
             ui.on("beleg_scan", _on_scan)
@@ -330,7 +331,23 @@ def render_belege():
         dlg.open()
         ui.run_javascript(_SCAN_JS)
 
-    box = ui.column().classes("w-full gap-3")
+    # Kategorisieren ist ein Buchungsakt: eine falsche Kategorie laeuft still in
+    # die EÜR. Die Putzkraft fotografiert und schreibt Haendler, Betrag und
+    # wofuer – gebucht wird von der Verwaltung.
+    bucht = _cur_role() in ("admin", "manager")
+
+    if bucht:
+        with ui.tabs().props("dense no-caps align=left").classes("w-full") as reiter:
+            r_liste = ui.tab(t("Belege"), icon="receipt")
+            r_abschluss = ui.tab(t("Monatsabschluss"), icon="event_available")
+        with ui.tab_panels(reiter, value=r_liste).classes("w-full"):
+            with ui.tab_panel(r_liste).classes("p-0"):
+                box = ui.column().classes("w-full gap-3")
+            with ui.tab_panel(r_abschluss).classes("p-0").mark("panel-abschluss"):
+                abschluss_box = ui.column().classes("w-full gap-3")
+    else:
+        box = ui.column().classes("w-full gap-3")
+        abschluss_box = None
 
     def render():
         box.clear()
@@ -357,7 +374,7 @@ def render_belege():
                     doc = await run.io_bound(_process_and_add, content, ext, True)
                     ui.notify(t("Beleg erfasst ✓") + (t(" (als PDF)") if doc.get("pdf") else ""),
                               type="positive")
-                    render()
+                    render_alles()
 
                 with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                     ui.button(t("Beleg scannen"), icon="document_scanner", on_click=_open_scanner) \
@@ -374,18 +391,39 @@ def render_belege():
                 leer("receipt_long", t("Noch keine Belege abgelegt."),
                      t("Oben fotografieren oder eine Datei hochladen."))
                 return
+            # Gruppiert nach dem BELEGDATUM, nicht nach dem Upload: ein Beleg vom
+            # 29. gehoert in den alten Monat, auch wenn er am 2. ankommt.
+            items = sorted(items, key=buchhaltung.belegdatum, reverse=True)
             cur_month = None
             for r in items:
-                month = r["ts"][:7]
+                month = buchhaltung.monat(r)
                 if month != cur_month:
                     cur_month = month
                     ym = f"{_MONATE[int(month[5:7]) - 1]} {month[:4]}"
-                    ui.label(ym).classes("text-sm font-semibold text-primary mt-3")
-                _beleg_card(r, apts, user, admin, render)
-    render()
+                    with ui.row().classes("w-full items-center gap-2 mt-3"):
+                        ui.label(ym).classes("text-sm font-semibold text-primary")
+                        if buchhaltung.abschluss_von(month):
+                            ui.chip(t("abgeschlossen"), icon="lock") \
+                                .props("color=green-7 text-color=white dense square") \
+                                .classes("text-xs")
+                _beleg_card(r, apts, user, admin, bucht, render_alles)
+
+    def render_abschluss():
+        if abschluss_box is None:
+            return
+        abschluss_box.clear()
+        with abschluss_box:
+            _abschluss_ansicht(user, render_alles)
+
+    def render_alles():
+        render()
+        render_abschluss()
+
+    render_alles()
 
 
-def _beleg_card(r, apts, user, admin, rerender):
+def _beleg_card(r, apts, user, admin, bucht, rerender):
+    zu = buchhaltung.abschluss_von(buchhaltung.monat(r)) is not None
     with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-start gap-3 no-wrap"):
             if r.get("photo"):
@@ -409,11 +447,42 @@ def _beleg_card(r, apts, user, admin, rerender):
                     apt_sel.on_value_change(lambda e, i=r["id"]:
                                             receipts.update_receipt(i, apartment_id=e.value,
                                                                     apartment_name=apts.get(e.value, "")))
-                ui.label(f"{_d(r['ts'])} · {r.get('uploader', '')}").classes("text-xs text-slate-400")
+                if bucht:
+                    # Das Belegdatum ist NICHT der Upload: ein Beleg vom 29.,
+                    # der am 2. ankommt, gehört in den alten Monat.
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.icon("event").classes("text-slate-400 text-sm shrink-0")
+                        datum = ui.input(value=buchhaltung.belegdatum(r)) \
+                            .props("type=date dense borderless").classes("min-w-0") \
+                            .mark(f"beleg-datum-{r['id']}")
+                        datum.on("blur", lambda e, i=r["id"], f=datum:
+                                 receipts.update_receipt(i, datum=f.value or ""))
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.icon("sell").classes("text-slate-400 text-sm shrink-0")
+                        kat = ui.select({"": t("— Kategorie wählen —"),
+                                         **{k: k for k in buchhaltung.kategorien(CFG)}},
+                                        value=r.get("kategorie") or "") \
+                            .props("dense borderless options-dense").classes("min-w-0 flex-grow") \
+                            .mark(f"beleg-kategorie-{r['id']}")
+                        kat.on_value_change(lambda e, i=r["id"]: (
+                            receipts.update_receipt(
+                                i, kategorie=e.value or "",
+                                klasse=buchhaltung.klasse_fuer(e.value)),
+                            ui.notify(t("Kategorie gesetzt ✓"), type="positive",
+                                      timeout=1500)))
+                else:
+                    ui.label(_d(buchhaltung.belegdatum(r))).classes("text-xs text-slate-400")
+                ui.label(f"{t('erfasst')} {_d(r['ts'])} · {r.get('uploader', '')}") \
+                    .classes("text-xs text-slate-400")
                 note = ui.input(placeholder=t("Notiz (z. B. wofür)"),
                                 value=r.get("note", "")).props("dense borderless").classes("w-full")
                 note.on("blur", lambda e, i=r["id"], f=note:
                         receipts.update_receipt(i, note=f.value or ""))
+                if zu:
+                    with ui.row().classes("w-full items-center gap-1 no-wrap text-slate-400"):
+                        ui.icon("lock").classes("text-sm shrink-0")
+                        ui.label(t("Monat ist abgeschlossen – Änderungen wirken nicht "
+                                   "mehr im Export.")).classes("text-xs")
             with ui.column().classes("items-center gap-1 shrink-0"):
                 if r.get("pdf"):
                     ui.button(icon="picture_as_pdf",
@@ -438,3 +507,125 @@ def _del_beleg(receipt_id, rerender):
                                                    rerender())) \
                 .props("unelevated color=negative")
     dlg.open()
+
+
+# ------------------------------------------------------ Monatsabschluss (AP10)
+def _abschluss_ansicht(user, rerender):
+    """Je Monat: was drin ist, was noch fehlt, und die beiden Ausgaben.
+
+    Der Abschluss ist keine Formsache. Danach sind die Zahlen des Monats fest –
+    eine Summe, die sich nachträglich noch bewegt, ist im Steuerbüro nichts
+    wert. Deshalb geht er erst, wenn nichts mehr offen ist.
+    """
+    alle = receipts.list_receipts()
+    monate = buchhaltung.monate(alle)
+    if not monate:
+        leer("event_available", t("Noch nichts abzuschließen."),
+             t("Sobald Belege da sind, steht hier jeder Monat einzeln."))
+        return
+    for m in monate:
+        belege = [b for b in alle if buchhaltung.monat(b) == m]
+        _monatskarte(m, belege, user, rerender)
+
+
+def _monatskarte(m, belege, user, rerender):
+    befund = buchhaltung.pruefung(belege)
+    abschluss = buchhaltung.abschluss_von(m)
+    name = f"{_MONATE[int(m[5:7]) - 1]} {m[:4]}"
+    with ui.card().classes(ton.KARTE_ENG).mark(f"monat-{m}"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.label(name).classes("text-lg font-bold text-slate-800")
+            ui.space()
+            if abschluss:
+                ui.chip(t("abgeschlossen"), icon="lock") \
+                    .props("color=green-7 text-color=white dense square").classes("text-xs")
+            elif befund["abschliessbar"]:
+                ui.chip(t("bereit"), icon="check_circle") \
+                    .props("color=green-7 text-color=white dense square").classes("text-xs")
+            else:
+                ui.chip(t("offen"), icon="pending") \
+                    .props("color=amber-7 text-color=white dense square").classes("text-xs")
+        ui.label(t("{n} Belege · {summe} €", n=befund["anzahl"],
+                   summe=buchhaltung.betrag_text(befund["summe"]))) \
+            .classes("text-sm text-slate-600")
+
+        if abschluss:
+            ui.label(t("Abgeschlossen am {wann} von {wer}",
+                       wann=_d(abschluss.get("wann", "")), wer=abschluss.get("wer", ""))) \
+                .classes("text-xs text-slate-400")
+        else:
+            _befund_zeigen(befund)
+
+        with ui.row().classes("w-full items-center gap-2 flex-wrap mt-1"):
+            ui.button(t("CSV fürs Kontenjournal"), icon="table_view",
+                      on_click=lambda: ui.download.content(
+                          buchhaltung.csv_bytes(belege), f"belege_{m}.csv",
+                          media_type="text/csv")) \
+                .props("outline no-caps").mark(f"csv-{m}")
+            ui.button(t("Sammelmappe (PDF)"), icon="picture_as_pdf",
+                      on_click=lambda: _sammelmappe_laden(m, belege, name)) \
+                .props("outline no-caps").mark(f"pdf-{m}")
+            ui.space()
+            if abschluss:
+                ui.button(t("Wieder öffnen"), icon="lock_open",
+                          on_click=lambda: (buchhaltung.oeffnen(m),
+                                            ui.navigate.reload())) \
+                    .props("flat no-caps color=negative").mark(f"oeffnen-{m}")
+            else:
+                knopf = ui.button(
+                    t("Monat abschließen"), icon="lock",
+                    on_click=lambda: _abschliessen(m, belege, user, name, rerender)) \
+                    .props("unelevated no-caps").mark(f"abschliessen-{m}")
+                if not befund["abschliessbar"]:
+                    knopf.disable()
+                    knopf.tooltip(t("Erst klären, was oben offen steht."))
+
+
+def _befund_zeigen(befund):
+    """Was den Abschluss aufhält – benannt, nicht gezählt. „3 Probleme" schickt
+    einen suchen; „Rossmann 27,81 € zweimal" nicht."""
+    if befund["abschliessbar"]:
+        return
+    with ui.column().classes(f"w-full gap-1 rounded-lg p-2 {ton.FLAECHE_HINWEIS}"):
+        for beleg, felder in befund["unvollstaendig"]:
+            _befundzeile("edit_note",
+                         t("{haendler}: es fehlt {felder}",
+                           haendler=(beleg.get("merchant") or t("ohne Händler")),
+                           felder=", ".join(felder)))
+        for beleg in befund["unklar"]:
+            _befundzeile("help_outline",
+                         t("{haendler}: Kategorie noch ungeklärt",
+                           haendler=(beleg.get("merchant") or t("ohne Händler"))))
+        for gruppe in befund["dubletten"]:
+            b = gruppe[0]
+            _befundzeile("content_copy",
+                         t("{haendler} {betrag} € steht {n}× am selben Tag – doppelt erfasst?",
+                           haendler=(b.get("merchant") or t("ohne Händler")),
+                           betrag=b.get("amount", ""), n=len(gruppe)))
+
+
+def _befundzeile(icon, text):
+    with ui.row().classes(f"w-full items-start gap-2 no-wrap {ton.AUF_HINWEIS}"):
+        ui.icon(icon).classes("text-sm shrink-0 mt-0.5")
+        ui.label(text).classes("text-xs")
+
+
+def _sammelmappe_laden(m, belege, name):
+    try:
+        zeilen = buchhaltung.journal_zeilen(belege)
+        sortiert = sorted(belege, key=buchhaltung.belegdatum)
+        roh = receipts.sammelmappe(sortiert, t("Belege {monat}", monat=name), zeilen)
+    except Exception as ex:
+        ui.notify(t("Sammelmappe fehlgeschlagen: {fehler}", fehler=ex),
+                  type="negative", timeout=9000)
+        return
+    ui.download.content(roh, f"belege_{m}.pdf", media_type="application/pdf")
+
+
+def _abschliessen(m, belege, user, name, rerender):
+    try:
+        buchhaltung.abschliessen(m, belege, user)
+    except ValueError:
+        ui.notify(t("Es steht noch etwas offen – siehe oben."), type="warning")
+        return
+    ui.navigate.reload()

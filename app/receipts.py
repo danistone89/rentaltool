@@ -16,7 +16,11 @@ from app import db, housekeeping, paths
 HERE = paths.ROOT
 TABELLE = "belege"
 
-_EDITABLE = {"merchant", "amount", "note", "kategorie", "apartment_id", "apartment_name"}
+# `datum` ist das Belegdatum und NICHT `ts` (der Upload). Ein Beleg vom 29.,
+# der am 2. fotografiert wird, gehoert in den alten Monat – siehe
+# buchhaltung.belegdatum().
+_EDITABLE = {"merchant", "amount", "note", "kategorie", "klasse", "datum",
+             "apartment_id", "apartment_name"}
 _KNOWN_MERCHANTS = ["ALDI", "LIDL", "REWE", "EDEKA", "KAUFLAND", "PENNY", "NETTO",
                     "ROSSMANN", "IKEA", "OBI", "BAUHAUS", "HORNBACH", "METRO",
                     "TEDI", "ACTION", "MÜLLER", "MEDIAMARKT", "SATURN", "AMAZON",
@@ -338,3 +342,65 @@ def guess_merchant(text):
         if len(s) >= 3:
             return s[:40]
     return ""
+
+
+# --------------------------------------------------- Sammelmappe (AP10)
+def sammelmappe(belege, titel, zeilen):
+    """Alle Belege eines Monats zu einer PDF binden – das, was das Steuerbüro
+    sonst einzeln anfordert.
+
+    Erste Seite ist die Aufstellung (dieselben Zahlen wie im CSV), danach je
+    Beleg seine Seiten mit einer Kopfzeile darüber. Ohne die Kopfzeile ist ein
+    abfotografierter Kassenbon in einem Stapel von vierzig nicht mehr
+    zuzuordnen – und genau das ist die Arbeit, die sonst beim Steuerberater
+    anfällt.
+
+    `zeilen` sind die Journalzeilen (siehe buchhaltung.journal_zeilen), damit
+    dieses Modul nichts über Buchhaltung wissen muss.
+    """
+    import fitz
+    aus = fitz.open()
+    breite, hoehe = fitz.paper_size("a4")
+    rand, schrift = 40, "helv"
+
+    # ---- Aufstellung ----
+    seite = aus.new_page(width=breite, height=hoehe)
+    y = rand + 20
+    seite.insert_text((rand, y), titel, fontname=schrift, fontsize=16)
+    y += 28
+    for z in zeilen:
+        if y > hoehe - rand:
+            seite = aus.new_page(width=breite, height=hoehe)
+            y = rand + 20
+        text = f"{z['Datum']}   {z['Gegenkonto'][:28]:28}  {z['Betrag']:>10}   {z['Kategorie'][:34]}"
+        seite.insert_text((rand, y), text, fontname="cour", fontsize=8)
+        y += 13
+
+    # ---- die Belege selbst ----
+    for beleg, z in zip(belege, zeilen):
+        kopf = (f"{z['Datum']} · {z['Gegenkonto']} · {z['Betrag']} € · {z['Kategorie']}")
+        rel_pdf, rel_bild = beleg.get("pdf"), beleg.get("photo")
+        pfad_pdf = os.path.join(housekeeping.MEDIA_DIR, rel_pdf) if rel_pdf else None
+        pfad_bild = os.path.join(housekeeping.MEDIA_DIR, rel_bild) if rel_bild else None
+        vorher = aus.page_count
+        if pfad_pdf and os.path.exists(pfad_pdf):
+            try:
+                with fitz.open(pfad_pdf) as quelle:
+                    aus.insert_pdf(quelle)
+            except Exception:
+                pass
+        if aus.page_count == vorher and pfad_bild and os.path.exists(pfad_bild):
+            try:
+                seite = aus.new_page(width=breite, height=hoehe)
+                kasten = fitz.Rect(rand, rand + 24, breite - rand, hoehe - rand)
+                seite.insert_image(kasten, filename=pfad_bild, keep_proportion=True)
+            except Exception:
+                pass
+        if aus.page_count == vorher:            # weder PDF noch Bild lesbar
+            aus.new_page(width=breite, height=hoehe)
+        # Kopfzeile auf die erste Seite dieses Belegs
+        aus[vorher].insert_text((rand, rand - 10), kopf, fontname=schrift, fontsize=8,
+                                color=(0.35, 0.16, 0.52))
+    roh = aus.tobytes()
+    aus.close()
+    return roh

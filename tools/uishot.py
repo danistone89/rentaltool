@@ -57,6 +57,7 @@ AUFNAHMEN = [
     # Schublade. Das "?" macht den Schritt freiwillig: fehlt er dort, ist das
     # kein Befund, sondern erwartet.
     ("11-menue", ["@login", "?Menü"]),
+    ("12-monatsabschluss", ["@login", "Belege", "Monatsabschluss"]),
 ]
 
 
@@ -119,6 +120,27 @@ _FAKE = [_b(9001, 2748963, "Cottaer Straße", 0, -4, "Anja Ernst"),
 _data._reservations = lambda *a, **k: _FAKE
 _data.get_apartments = lambda: [{"id": 2748963, "name": "Cottaer Straße"},
                                 {"id": 2960031, "name": "Wernerstraße"}]
+
+# Belege fuer den Monatsabschluss (AP10). Bewusst mit einem Haken: einer ohne
+# Kategorie und ein doppelt erfasster – sonst zeigt das Bild nur den guten Fall,
+# und der Befund, um den es geht, waere nie zu sehen.
+from app import receipts as _r
+if not _r.list_receipts():
+    _heute = _dt.date.today()
+    def _beleg(tage, betrag, laden, was, kat="", wohnung=""):
+        b = _r.add_receipt("gabriel", photo=None, amount=betrag, merchant=laden,
+                           note=was, kategorie=kat, apartment_name=wohnung)
+        _r.update_receipt(b["id"],
+                          datum=(_heute - _dt.timedelta(days=tage)).isoformat())
+    _beleg(9, "27,81", "Rossmann 2540", "Reinigungsmittel",
+           "Drogerie/Verbrauch (Rossmann)", "Cottaer Straße")
+    _beleg(7, "54,90", "JYSK", "Bettwaesche", "Ausstattung/GWG (JYSK)", "Wernerstraße")
+    _beleg(5, "3,75", "dm", "Spuelmittel", "Reinigung/Verbrauch (dm)")
+    _beleg(3, "12,40", "ALDI", "Kaffee fuer die Gaeste")          # ohne Kategorie
+    _beleg(2, "9,90", "Rossmann 2540", "Waschmittel",
+           "Drogerie/Verbrauch (Rossmann)")
+    _beleg(2, "9,90", "Rossmann 2540", "Waschmittel",
+           "Drogerie/Verbrauch (Rossmann)")                        # doppelt erfasst
 '''
 
 

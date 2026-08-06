@@ -152,6 +152,11 @@ _EN = {
     "Gast": "Guest",
     "keine": "none",
     "Noch keine Einträge.": "No entries yet.",
+    "erfasst": "recorded",
+    "Kategorie gesetzt ✓": "Category set ✓",
+    # Der Monatsabschluss bleibt deutsch – er gehoert zum Verwaltungsteil
+    # (siehe Kopf dieser Datei), den nur der Betreiber bedient.
+
 
     # ------------------------------------------------------------- Buchungen
     "Buchungen": "Bookings",

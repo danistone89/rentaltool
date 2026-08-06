@@ -225,11 +225,43 @@ heißen jetzt `farbe`.
 
 ## Phase 4 — Buchhaltung & Steuer
 
-### AP10 · Belege bis zur EÜR — offen
+### AP10 · Belege bis zur EÜR — ✅ erledigt (6.8.2026)
 
-Kategorien passend zum EÜR-Workbook, Monatsabschluss, Export, Pflichtfeld- und
-Dublettenprüfung. Ziel: Belege landen nicht im Archiv, sondern in der
-Buchhaltung.
+Fachlogik in `app/buchhaltung.py`, Oberfläche im Reiter „Monatsabschluss" der
+Belege.
+
+**Die Kategorien sind wörtlich die SUMIF-Kriterien des Workbooks.** Die EÜR zieht
+jede Position über einen Textvergleich; ein Buchstabe daneben – „Bertsch" statt
+„Bartsch", ein Bindestrich statt des Halbgeviertstrichs – und die Summe bleibt
+still auf null. Kein Fehler, keine Meldung, nur eine zu niedrige EÜR. Angeboten
+werden die elf belegtypischen plus der Auffangposten
+„Eingangsrechnung – Verwendungszweck unklar (prüfen)"; eigene kommen über
+`config.beleg_kategorien` dazu. Am 6.8.2026 gegen das Workbook geprüft: alle 26
+Kriterien treffen (`test_kategorien_sind_woertlich_die_kriterien_des_workbooks`,
+läuft nur mit dem Workbook und `pip install openpyxl`).
+
+**Belegdatum ≠ Uploaddatum.** Ein Beleg vom 29., der am 2. fotografiert wird,
+gehört in den alten Monat – sonst wandert die Ausgabe ins nächste Quartal. Die
+Liste gruppiert danach, nicht mehr nach `ts`.
+
+**Geprüft wird vor dem Abschluss:** Pflichtfelder (Datum, Betrag, Händler,
+Kategorie), der Auffangposten als Klärfall und Dubletten (gleicher Tag, Händler,
+Betrag – zwei Leute fotografieren denselben Bon). Der Befund nennt Händler und
+Feld; „3 Probleme" schickt nur suchen. Solange etwas offen ist, ist der
+Abschluss gesperrt.
+
+**Ausgabe:** CSV in den acht Spalten des Kontenjournals (`;`, utf-8-BOM,
+deutsche Beträge, Ausgaben negativ) plus die Sammelmappe als PDF – Aufstellung
+und danach jeder Beleg mit Kopfzeile. Angehängt wird von Hand; die
+Bereichsgrenze `N` der SUMIF ist dabei nachzuziehen. Die App schreibt bewusst
+nicht ins Workbook: die Buchhaltung bleibt, wo sie hingehört.
+
+**Kategorisieren darf nur die Verwaltung** (`admin`, `manager`). Die Putzkraft
+fotografiert und schreibt Händler, Betrag und wofür.
+
+49 Tests in `tests/test_buchhaltung.py`. `tools/uishot.py` legt jetzt erfundene
+Belege an – darunter einen ohne Kategorie und einen doppelt erfassten, sonst
+zeigt das Prüfbild nur den guten Fall.
 
 *Größe:* M.
 
