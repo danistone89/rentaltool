@@ -110,6 +110,56 @@ Oberfläche, 20 Tests); die Preisregel teilt sie sich mit der Steueranmeldung
 
 ---
 
+## Phase 3.5 — Bedienung (eingeschoben am 6.8.2026)
+
+Konzept mit Skizzen: <https://claude.ai/code/artifact/5869a152-6598-4a20-9f3e-9194ecf7289c>
+
+Ausgangslage: Die Schublade links stammt aus der Zeit am Rechner. Seit AP6 läuft
+die App als Symbol auf dem Home-Bildschirm – dort bedient man sie mit dem Daumen,
+und ohne Adressleiste muss die Orientierung ganz aus der Oberfläche kommen.
+
+**Entschieden am 6.8.2026:**
+
+* **Vier Plätze unten**, der vierte ist immer das Menü.
+* **Die Leiste richtet sich nach der Rolle.** Putzkraft: Reinigungen · Zeiten ·
+  Belege. Verwaltung: Buchungen · Übersicht · Belege. Was nicht hineinpasst –
+  Zeiterfassung, Beherbergungssteuer, Benutzer, Einstellungen, Mein Konto –
+  liegt im Menü. Die Rechte bleiben in `ROLE_AREAS`.
+* **Am Rechner ab 1024 px weiter die Schublade**, erzeugt aus derselben
+  Bereichsliste wie die Leiste (zwei gepflegte Listen laufen auseinander).
+* **Genau ein Zähler**, auf „Reinigungen", und nur wenn er größer als null ist.
+
+Bewusst nicht: runder Knopf in der Mitte (keine eindeutige Hauptaktion – „Zeit
+starten" steht in der Reinigungskarte, wo der Zusammenhang ist), Symbole ohne
+Beschriftung, Wischen zwischen Bereichen (in den Buchungen wird schon gewischt).
+
+### AP-D1 · Leiste unten und Menü — offen
+
+Bereichsliste um Symbol und Reihenfolge je Rolle ergänzen, Leiste bauen, Menü als
+Blatt von unten, Kopfzeile ausräumen (Benutzer/Einstellungen/Mein Konto/Abmelden
+ziehen ins Menü), Zähler auf „Reinigungen". Zwischenschritte wie der
+Checklisten-Durchgang halten „Reinigungen" aktiv.
+
+*Größe:* M.
+
+### AP-D2 · Bildschirme am Handy nachziehen — offen
+
+Die Bereichs-Kopfzeilen (`_feature_header`) sind für den Monitor gebaut: großes
+Symbol, Titel, Unterzeile – am Handy ein Sechstel der Höhe. Dazu Tap-Ziele in
+Listen, Abstände, und die Zustände „lädt", „leer", „ging schief" überall gleich.
+
+*Größe:* M.
+
+### AP-D3 · Farb- und Abstandsrollen festschreiben — offen
+
+Farben stehen heute als Tailwind-Klassen verstreut im Code (`text-amber-800`,
+`bg-violet-50`). Als benannte Rollen – Hinweis, Warnung, Erfolg, ruhig – an einer
+Stelle, damit der nächste Bereich von allein passt. Optional, lohnt erst nach D1.
+
+*Größe:* S–M.
+
+---
+
 ## Phase 4 — Buchhaltung & Steuer
 
 ### AP10 · Belege bis zur EÜR — offen
