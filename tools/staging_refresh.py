@@ -90,7 +90,10 @@ def main(argv=None):
         print(f"Quelle {echt} gibt es nicht.")
         return 1
 
-    quellen = [n for n in paths.DATEIEN + paths.ORDNER
+    # ALTE_JSON gehört dazu, solange eine Installation noch nicht auf die
+    # Datenbank umgezogen ist – sonst käme die Probe-Instanz ohne Daten an,
+    # und genau darauf will man den Umzug ja vorher üben.
+    quellen = [n for n in paths.DATEIEN + paths.ALTE_JSON + paths.ORDNER
                if os.path.exists(os.path.join(echt, n))]
     print(f"Quelle: {echt}")
     print(f"Ziel:   {probe}   (wird VORHER geleert)")
