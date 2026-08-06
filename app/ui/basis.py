@@ -208,7 +208,9 @@ def _has_rates():
                for k in ("stundensatz_werktag", "stundensatz_wochenende"))
 
 
+# Markenfarben – auch von der Handy-App gebraucht (app/ui/pwa.py)
 PURPLE, GOLD = "#5E2A84", "#C8A96E"
+SAND = "#F5F2EB"      # Seitenhintergrund
 
 # LIVARO-Suites-Wortbildmarke als komplettes SVG (Gold-Turm-Icon + Schriftzug).
 _LOGO_SVG = (

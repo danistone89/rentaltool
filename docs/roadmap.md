@@ -67,14 +67,17 @@ Ledger-Datei des Steuerarchivs bleiben Dateien. Übernahme über
 
 ## Phase 2 — Alltag des Teams
 
-### AP6 · Echte Handy-App (PWA) — offen
+### AP6 · Echte Handy-App (PWA) — ✅ erledigt (6.8.2026)
 
-Installierbar auf dem Home-Screen, eigenes Icon, Startbildschirm, sinnvolles
-Verhalten ohne Netz. Heute gibt es kein Manifest – die App ist nur eine
-Browser-Seite unter einer URL, obwohl die Putzkräfte ausschließlich am Handy
-arbeiten. Dazu Feinschliff der Listen auf kleinen Schirmen.
+Manifest, Icons aus der Wortbildmarke, Start ohne Adressleiste, sichere Ränder
+unter Kamera-Insel und Home-Balken, eigene Offline-Seite statt der
+Browser-Fehlerseite, Anleitung zum Einrichten (Safari kennt keinen
+Installations-Dialog). Der Service Worker speichert bewusst nur die eigenen
+statischen Dateien. Siehe README → „Als App auf dem Handy".
 
-*Größe:* S–M.
+**Vorher geprüft:** PWAs laufen auf dem iPhone; die EU-Abschaltung von
+Februar 2024 wurde im März 2024 zurückgenommen, und seit iOS 26 gibt es gar
+keine Anforderungen an die Installierbarkeit mehr.
 
 ### AP7 · Benachrichtigungen, die ankommen — offen
 

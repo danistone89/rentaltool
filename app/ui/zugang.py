@@ -8,6 +8,7 @@ import time as _time
 
 from nicegui import app, ui
 from app import auth, data, i18n, mailer
+from app.ui import pwa
 from app.ui.basis import (CFG, ROLES, USERS, _app_url, _cur_user, _is_admin, _lang, _lang_select, _probe_hinweis, _role_label, logo, t)
 
 # ---------------------------------------------------------------- Login
@@ -28,6 +29,7 @@ def _finish_login(username, role):
 
 
 def login_page():
+    pwa.kopf()
     ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
               positive="#16a34a", negative="#dc2626")
     ui.query("body").classes("bg-[#F5F2EB]")
@@ -178,6 +180,7 @@ def _find_invite(token):
 
 
 def invite_page(token: str = ""):
+    pwa.kopf()
     """Einmal-Link aus der Einladungs-/Zurücksetzen-Mail: Passwort selbst vergeben."""
     ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
               positive="#16a34a", negative="#dc2626")
@@ -290,6 +293,9 @@ def open_account():
             else:
                 ui.button(t("2FA aktivieren"), icon="qr_code_2",
                           on_click=lambda: (dlg.close(), open_2fa_setup())).props("outline no-caps")
+        # Die Anleitung gehört hierher: „Wie kriege ich das aufs Handy?“ sucht
+        # man beim eigenen Konto, nicht in den Einstellungen des Betreibers.
+        pwa.einrichten_hinweis()
 
         def save():
             u["email"] = (email_in.value or "").strip()

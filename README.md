@@ -40,6 +40,7 @@ Oberfläche hat ein Modul je Bereich:
 | `app/ui/kalender.py` | Zeitleiste über alle Wohnungen, Monatsblatt einer Wohnung | 241 |
 | `app/ui/reinigung.py` | Checklisten-Durchgang, Schäden, Bestand, Übersicht | 594 |
 | `app/ui/belege.py` | Belegscanner, Ablage, OCR, Liste | 441 |
+| `app/ui/pwa.py` | Handy-App: Manifest, Icons, Service Worker, Einricht-Anleitung | 250 |
 
 Die Abhängigkeiten laufen von `basis` (kennt keinen Bereich) nach außen. Wo zwei
 Bereiche einander brauchen – Buchungen, Dialog, Kalender, Reinigung –, wird das
@@ -392,6 +393,44 @@ abgefragt oder gespeichert, und die Mitarbeiter werden nicht nach einer
 Ortungsfreigabe gefragt. Die Geofence-Liste darunter wirkt nur bei
 eingeschaltetem Schalter. Bereits erfasste Standorte älterer Einträge bleiben in
 `worklog.json` erhalten.
+
+## Als App auf dem Handy (PWA)
+
+Die Putzkräfte arbeiten ausschließlich am Handy. Über **Teilen → „Zum
+Home-Bildschirm"** (iOS) bzw. **Menü → „App installieren"** (Android) landet die
+App mit eigenem Symbol auf dem Startbildschirm und öffnet **ohne Adressleiste**.
+Die Anleitung dazu steht in der App unter **Mein Konto → „Als App einrichten"**;
+am Handy erscheint zusätzlich einmalig ein Hinweis oben auf der Seite (wegtippbar,
+Merker im Browser).
+
+Bestandteile (`app/ui/pwa.py`): `/manifest.webmanifest`, die Icons unter
+`app/ui/static/` (der **Turm allein** auf Markenviolett – ein Schriftzug ist auf
+60 px nicht zu lesen; die maskable-Variante hat mehr Rand, weil Android zum
+Kreis beschneidet), `/sw.js` und die Offline-Seite `/offline`.
+
+**Der Service Worker speichert die Anwendung bewusst NICHT.** NiceGUI baut die
+Oberfläche über eine offene Verbindung zum Server auf – eine zwischengespeicherte
+Hülle ohne Verbindung sähe aus wie die App, wäre aber leer, und veraltetes
+JavaScript im Speicher bricht sie nach einem Deploy. Zwischengespeichert werden
+ausschließlich die eigenen Dateien unter `/static/`; für alles andere gilt **erst
+das Netz**, und schlägt das fehl, kommt statt der Browser-Fehlerseite eine eigene
+Seite auf Deutsch und Englisch. Ohne Netz bleibt die App also **lesbar, nicht
+schreibfähig** – Background-Sync gibt es auf iOS nicht verlässlich, „offline
+erfassen und später senden" wäre nicht zu halten.
+
+> **Falle:** Das Handy holt Manifest und Icon, **bevor** sich jemand anmeldet.
+> Ohne Ausnahme in der Login-Schranke (`_UNRESTRICTED` und `/static/` in
+> `app/web.py`) bekommt iOS dort HTML statt eines Icons: das Symbol bliebe grau
+> und der Service Worker ließe sich gar nicht erst registrieren. Abgesichert
+> durch `tests/test_pwa.py::test_icons_und_manifest_sind_ohne_login_erreichbar`.
+
+Stand iOS 26 (an den WebKit-Quellen geprüft): Home-Screen-Web-Apps werden
+unterstützt, seit iOS 26 sogar **ohne** Anforderungen an die Installierbarkeit.
+Die kurzzeitige Abschaltung in der EU (iOS-17.4-Beta, Februar 2024) wurde im
+März 2024 zurückgenommen. Safari kennt aber **keinen** Installations-Dialog –
+daher die Anleitung – und **Push-Benachrichtigungen kommen nur an, wenn die App
+auf dem Home-Bildschirm liegt**; im Safari-Tab nicht. Genau deshalb steht dieses
+Paket vor den Benachrichtigungen (AP7).
 
 ## Sprache (Deutsch / Englisch)
 

@@ -168,6 +168,22 @@ _EN = {
     "Für dich heute nichts zu tun. \U0001F389": "Nothing for you today. \U0001F389",
     "{n} Reinigung": "{n} cleaning",
     "{n} Reinigungen": "{n} cleanings",
+    # ------------------------------------------- Handy-App einrichten
+    "Als App einrichten": "Set up as an app",
+    "Danach startest du die App über ein eigenes Symbol – ohne "
+    "Adressleiste, und Benachrichtigungen sind erst dann möglich.":
+        "You then start the app from its own icon – without an address bar, "
+        "and only then can it send you notifications.",
+    "Unten auf das Teilen-Symbol tippen (Viereck mit Pfeil)":
+        "Tap the share icon at the bottom (square with an arrow)",
+    "„Zum Home-Bildschirm“ wählen": "Choose “Add to Home Screen”",
+    "Oben rechts auf „Hinzufügen“ tippen": "Tap “Add” in the top right",
+    "Oben rechts auf die drei Punkte tippen": "Tap the three dots in the top right",
+    "„App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen":
+        "Choose “Install app” or “Add to Home screen”",
+    "Ein Symbol auf dem Home-Bildschirm – so geht es unter „Mein Konto“.":
+        "An icon on your Home Screen – see “My account” for how.",
+
     "{n} frei": "{n} free",
     "{n} vergeben": "{n} assigned",
     "noch frei": "still free",

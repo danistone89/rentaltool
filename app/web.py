@@ -33,6 +33,7 @@ from starlette.responses import RedirectResponse  # noqa: E402
 from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402,F401
                  bookings, receipts, feiertage, i18n, ical, mode)
 from app.ui import basis, belege, buchungen, dialog, einstellungen  # noqa: E402,F401
+from app.ui import pwa  # noqa: E402,F401
 from app.ui import kalender, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
 from app.ui.basis import (AREAS, AUTH, CFG, ROLE_AREAS, ROLES, STORAGE_SECRET,  # noqa: E402,F401
                           USERS, _APARTMENTS, _apts, _checklisten_an, _cur_area,
@@ -57,8 +58,14 @@ app.add_static_files("/media", housekeeping.MEDIA_DIR)
 
 
 # Pfade ohne Login-Zwang: Login-Seite, Einladungs-Link, Smoobu-Webhook,
-# NiceGUI-Interna.
-_UNRESTRICTED = {"/login", "/invite"}
+# NiceGUI-Interna – und alles, was die Handy-App braucht.
+#
+# Letzteres ist keine Kleinigkeit: das Handy holt Manifest und Icon, **bevor**
+# sich jemand anmeldet. Landen sie auf der Anmeldeseite, bekommt iOS HTML statt
+# eines Icons – das Symbol auf dem Home-Bildschirm bliebe grau, und der Service
+# Worker ließe sich gar nicht erst registrieren.
+_UNRESTRICTED = {"/login", "/invite", "/manifest.webmanifest", "/sw.js", "/offline",
+                 "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -68,8 +75,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # /media = in der UI eingebettete Fotos (zufällige UUID-Dateinamen);
             # app.storage.user ist bei Static-Requests nicht verlässlich verfügbar,
             # daher hier durchlassen statt auf /login umzuleiten.
+            # /static = Icons der Handy-App (siehe oben).
             if not (path in _UNRESTRICTED or path.startswith("/_nicegui")
-                    or path.startswith("/api/") or path.startswith("/media/")):
+                    or path.startswith("/api/") or path.startswith("/media/")
+                    or path.startswith("/static/")):
                 app.storage.user["referrer"] = path
                 return RedirectResponse("/login")
         return await call_next(request)
@@ -77,10 +86,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(AuthMiddleware)
 
-# Seiten der Bereiche anmelden. Siehe zugang.seiten_registrieren() – die
-# Registrierung ist ein Aufruf und kein Dekorator, weil diese Datei im Testlauf
-# je Test erneut ausgeführt wird, die Bereichsmodule aber geladen bleiben.
+# Seiten und Routen der Bereiche anmelden – ein Aufruf und kein Dekorator, weil
+# diese Datei im Testlauf je Test erneut ausgeführt wird, die Bereichsmodule
+# aber geladen bleiben (siehe zugang.seiten_registrieren()).
 zugang.seiten_registrieren()
+pwa.routen_registrieren()
 
 # Aus demselben Grund hier die flüchtigen Zwischenspeicher leeren: im Betrieb
 # passiert das einmal beim Start, im Testlauf vor jedem Test.
@@ -107,6 +117,7 @@ def whoami(request: Request):
 # ---------------------------------------------------------------- Hauptseite
 @ui.page("/")
 def main_page():
+    pwa.kopf()
     ui.colors(primary="#5E2A84", secondary="#8A5CC2", accent="#C8A96E",
               positive="#16a34a", negative="#dc2626", dark="#2D2D2D")
     ui.query("body").classes("bg-[#F5F2EB]")
@@ -151,6 +162,8 @@ def main_page():
             ui.label(_role_label(role)).classes("text-xs text-gray-400")
 
     content = ui.column().classes("w-full max-w-6xl mx-auto p-3 sm:p-6 gap-4 sm:gap-5")
+    with content:
+        pwa.einrichten_banner()
     visible = [a for a in AREAS if a["key"] in areas]
 
     def _feature_header(icon, title, subtitle, action=None):
