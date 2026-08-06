@@ -6,7 +6,8 @@ tauschen, Zeit nachtragen, Schaden melden, Gast anschreiben.
 
 from nicegui import ui
 from app import bookings, housekeeping, mailer, planung, push, smoobu, timetrack
-from app.ui.basis import (CFG, USERS, _app_url, _checklisten_an, _cur_area, _cur_role, _cur_user, _d, _photo_thumb, _t, t)
+from app.ui.basis import (CFG, USERS, _app_url, _checklisten_an, _cur_area,
+                          _cur_role, _cur_user, _d, _photo_thumb, _t, laedt, t)
 from app.ui import buchungen, reinigung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 def _dfmt_kurz(iso):
@@ -386,7 +387,7 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                         _mstate["busy"] = True
                         _mbox.clear()
                         with _mbox:
-                            ui.spinner(size="lg").classes("m-auto")
+                            laedt(t("Nachrichten werden geholt …"))
                         from nicegui import run
                         api_key = (CFG.get("smoobu_api_key") or "").strip()
                         err, msgs = None, []

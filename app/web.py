@@ -140,6 +140,10 @@ def main_page():
        Farbe UND Strich: Farbe allein traegt nicht, wenn die Sonne aufs
        Display faellt oder jemand Farben schlecht unterscheidet. */
     .nav-leiste { padding-bottom: env(safe-area-inset-bottom); }
+    /* Checklisten-Aufgabe: der Text ist Teil des Kaestchens, damit die ganze
+       Zeile das Tap-Ziel ist. Erledigtes bleibt durchgestrichen lesbar. */
+    .aufgabe .q-checkbox__label { font-size:.875rem; color:#334155; line-height:1.3; }
+    .aufgabe-erledigt .q-checkbox__label { text-decoration:line-through; color:#9ca3af; }
     .nav-platz { color:#64748b; }
     /* Das Menue-Blatt endet ueber der Leiste, statt sie zu verdecken: sonst
        ist waehrend des Blaetterns nicht mehr zu sehen, in welchem Bereich man
@@ -186,15 +190,9 @@ def main_page():
     with content:
         pwa.einrichten_banner()
 
-    def _feature_header(icon, title, subtitle, action=None):
-        with ui.row().classes("w-full items-center gap-3"):
-            ui.icon(icon).classes("text-3xl text-primary")
-            with ui.column().classes("gap-0"):
-                ui.label(title).classes("text-2xl font-bold text-slate-800 leading-tight")
-                ui.label(subtitle).classes("text-sm text-gray-500")
-            ui.space()
-            if action:
-                action()
+    # Die Kopfzeile steht seit AP-D2 in basis.bereichskopf – vier Bereiche
+    # hatten sie vorher Zeile für Zeile nachgebaut.
+    _feature_header = basis.bereichskopf
 
     def build_beherbergungssteuer():
         apts = _load_apartments()
@@ -470,11 +468,9 @@ def main_page():
         activate(start if start in erlaubt else erlaubt[0])
     else:
         with content:
-            with ui.card().classes("w-full rounded-xl p-8 items-center gap-2"):
-                ui.icon("lock").classes("text-5xl text-gray-300")
-                ui.label(t("Willkommen, {name}!", name=_cur_user())).classes("text-lg font-medium text-slate-700")
-                ui.label(t("Für deinen Zugang sind noch keine Bereiche freigeschaltet.")) \
-                    .classes("text-gray-500")
+            with ui.card().classes("w-full rounded-xl"):
+                basis.leer("lock", t("Willkommen, {name}!", name=_cur_user()),
+                           t("Für deinen Zugang sind noch keine Bereiche freigeschaltet."))
 
 
 def run():

@@ -161,11 +161,32 @@ Checklisten-Durchgang ist kein eigener Platz, sondern hält „Reinigungen" akti
 
 *Größe:* M.
 
-### AP-D2 · Bildschirme am Handy nachziehen — offen
+### AP-D2 · Bildschirme am Handy nachziehen — ✅ erledigt (6.8.2026)
 
-Die Bereichs-Kopfzeilen (`_feature_header`) sind für den Monitor gebaut: großes
-Symbol, Titel, Unterzeile – am Handy ein Sechstel der Höhe. Dazu Tap-Ziele in
-Listen, Abstände, und die Zustände „lädt", „leer", „ging schief" überall gleich.
+**Kopfzeile.** Vier Bereiche hatten sie Zeile für Zeile nachgebaut; jetzt steht
+sie einmal in `basis.bereichskopf`. Am Handy schrumpfen Symbol und Titel, die
+Unterzeile tritt ganz zurück (`hidden sm:block` – sie bleibt im Markup). Das
+gibt gut eine Zeile Inhalt zurück; die Reinigungsliste beginnt rund 65 Punkte
+weiter oben.
+
+**Die drei Zustände** stehen ebenfalls in `basis`: `leer()`, `stoerung()`,
+`laedt()`. Wichtig ist der Unterschied zwischen den ersten beiden. Fällt Smoobu
+aus, kamen null Buchungen zurück und die Liste meldete „Keine anstehenden
+Reinigungen" – eine Putzkraft hätte daraus geschlossen, sie habe frei. Der
+Merker `buchungen.abruf_fehler()` hält fest, ob der Abruf durchkam; ein Ausfall
+steht jetzt als Ausfall da, mit Grund und „Nochmal versuchen".
+
+**Tap-Ziele.** Die Aufgabenzeile der Checkliste ist die meistberührte Fläche der
+App. Der Text gehört jetzt ins Kästchen statt daneben, damit die ganze Zeile das
+Ziel ist (vorher: 20 Punkte, mit Putzhandschuhen aussichtslos), Mindesthöhe
+44 Punkte; der Foto-Knopf ist nicht mehr `dense`.
+
+*Bewusst nicht:* Die Abstände blieben, wie sie waren – der Inhaltsrahmen war mit
+`p-3 sm:p-6 gap-4 sm:gap-5` schon am Gerät ausgerichtet. Kleine Unterlisten
+(„Noch keine Einträge" in der Zeitenliste) haben weiter ihre karge Zeile: ein
+Block mit großem Symbol wäre in einer Karte von drei Zeilen unangemessen.
+
+8 Tests in `tests/test_bedienung.py`.
 
 *Größe:* M.
 

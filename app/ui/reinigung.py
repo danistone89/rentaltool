@@ -10,7 +10,8 @@ einander brauchen.
 from nicegui import ui
 from datetime import date
 from app import bookings, data, housekeeping, mailer, push, timetrack
-from app.ui.basis import (CFG, USERS, _apts, _checklisten_an, _cur_user, _d, _is_admin, _photo_button, _photo_thumb, _run_ist, t)
+from app.ui.basis import (CFG, USERS, _apts, _checklisten_an, _cur_user, _d, _is_admin,
+                          _photo_button, _photo_thumb, _run_ist, bereichskopf, leer, t)
 from app.ui import auswertung, buchungen, dialog
 from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
 
@@ -93,11 +94,7 @@ def open_damage_dialog(apt_id, apt_name, reporter, on_saved=None, booking_id=Non
 
 
 def _hk_header(title, subtitle):
-    with ui.row().classes("w-full items-center gap-3"):
-        ui.icon("cleaning_services").classes("text-3xl text-primary")
-        with ui.column().classes("gap-0"):
-            ui.label(title).classes("text-2xl font-bold text-slate-800 leading-tight")
-            ui.label(subtitle).classes("text-sm text-gray-500")
+    bereichskopf("cleaning_services", title, subtitle)
 
 
 def render_reinigung(activate=None):
@@ -106,14 +103,11 @@ def render_reinigung(activate=None):
     if not _checklisten_an():
         # Alle Einstiege sind ausgeblendet; wer trotzdem hier landet (alter Link,
         # offener Tab), soll nicht auf einer leeren Seite stehen.
-        with ui.column().classes("w-full items-center gap-2 py-10"):
-            ui.icon("checklist_rtl").classes("text-5xl text-gray-300")
-            ui.label(t("Checklisten sind ausgeschaltet.")).classes("text-gray-600 font-medium")
-            ui.label(t("Arbeitszeit starten und beenden reicht.")).classes("text-sm text-gray-500")
-            if activate:
-                ui.button(t("Zu den Reinigungen"), icon="cleaning_services",
-                          on_click=lambda: activate("buchungen")) \
-                    .props("unelevated no-caps").classes("mt-2")
+        leer("checklist_rtl", t("Checklisten sind ausgeschaltet."),
+             t("Arbeitszeit starten und beenden reicht."),
+             (lambda: ui.button(t("Zu den Reinigungen"), icon="cleaning_services",
+                                on_click=lambda: activate("buchungen"))
+              .props("unelevated no-caps").classes("mt-2")) if activate else None)
         return
     reinigung_putzkraft(activate)
 
@@ -182,13 +176,16 @@ def reinigung_putzkraft(activate=None):
         done = run["tasks"].get(task["id"], {}).get("done", False)
         has_photo = bool(_run_ist(run["id"], task["id"]))
         with ui.row().classes("w-full items-center gap-2 no-wrap py-1"):
-            cb = ui.checkbox(value=done).props("dense")
+            # Der Text gehört ins Kästchen und nicht daneben: damit ist die
+            # ganze Zeile das Tap-Ziel. Vorher musste der Daumen ein Kästchen
+            # von 20 Punkten treffen – mit Putzhandschuhen und dem Handy in
+            # einer Hand ist das aussichtslos.
+            cb = ui.checkbox(task["text"], value=done).props("dense").classes(
+                "grow min-h-[44px] aufgabe " + ("aufgabe-erledigt" if done else ""))
             cb.on_value_change(lambda e, tid=task["id"]:
                                (housekeeping.update_task(run["id"], tid, done=e.value), render()))
-            ui.label(task["text"]).classes(
-                "flex-grow text-sm " + ("line-through text-gray-400" if done else "text-slate-700"))
             ui.button(icon="photo_camera", on_click=lambda: _photo_dialog(run, task)) \
-                .props("flat round dense").classes("text-green-600" if has_photo else "text-primary") \
+                .props("flat round").classes("text-green-600" if has_photo else "text-primary") \
                 .tooltip(t("Foto"))
 
     def _picker():

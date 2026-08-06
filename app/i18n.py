@@ -122,6 +122,19 @@ _EN = {
     "Steuer": "Tax",
     "Archiv": "Archive",
 
+    # ------------------------------------------- Die drei Zustände (AP-D2)
+    # „leer" und „ging schief" müssen sich unterscheiden: ein Ausfall bei
+    # Smoobu sah bisher aus wie Feierabend.
+    "Wird geladen …": "Loading …",
+    "Nachrichten werden geholt …": "Fetching messages …",
+    "Nochmal versuchen": "Try again",
+    "Die Buchungen konnten nicht geladen werden.":
+        "The bookings could not be loaded.",
+    "In den nächsten drei Wochen steht keine Abreise an.":
+        "No departure is due in the next three weeks.",
+    "Oben fotografieren oder eine Datei hochladen.":
+        "Take a photo above or upload a file.",
+
     # ------------------------------------------------------------- Allgemein
     "Speichern": "Save",
     "Abbrechen": "Cancel",

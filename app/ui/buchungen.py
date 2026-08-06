@@ -11,13 +11,24 @@ angesprochen, damit sich die Importe nicht im Kreis drehen.
 from nicegui import ui
 from datetime import date
 from app import bookings, data, housekeeping, i18n, ical, smoobu, timetrack
-from app.ui.basis import (USERS, _checklisten_an, _cur_area, _cur_user, _is_admin, t)
+from app.ui.basis import (USERS, _checklisten_an, _cur_area, _cur_user, _is_admin,
+                          bereichskopf, leer, stoerung, t)
 from app.ui.standort import (_match_geofence, get_location)
 from app.ui import dialog, kalender, reinigung
 from app.ui import planung as ui_planung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 # ---------------------------------------------------------------- Buchungen
 _PENDING_REINIGUNG = {}   # {"apt": (id, name)} – Workflow-Sprung Buchung → Checkliste
+
+# Kam der letzte Abruf bei Smoobu durch? Ohne diesen Merker sieht ein Ausfall
+# aus wie Feierabend: es kommen null Buchungen zurück, und die Liste meldet
+# „Keine anstehenden Reinigungen" – die gefährlichste Falschauskunft der App.
+_ABRUF = {"fehler": None}
+
+
+def abruf_fehler():
+    """Fehlertext des letzten Smoobu-Abrufs; None, wenn er durchkam."""
+    return _ABRUF["fehler"]
 
 
 def _staff_users():
@@ -140,8 +151,10 @@ def _events_between(d_from, d_to):
     try:
         raw = data._reservations(d_from, d_to)
     except smoobu.SmoobuError as ex:
+        _ABRUF["fehler"] = str(ex)
         ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         return []
+    _ABRUF["fehler"] = None
     evs = []
     for b in raw:
         if not bookings.is_real(b):
@@ -185,9 +198,11 @@ def _cleaning_jobs(days_ahead=21, days_back=1, quiet=False):
     try:
         raw = data._reservations(d_from, look_to)
     except smoobu.SmoobuError as ex:
+        _ABRUF["fehler"] = str(ex)
         if not quiet:
             ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         return []
+    _ABRUF["fehler"] = None
     norm = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
     by_apt = {}
     for nb in norm:
@@ -313,15 +328,12 @@ def _status_chip(job):
 def render_buchungen(activate):
     user = _cur_user()
     admin = _is_admin()
-    with ui.row().classes("w-full items-center gap-3"):
-        ui.icon("calendar_month").classes("text-3xl text-primary")
-        with ui.column().classes("gap-0"):
-            ui.label(t("Buchungen")).classes("text-2xl font-bold text-slate-800 leading-tight")
-            ui.label(t("Reinigungs-Übersicht & Buchungskalender")) \
-                .classes("text-sm text-gray-500")
-        ui.space()
-        ui.button(icon="refresh", on_click=lambda: (data.clear_cache(), activate("buchungen"))) \
-            .props("flat round").tooltip(t("Aktualisieren"))
+    bereichskopf("calendar_month", t("Buchungen"),
+                 t("Reinigungs-Übersicht & Buchungskalender"),
+                 lambda: ui.button(icon="refresh",
+                                   on_click=lambda: (data.clear_cache(),
+                                                     activate("buchungen")))
+                 .props("flat round").tooltip(t("Aktualisieren")))
     staff = _staff_users()
     # „Meine Reinigungen“ ist die Startansicht: am Tagesanfang zählt, wofür man
     # selbst zuständig ist. Zuweisen passiert in „Alle Reinigungen“.
@@ -344,18 +356,26 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
     das ist die Startansicht: am Tagesanfang zählt, wofür man zuständig ist.
     """
     jobs = _cleaning_jobs()
+
+    def _stoerung():
+        """Kein Abruf, keine Liste – das muss als Ausfall dastehen, nicht als
+        leerer Tag."""
+        stoerung(t("Die Buchungen konnten nicht geladen werden."),
+                 abruf_fehler(),
+                 nochmal=lambda: (data.clear_cache(), activate("buchungen")))
+
     if nur_eigene:
         jobs = [j for j in jobs if bookings.assignee_of(j["id"]) == user]
         if not jobs:
-            with ui.column().classes("w-full items-center gap-1 py-8"):
-                ui.icon("assignment_turned_in").classes("text-5xl text-gray-300")
-                ui.label(t("Dir ist gerade keine Reinigung zugewiesen.")) \
-                    .classes("text-gray-500")
-                ui.label(t("Unter „Alle Reinigungen“ siehst du, was noch frei ist.")) \
-                    .classes("text-xs text-gray-400")
-                if zu_allen:
-                    ui.button(t("Alle Reinigungen ansehen"), icon="cleaning_services",
-                              on_click=zu_allen).props("unelevated no-caps").classes("mt-2")
+            if abruf_fehler():
+                _stoerung()
+            else:
+                leer("assignment_turned_in",
+                     t("Dir ist gerade keine Reinigung zugewiesen."),
+                     t("Unter „Alle Reinigungen“ siehst du, was noch frei ist."),
+                     (lambda: ui.button(t("Alle Reinigungen ansehen"),
+                                        icon="cleaning_services", on_click=zu_allen)
+                      .props("unelevated no-caps").classes("mt-2")) if zu_allen else None)
             return
     else:
         # Offene "Nachtragen"-Fälle einmalig per E-Mail anstoßen – nur hier,
@@ -364,7 +384,11 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
             if _booking_status(j) == "nachtragen":
                 dialog._notify_nachtragen(j, staff)
     if not jobs:
-        ui.label(t("Keine anstehenden Reinigungen.")).classes("text-gray-500 mt-4")
+        if abruf_fehler():
+            _stoerung()
+        else:
+            leer("event_available", t("Keine anstehenden Reinigungen."),
+                 t("In den nächsten drei Wochen steht keine Abreise an."))
         return
     today = date.today().isoformat()
     overdue = [j for j in jobs if _booking_status(j) == "nachtragen"]

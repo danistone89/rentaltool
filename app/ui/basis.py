@@ -300,6 +300,73 @@ def logo(height=44):
         .style(f"height:{height}px;width:{round(height * 300 / 70)}px")
 
 
+# ---- Bereichs-Kopfzeile und die drei Zustände (AP-D2) ----------------------
+def bereichskopf(icon, titel, unterzeile="", aktion=None):
+    """Kopfzeile eines Bereichs – am Rechner groß, am Handy schmal.
+
+    Am Monitor trägt sie großes Symbol, Titel und Unterzeile. Am Handy kostete
+    dieselbe Zeile ein Sechstel der Höhe – für eine Auskunft, die die Leiste
+    unten ohnehin gibt. Dort schrumpfen Symbol und Titel, und die Unterzeile
+    tritt ganz zurück (sie steht weiter im Markup, nur nicht im Bild).
+
+    `aktion` zeichnet rechts einen Knopf (Aktualisieren, Archiv, …).
+    """
+    with ui.row().classes("w-full items-center gap-2 sm:gap-3"):
+        ui.icon(icon).classes("text-2xl sm:text-3xl text-primary shrink-0")
+        with ui.column().classes("gap-0 min-w-0"):
+            ui.label(titel).classes(
+                "text-lg sm:text-2xl font-bold text-slate-800 leading-tight") \
+                .mark("bereich-titel")
+            if unterzeile:
+                ui.label(unterzeile).classes(
+                    "hidden sm:block text-sm text-gray-500").mark("bereich-unterzeile")
+        ui.space()
+        if aktion:
+            aktion()
+
+
+def leer(icon, text, hinweis="", aktion=None):
+    """„Hier ist gerade nichts."" – überall gleich gebaut.
+
+    Ein leerer Bereich darf nicht wie ein kaputter aussehen und auch nicht wie
+    eine vergessene Seite: Symbol, ein Satz, was es heißt, und wenn es einen
+    nächsten Schritt gibt, der Knopf dazu. Für „ging schief" gibt es
+    `stoerung()` – die Unterscheidung ist der Sinn der Sache.
+    """
+    with ui.column().classes("w-full items-center gap-1 py-8"):
+        ui.icon(icon).classes("text-5xl text-gray-300")
+        ui.label(text).classes("text-gray-500 text-center px-4")
+        if hinweis:
+            ui.label(hinweis).classes("text-xs text-gray-400 text-center px-4")
+        if aktion:
+            aktion()
+
+
+def stoerung(text, hinweis="", nochmal=None):
+    """„Das ging schief." – und zwar sichtbar anders als „hier ist nichts".
+
+    Fällt Smoobu aus, kamen bisher null Buchungen zurück und der Bereich sagte
+    „Keine anstehenden Reinigungen". Das ist die gefährlichste Falschauskunft
+    der App: sie sieht aus wie Feierabend. Ein Ausfall muss als Ausfall
+    dastehen.
+    """
+    with ui.column().classes("w-full items-center gap-1 py-8"):
+        ui.icon("cloud_off").classes("text-5xl text-red-200")
+        ui.label(text).classes("text-red-700 font-medium text-center px-4")
+        if hinweis:
+            ui.label(hinweis).classes("text-xs text-gray-500 text-center px-4")
+        if nochmal:
+            ui.button(t("Nochmal versuchen"), icon="refresh", on_click=nochmal) \
+                .props("outline no-caps").classes("mt-2")
+
+
+def laedt(text=""):
+    """„Wird geholt." – damit Warten nicht wie Leere aussieht."""
+    with ui.column().classes("w-full items-center gap-2 py-8"):
+        ui.spinner(size="lg").classes("text-primary")
+        ui.label(text or t("Wird geladen …")).classes("text-sm text-gray-500")
+
+
 def _probe_hinweis():
     """Unuebersehbares Kennzeichen der Probe-Instanz.
 

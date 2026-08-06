@@ -8,7 +8,8 @@ import os
 import base64
 from nicegui import ui
 from app import housekeeping, mode, receipts
-from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _esc_attr, _is_admin, _photo_thumb, _read_upload, t)
+from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _esc_attr, _is_admin,
+                          _photo_thumb, _read_upload, bereichskopf, leer, t)
 
 def _beleg_mirror():
     if mode.STAGING:
@@ -215,12 +216,8 @@ _SCAN_JS = r"""
 def render_belege():
     user = _cur_user()
     admin = _is_admin()
-    with ui.row().classes("w-full items-center gap-3"):
-        ui.icon("receipt").classes("text-3xl text-primary")
-        with ui.column().classes("gap-0"):
-            ui.label(t("Belege")).classes("text-2xl font-bold text-slate-800 leading-tight")
-            ui.label(t("Rechnungen scannen, ablegen & per OCR auslesen")) \
-                .classes("text-sm text-gray-500")
+    bereichskopf("receipt", t("Belege"),
+                 t("Rechnungen scannen, ablegen & per OCR auslesen"))
 
     apts = _apts()
     sc = {"apt": None, "dlg": None}
@@ -373,7 +370,8 @@ def render_belege():
 
             items = receipts.list_receipts()
             if not items:
-                ui.label(t("Noch keine Belege abgelegt.")).classes("text-gray-500 mt-2")
+                leer("receipt_long", t("Noch keine Belege abgelegt."),
+                     t("Oben fotografieren oder eine Datei hochladen."))
                 return
             cur_month = None
             for r in items:
