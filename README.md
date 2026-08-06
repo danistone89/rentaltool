@@ -67,7 +67,8 @@ sich beim Laden im Kreis drehen.
 | `app/i18n.py` | Mehrsprachigkeit DE/EN der Mitarbeiterbereiche (`t()`) |
 | `app/ical.py` | Reinigungstermin als `.ics` für den eigenen Kalender |
 | `app/paths.py` | Wo die Betriebsdaten liegen (Datenordner, getrennt vom Code) |
-| `app/store.py` | Ein Weg für allen Dateizugriff: atomar schreiben, gesperrt ändern |
+| `app/db.py` | Betriebsdaten in SQLite (Sätze als JSON, generierte Spalten, Transaktionen) |
+| `app/store.py` | Dateizugriff für `config.json`: atomar schreiben, gesperrt ändern |
 | `app/mode.py` | Echtbetrieb oder Probe-Instanz (sperrt Mail/Gast-Nachricht/Spiegel) |
 
 | Werkzeuge | Aufgabe |
@@ -76,6 +77,7 @@ sich beim Laden im Kreis drehen.
 | `tools/useradmin.py` | Benutzer per Kommandozeile (Notfall/Server, ohne Oberfläche) |
 | `tools/migrate_data.py` | Betriebsdaten einmalig in einen eigenen Datenordner umziehen |
 | `tools/backup.py` | Tägliche Sicherung auf die Nextcloud + Wiederherstellungs-Probe |
+| `tools/migrate_db.py` | Einmalige Übernahme der JSON-Bestände in die Datenbank |
 | `tools/deploy.sh` | Ausrollen mit Tests, Rauchprobe und Rückweg |
 | `tools/staging_refresh.py` | Probe-Instanz mit entschärfter Kopie der Echtdaten füllen |
 | `tools/watchdog.py` | Wächter: Oberfläche, Smoobu, Daten, Sicherung |
@@ -620,11 +622,70 @@ Dateien im Ziel werden nie überschrieben.
 > mit leerer Konfiguration hoch und böte an, einen neuen Administrator anzulegen –
 > während die echten Konten unbemerkt daneben lägen.
 
+## Datenhaltung: SQLite
+
+Arbeitszeiten, Zuweisungen, Belege und die Reinigungsdaten liegen in
+**einer SQLite-Datei** (`rentaltool.db` im Datenordner, Modul `app/db.py`).
+Vorher war jeder Bestand eine JSON-Datei, die bei **jeder** Änderung komplett
+neu geschrieben wurde – bei acht Zeiteinträgen egal, bei ein paar tausend nicht
+mehr. Dazu ließen sich mehrere Dateien nie gemeinsam ändern: eine Zuweisung
+löschen *und* die zugehörigen Zeiten entfernen waren zwei Schreibvorgänge mit
+einer Lücke dazwischen.
+
+**Der Datensatz bleibt ein Python-Dict.** Jede Zeile speichert den vollständigen
+Satz als JSON in der Spalte `daten`; die Felder, nach denen gesucht wird, hängen
+als **generierte Spalten** daran:
+
+```sql
+CREATE TABLE zeiten (
+  id    TEXT PRIMARY KEY,
+  daten TEXT NOT NULL,
+  benutzer GENERATED ALWAYS AS (json_extract(daten, '$.user')) VIRTUAL,
+  ende     GENERATED ALWAYS AS (json_extract(daten, '$.checkout')) VIRTUAL, …
+```
+
+Generiert heißt: SQLite leitet sie aus `daten` ab, sie können also gar nicht
+auseinanderlaufen. Damit bleibt der Code der Fachmodule so, wie er war (Dicts
+rein, Dicts raus), und Auswertungen bekommen trotzdem echte Indizes – die
+Grundlage für das Kennzahlen-Dashboard (AP9).
+
+Festlegungen, die man kennen sollte:
+
+* **`speichern()` macht UPDATE, nicht `INSERT OR REPLACE`.** Letzteres löscht die
+  Zeile und legt sie neu an – sie bekäme eine neue `rowid` und spränge in der
+  Liste ans Ende. Die Reihenfolge ist aber sichtbar („neueste zuerst").
+* **Transaktionen schachteln sich.** `start_run` ruft innen `get_open_run`; ohne
+  Schachtelung würde ein inneres `COMMIT` die äußere Klammer vorzeitig
+  festschreiben.
+* **Jeder Thread hat seine eigene Verbindung** (NiceGUI arbeitet mit
+  Hintergrund-Threads), im WAL-Modus ausdrücklich vorgesehen.
+
+**Nicht** in der Datenbank: `config.json` (Konten – im Notfall mit einem
+Texteditor zu reparieren, `tools/useradmin.py` arbeitet darauf),
+`archive/ledger.jsonl` (die Hash-Kette der Steuerablage soll ein Prüfer ohne
+unsere Software lesen können) und die Fotos unter `media/`.
+
+### Übernahme der Altbestände
+
+```bash
+python3 tools/migrate_db.py            # Probelauf
+python3 tools/migrate_db.py --jetzt    # übernehmen, gegenlesen, alte Dateien umbenennen
+```
+
+Läuft einmal je Installation und ist bewusst misstrauisch: die Datenbank muss
+leer sein (sonst stünde nach dem zweiten Lauf alles doppelt darin), übernommen
+wird **in Dateireihenfolge**, und danach wird **gegengelesen** – jeder Satz muss
+sich unverändert und in derselben Reihenfolge wieder herausholen lassen. Erst
+dann werden die alten Dateien in `<name>.vor-sqlite` umbenannt; gelöscht wird
+nichts. Der Rückweg ist damit: vorherigen Stand ausrollen, Dateien
+zurückbenennen.
+
 ## Speicherschicht: atomar schreiben, gesperrt ändern
 
-Aller Dateizugriff läuft über `app/store.py`. Vorher machte jedes Modul „ganze
-Datei lesen → im Speicher ändern → ganze Datei überschreiben". Darin steckten
-zwei Fehler:
+`app/store.py` regelt den verbliebenen Dateizugriff – vor allem `config.json`.
+(Die Bestände liegen seit AP5 in der Datenbank, siehe oben.) Vorher machte jedes
+Modul „ganze Datei lesen → im Speicher ändern → ganze Datei überschreiben".
+Darin steckten zwei Fehler:
 
 **Nicht atomar.** `open(pfad, "w")` kürzt die Datei sofort auf 0 Bytes. Wer in
 diesem Moment abstürzt – Neustart, OOM-Killer, volle Platte – hinterlässt eine

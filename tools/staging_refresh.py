@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import shutil
+import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -109,6 +110,14 @@ def main(argv=None):
         z = os.path.join(probe, n)
         if os.path.isdir(q):
             shutil.copytree(q, z)
+        elif n.endswith(".db"):
+            # Eine laufende SQLite-Datenbank besteht aus mehreren Dateien; eine
+            # Dateikopie kann einen Stand ergeben, den es nie gab.
+            con = sqlite3.connect(f"file:{q}?mode=ro", uri=True, timeout=15)
+            try:
+                con.execute("VACUUM INTO ?", (z,))
+            finally:
+                con.close()
         else:
             shutil.copy2(q, z)
         print(f"   kopiert: {n}")

@@ -17,6 +17,11 @@ Gesichert wird der Datenordner (app/paths.DATA_DIR), also Konten, Arbeitszeiten,
 Belege, Reinigungsdaten, Fotos und das revisionssichere Steuerarchiv. Nicht
 gesichert werden Programmcode (steht im Git) und `.nicegui/` (nur Sitzungen).
 
+Die Datenbank wird **nicht einfach mitkopiert**: eine laufende SQLite-Datenbank
+besteht aus mehreren Dateien (WAL), und ein Dateikopie-Schnappschuss davon kann
+einen Stand ergeben, den es nie gab. Stattdessen schreibt `db.sichern_nach()`
+einen in sich stimmigen Abzug, und der kommt ins Paket.
+
 Scheitert etwas, geht eine Mail an den Benachrichtigungs-Empfänger und der
 Exit-Code ist ungleich 0 – daran hängt die systemd-Meldung.
 """
@@ -128,15 +133,20 @@ def entfernen(ziel, name):
 
 # ------------------------------------------------------------------ Paket bauen/prüfen
 def json_defekt(ordner):
-    """Namen der JSON-Dateien, die sich nicht lesen lassen.
+    """Namen der Dateien, die sich nicht lesen lassen (JSON und Datenbank).
 
     Bricht die Sicherung NICHT ab: eine kaputte Datei ist der Grund, warum man
     Sicherungen hat. Sie wird gemeldet und mitgesichert.
     """
     kaputt = []
-    for name in paths.DATEIEN:
+    for name in paths.DATEIEN + paths.ALTE_JSON:
         pfad = os.path.join(ordner, name)
         if not os.path.exists(pfad):
+            continue
+        if name.endswith(".db"):
+            ok, meldung = _db_pruefen(pfad)
+            if not ok:
+                kaputt.append(f"{name}: {meldung}")
             continue
         try:
             with open(pfad, encoding="utf-8") as f:
@@ -146,15 +156,36 @@ def json_defekt(ordner):
     return kaputt
 
 
+def _db_pruefen(pfad):
+    """(ok, meldung) – Selbsttest einer Datenbankdatei, ohne sie zu verändern."""
+    import sqlite3
+    try:
+        con = sqlite3.connect(f"file:{pfad}?mode=ro", uri=True, timeout=10)
+        try:
+            ergebnis = con.execute("PRAGMA integrity_check").fetchone()[0]
+        finally:
+            con.close()
+        return (ergebnis == "ok"), ergebnis
+    except sqlite3.Error as ex:
+        return False, f"{type(ex).__name__}: {ex}"
+
+
 def _filter(ti):
     teile = set(ti.name.split("/"))
     return None if teile & AUS else ti
 
 
-def paket_bauen(ordner, zieldatei):
-    """tar.gz des Datenordners. Gibt die Größe in Bytes zurück."""
+def paket_bauen(ordner, zieldatei, abzug=None):
+    """tar.gz des Datenordners. Gibt die Größe in Bytes zurück.
+
+    `abzug`: Pfad eines sauberen Datenbank-Abzugs, der anstelle der laufenden
+    Datei ins Paket kommt (siehe Kopf).
+    """
     with tarfile.open(zieldatei, "w:gz") as tar:
-        for name in paths.DATEIEN + paths.ORDNER:
+        for name in paths.DATEIEN + paths.ALTE_JSON + paths.ORDNER:
+            if name.endswith(".db") and abzug:
+                tar.add(abzug, arcname=name)
+                continue
             pfad = os.path.join(ordner, name)
             if os.path.exists(pfad):
                 tar.add(pfad, arcname=name, filter=_filter)
@@ -189,6 +220,11 @@ def paket_pruefen(tarpfad):
                 konten = ((json.load(f).get("auth") or {}).get("users") or {})
             if not konten:
                 meldungen.append("keine Benutzerkonten im Paket")
+        datenbank = os.path.join(tmp, "rentaltool.db")
+        if os.path.exists(datenbank):
+            ok, meldung = _db_pruefen(datenbank)
+            if not ok:
+                meldungen.append(f"Datenbank im Paket: {meldung}")
         if os.path.isdir(os.path.join(tmp, "archive")):
             meldungen += _archiv_pruefen(tmp)
     return not meldungen, meldungen
@@ -265,7 +301,11 @@ def cmd_sichern(args):
 
     with tempfile.TemporaryDirectory() as tmp:
         lokal = os.path.join(tmp, name)
-        groesse = paket_bauen(ordner, lokal)
+        abzug = None
+        if os.path.exists(os.path.join(ordner, "rentaltool.db")):
+            from app import db
+            abzug = db.sichern_nach(os.path.join(tmp, "abzug.db"))
+        groesse = paket_bauen(ordner, lokal, abzug=abzug)
         print(f"   Paket gebaut: {groesse / 1024 / 1024:.1f} MB")
 
         ok, meldungen = paket_pruefen(lokal)

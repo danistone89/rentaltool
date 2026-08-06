@@ -93,7 +93,6 @@ async def test_einstellungen_dialog(user: User, mock_backend):
 
 async def test_belege_bereich(user: User, mock_backend, tmp_path, monkeypatch):
     from app import receipts, housekeeping as hk
-    monkeypatch.setattr(receipts, "RECEIPTS", str(tmp_path / "receipts.json"))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     await _login(user)
     user.find(marker="nav-belege").click()
@@ -103,10 +102,7 @@ async def test_belege_bereich(user: User, mock_backend, tmp_path, monkeypatch):
 
 async def test_uebersicht_admin(user: User, mock_backend, tmp_path, monkeypatch):
     from app import housekeeping as hk, bookings
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "a.json"))
     monkeypatch.setitem(web.CFG, "checklisten_aktiv", True)
     await _login(user)
     user.find(marker="nav-uebersicht").click()
@@ -131,7 +127,6 @@ async def test_mein_konto(user: User, mock_backend):
 
 
 async def test_putzkraft_bereiche(user: User, mock_backend, tmp_path, monkeypatch):
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.USERS, "putzi", {
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
@@ -148,11 +143,7 @@ async def test_putzkraft_bereiche(user: User, mock_backend, tmp_path, monkeypatc
 
 async def test_manager_bereiche(user: User, mock_backend, tmp_path, monkeypatch):
     from app import housekeeping as hk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "a.json"))
     monkeypatch.setitem(web.USERS, "mgr", {
         "password_hash": auth.hash_password("mgr"), "role": "manager",
         "totp_secret": "", "name": "mgr"})
@@ -170,7 +161,6 @@ async def test_manager_bereiche(user: User, mock_backend, tmp_path, monkeypatch)
 
 async def test_buchungen_hub(user: User, mock_backend, tmp_path, monkeypatch):
     """Buchungs-Hub rendert eine Buchung mit Zuweisungs-Aktion."""
-    monkeypatch.setattr(bookings, "ASSIGN", str(tmp_path / "assignments.json"))
     fake = [{"id": 999, "type": "reservation", "is-blocked-booking": False,
              "apartment": {"id": 2748963, "name": "Cottaer Straße"},
              "arrival": "2026-07-01", "departure": date.today().isoformat(),
@@ -232,7 +222,6 @@ async def test_vorgabesaetze_in_einstellungen(user: User, mock_backend):
 async def test_zeiten_kennzeichnen_wochenende_und_feiertag(
         user: User, mock_backend, tmp_path, monkeypatch):
     from datetime import datetime
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     timetrack.add_manual("test", datetime(2026, 5, 1, 8), datetime(2026, 5, 1, 12))   # Feiertag
     timetrack.add_manual("test", datetime(2026, 7, 5, 9), datetime(2026, 7, 5, 12))   # Sonntag
     timetrack.add_manual("test", datetime(2026, 7, 1, 9), datetime(2026, 7, 1, 12))   # Mittwoch
@@ -245,7 +234,6 @@ async def test_zeiten_kennzeichnen_wochenende_und_feiertag(
 async def test_auswertung_zeigt_split_und_betraege(
         user: User, mock_backend, tmp_path, monkeypatch):
     from datetime import datetime
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.USERS["test"], "stundensatz_werktag", 15)
     monkeypatch.setitem(web.USERS["test"], "stundensatz_wochenende", 20)
     monkeypatch.setitem(web.USERS["test"], "wochenendsatz_aktiv", True)
@@ -261,10 +249,6 @@ async def test_auswertung_zeigt_split_und_betraege(
 async def test_oberflaeche_auf_englisch(user: User, mock_backend, monkeypatch, tmp_path):
     """Mit Profilsprache 'en' erscheinen die Mitarbeiterbereiche englisch."""
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setitem(web.USERS["test"], "lang", "en")
     await _login(user)
     await user.should_see("Sections")          # Navigations-Überschrift
@@ -291,7 +275,6 @@ async def test_sprachwahl_im_konto_dialog(user: User, mock_backend):
 
 async def test_zeiterfassung_englisch(user: User, mock_backend, monkeypatch, tmp_path):
     from datetime import datetime
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.USERS["test"], "lang", "en")
     timetrack.add_manual("test", datetime(2026, 5, 1, 8), datetime(2026, 5, 1, 12))  # Feiertag
     await _login(user)
@@ -330,10 +313,6 @@ def _mock_booking(monkeypatch, abreise_pers=(2, 1), anreise_pers=(2, 0)):
 async def test_buchungsaktionen_englisch(user: User, mock_backend, monkeypatch, tmp_path):
     """Die Aktionsliste einer Buchung erscheint vollständig englisch."""
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     _mock_booking(monkeypatch)
     monkeypatch.setitem(web.USERS["test"], "lang", "en")
@@ -351,10 +330,6 @@ async def test_buchungsaktionen_englisch(user: User, mock_backend, monkeypatch, 
 
 async def test_buchungsaktionen_deutsch(user: User, mock_backend, monkeypatch, tmp_path):
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     _mock_booking(monkeypatch)
     await _login(user)
@@ -372,10 +347,6 @@ async def test_abreise_und_anreise_getrennt(user: User, mock_backend, monkeypatc
     und nur die Anreise-Zahl gross im 'Vorbereiten'-Block.
     """
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     _mock_booking(monkeypatch, abreise_pers=(3, 0), anreise_pers=(2, 0))
     await _login(user)
@@ -393,7 +364,6 @@ async def test_scanner_dialog_zeigt_neue_bedienung(user: User, mock_backend, tmp
     """Der Dialog selbst (Python-Seite). Das Scanner-JS laeuft im Headless-
     Harness nicht, daher wird run_javascript stillgelegt."""
     from app import receipts, housekeeping as hk
-    monkeypatch.setattr(receipts, "RECEIPTS", str(tmp_path / "receipts.json"))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setattr(web.ui, "run_javascript", lambda *a, **k: None)
     await _login(user)
@@ -435,7 +405,6 @@ async def test_invite_ohne_token_zeigt_hinweis(user: User, mock_backend):
 
 async def test_invite_setzt_passwort_und_meldet_an(user: User, mock_backend, eingeladen,
                                                    tmp_path, monkeypatch):
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     await user.open(f"/invite?token={eingeladen}")
     await user.should_see("Zugang einrichten")
     await user.should_see("Konto: anna")
@@ -560,7 +529,6 @@ async def _login_as(user, name, rolle):
 async def test_putzkraft_sieht_eigene_kennzahlen(user: User, mock_backend, tmp_path, monkeypatch):
     """Die Putzkraft bekommt in der Zeiterfassung eine Übersicht ihrer Stunden."""
     from datetime import datetime
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.USERS, "putzi", {
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
@@ -582,7 +550,6 @@ async def test_abgerechnete_zeit_ist_fuer_putzkraft_gesperrt(user: User, mock_ba
     bearbeiten oder löschen – sonst weicht der Bestand von der Meldung ab."""
     from datetime import datetime
     from nicegui import ui as _ui
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.USERS, "putzi", {
         "password_hash": auth.hash_password("putzi"), "role": "putzkraft",
         "totp_secret": "", "name": "putzi"})
@@ -602,7 +569,6 @@ async def test_abgerechnete_zeit_ist_fuer_putzkraft_gesperrt(user: User, mock_ba
 async def test_admin_kann_abrechnen_und_zuruecknehmen(user: User, mock_backend,
                                                       tmp_path, monkeypatch):
     from datetime import datetime
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     heute = date.today()
     timetrack.add_manual("test", datetime(heute.year, heute.month, heute.day, 9),
                          datetime(heute.year, heute.month, heute.day, 12))
@@ -637,10 +603,6 @@ async def test_tagesgruppe_zeigt_frei_und_vergeben_ohne_aufklappen(
     Buchungen an einem Tag, davon nur EINE zu vergeben."""
     from datetime import timedelta
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     monkeypatch.setitem(web.USERS, "vale", {
         "password_hash": auth.hash_password("vale"), "role": "putzkraft",
@@ -677,10 +639,6 @@ async def test_tagesgruppe_zeigt_je_reinigung_den_mitarbeiter(
     from datetime import timedelta
     from nicegui import ui as _ui
     from app import housekeeping as hk, bookings as bk
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
     for u, n in (("vale", "Valeriya"), ("mira", "Mira")):
         monkeypatch.setitem(web.USERS, u, {
@@ -773,12 +731,10 @@ def _aktion_klicken(user, text):
 
 
 def _hk_mocks(monkeypatch, tmp_path):
-    from app import housekeeping as hk, bookings as bk
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
+    """Fotos in einen Wegwerf-Ordner. Die Daten selbst liegen ohnehin in einer
+    eigenen Datenbank je Test (siehe tests/conftest.py)."""
+    from app import housekeeping as hk
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
 
 
 async def test_bereich_wird_in_der_sitzung_gemerkt(user: User, mock_backend,
@@ -836,11 +792,7 @@ async def test_checkliste_aus_buchung_stuerzt_nicht_ab(user: User, mock_backend,
     Check-out-/Check-in-Zeiten gesetzt sind.
     """
     from app import housekeeping as hk, bookings as bk
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setattr(bk, "ASSIGN", str(tmp_path / "a.json"))
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
     monkeypatch.setitem(web.CFG, "checklisten_aktiv", True)   # Funktion ist sonst aus
     _mock_booking(monkeypatch)
 

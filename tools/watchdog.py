@@ -67,11 +67,14 @@ def _pruefe_smoobu():
 
 
 def _pruefe_daten():
-    from app import bookings, data, store, timetrack
+    from app import bookings, data, db, store, timetrack
     try:
         konten = ((data.CONFIG.get("auth") or {}).get("users") or {})
         if not konten:
             return False, "keine Benutzerkonten"
+        ok, meldung = db.pruefen()          # integrity_check der Datenbank
+        if not ok:
+            return False, f"Datenbank: {meldung}"
         n_zeit = len(timetrack.entries())
         n_zuw = len(bookings._read())
     except store.DatenFehler as ex:

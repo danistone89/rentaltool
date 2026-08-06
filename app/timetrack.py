@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Arbeitszeit-Erfassung: Check-in/Check-out je Benutzer mit Standort.
 
-Speichert Einträge in worklog.json (Liste). Jeder Eintrag:
+Einträge in der Tabelle `zeiten` (siehe app/db.py). Jeder Eintrag:
   {id, user, checkin(ISO), checkin_loc, checkout(ISO|None), checkout_loc}
 checkin_loc/checkout_loc: {lat, lon, acc} oder {error: "..."} (Standort-Nachweis
 als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
@@ -9,30 +9,16 @@ als Betrugsschutz – fehlt/verweigert wird sichtbar protokolliert).
 import uuid
 from datetime import date, datetime
 
-from app import feiertage, paths, store
+from app import db, feiertage, paths
 
 HERE = paths.ROOT
-LOG = paths.p("worklog.json")
-
-
-def _read():
-    return store.read(LOG, [])
-
-
-def _write(items):
-    store.write(LOG, items)
-
-
-def _aendern():
-    """Zeitenliste unter Sperre ändern (siehe app/store.py)."""
-    return store.edit(LOG, [])
+TABELLE = "zeiten"
 
 
 def get_open(user):
-    for e in _read():
-        if e["user"] == user and not e.get("checkout"):
-            return e
-    return None
+    """Laufender Eintrag des Benutzers (Check-in ohne Check-out)."""
+    offen = db.finden(TABELLE, benutzer=user, ende=None)
+    return offen[0] if offen else None
 
 
 def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None,
@@ -42,9 +28,10 @@ def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None,
     loc: GPS-Dict. ip: öffentliche IP. ort: erkanntes Objekt (Geofence). dist: m.
     booking_id/apartment: optionale Kopplung an eine Smoobu-Buchung/Wohnung.
     """
-    with _aendern() as a:
-        if any(e["user"] == user and not e.get("checkout") for e in a.wert):
-            a.verwerfen()
+    with db.transaktion():
+        # Prüfen und Anlegen gehören zusammen – sonst entstünden bei zwei
+        # gleichzeitigen Anläufen zwei offene Einträge.
+        if db.finden(TABELLE, benutzer=user, ende=None):
             return None
         now = now or datetime.now()
         e = {"id": now.strftime("%Y%m%d%H%M%S") + "-" + user, "user": user,
@@ -53,24 +40,25 @@ def check_in(user, loc=None, ip=None, ort=None, dist=None, now=None,
              "booking_id": booking_id, "apartment": apartment,
              "checkout": None, "checkout_loc": None, "checkout_ip": None,
              "checkout_ort": None, "checkout_dist": None}
-        a.wert.append(e)
+        db.anlegen(TABELLE, e)
     return e
 
 
 def check_out(user, loc=None, ip=None, ort=None, dist=None, now=None):
     """Offenen Eintrag des Benutzers schließen. None, wenn keiner offen ist."""
-    with _aendern() as a:
+    with db.transaktion():
+        offen = db.finden(TABELLE, neueste_zuerst=True, benutzer=user, ende=None)
+        if not offen:
+            return None
+        e = offen[0]
         now = now or datetime.now()
-        for e in reversed(a.wert):
-            if e["user"] == user and not e.get("checkout"):
-                e["checkout"] = now.isoformat(timespec="seconds")
-                e["checkout_loc"] = loc
-                e["checkout_ip"] = ip
-                e["checkout_ort"] = ort
-                e["checkout_dist"] = dist
-                return e
-        a.verwerfen()
-    return None
+        e["checkout"] = now.isoformat(timespec="seconds")
+        e["checkout_loc"] = loc
+        e["checkout_ip"] = ip
+        e["checkout_ort"] = ort
+        e["checkout_dist"] = dist
+        db.speichern(TABELLE, e["id"], e)
+    return e
 
 
 def add_manual(user, checkin, checkout, booking_id=None, apartment=None):
@@ -81,57 +69,57 @@ def add_manual(user, checkin, checkout, booking_id=None, apartment=None):
          "booking_id": booking_id, "apartment": apartment, "manual": True,
          "checkout": checkout.isoformat(timespec="seconds"),
          "checkout_loc": None, "checkout_ip": None, "checkout_ort": None, "checkout_dist": None}
-    with _aendern() as a:
-        a.wert.append(e)
+    db.anlegen(TABELLE, e)
     return e
 
 
 def entries(user=None):
-    items = _read()
+    """Einträge, neueste zuerst."""
     if user:
-        items = [e for e in items if e["user"] == user]
-    return list(reversed(items))   # neueste zuerst
+        return db.finden(TABELLE, neueste_zuerst=True, benutzer=user)
+    return db.alle(TABELLE, neueste_zuerst=True)
 
 
 def entries_for_booking(booking_id):
     bid = str(booking_id)
-    return [e for e in reversed(_read()) if str(e.get("booking_id")) == bid]
+    return [e for e in db.alle(TABELLE, neueste_zuerst=True)
+            if str(e.get("booking_id")) == bid]
 
 
 def delete_for_booking(booking_id):
     """Alle Zeiteinträge dieser Buchung entfernen (Admin-Reset). Anzahl zurück."""
     bid = str(booking_id)
-    with _aendern() as a:
-        vorher = len(a.wert)
-        a.wert = [e for e in a.wert if str(e.get("booking_id")) != bid]
-        weg = vorher - len(a.wert)
+    weg = 0
+    with db.transaktion():
+        for e in db.alle(TABELLE):
+            if str(e.get("booking_id")) == bid:
+                db.loeschen(TABELLE, e["id"])
+                weg += 1
     return weg
 
 
 def get_entry(entry_id):
-    return next((e for e in _read() if e["id"] == entry_id), None)
+    return db.holen(TABELLE, entry_id)
 
 
 def update_entry(entry_id, checkin=None, checkout=None, apartment=None):
     """Zeiteintrag bearbeiten. checkin/checkout = datetime, apartment = Name/'' ."""
-    with _aendern() as a:
-        for e in a.wert:
-            if e["id"] == entry_id:
-                if checkin is not None:
-                    e["checkin"] = checkin.isoformat(timespec="seconds")
-                if checkout is not None:
-                    e["checkout"] = checkout.isoformat(timespec="seconds")
-                if apartment is not None:
-                    e["apartment"] = apartment
-                e["edited"] = datetime.now().isoformat(timespec="seconds")
+    with db.transaktion():
+        e = db.holen(TABELLE, entry_id)
+        if e is None:
+            return
+        if checkin is not None:
+            e["checkin"] = checkin.isoformat(timespec="seconds")
+        if checkout is not None:
+            e["checkout"] = checkout.isoformat(timespec="seconds")
+        if apartment is not None:
+            e["apartment"] = apartment
+        e["edited"] = datetime.now().isoformat(timespec="seconds")
+        db.speichern(TABELLE, entry_id, e)
 
 
 def delete_entry(entry_id):
-    with _aendern() as a:
-        vorher = len(a.wert)
-        a.wert = [e for e in a.wert if e["id"] != entry_id]
-        geloescht = vorher != len(a.wert)
-    return geloescht
+    return db.loeschen(TABELLE, entry_id)
 
 
 def duration_minutes(e):
@@ -157,14 +145,13 @@ def mark_billed(entry_ids, by, when=None):
     ids = {str(i) for i in entry_ids}
     ts = (when or datetime.now()).isoformat(timespec="seconds")
     n = 0
-    with _aendern() as a:
-        for e in a.wert:
+    with db.transaktion():
+        for e in db.alle(TABELLE):
             if str(e.get("id")) in ids and not e.get("abgerechnet"):
                 e["abgerechnet"] = ts
                 e["abgerechnet_von"] = by
+                db.speichern(TABELLE, e["id"], e)
                 n += 1
-        if not n:
-            a.verwerfen()
     return n
 
 
@@ -172,14 +159,13 @@ def unmark_billed(entry_ids):
     """Markierung wieder entfernen (Korrektur einer versehentlichen Meldung)."""
     ids = {str(i) for i in entry_ids}
     n = 0
-    with _aendern() as a:
-        for e in a.wert:
+    with db.transaktion():
+        for e in db.alle(TABELLE):
             if str(e.get("id")) in ids and e.get("abgerechnet"):
                 e.pop("abgerechnet", None)
                 e.pop("abgerechnet_von", None)
+                db.speichern(TABELLE, e["id"], e)
                 n += 1
-        if not n:
-            a.verwerfen()
     return n
 
 

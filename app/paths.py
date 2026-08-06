@@ -19,10 +19,15 @@ DATA_DIR = os.path.abspath(os.environ.get("RENTALTOOL_DATA") or ROOT)
 
 # Alles, was zum Datenbestand gehört – Grundlage für Umzug (tools/migrate_data.py)
 # und Sicherung (tools/backup.py). Reihenfolge = Anzeige-Reihenfolge.
-DATEIEN = ["config.json", "worklog.json", "assignments.json", "receipts.json",
-           "checklists.json", "inventory.json", "cleanings.json", "damages.json",
-           "restock.json"]
+DATEIEN = ["config.json", "rentaltool.db"]
 ORDNER = ["media", "archive", "templates", "assets"]
+
+# Die Bestände, die früher je eine JSON-Datei hatten und seit AP5 in der
+# Datenbank liegen (tools/migrate_db.py). Nach dem Umzug heißen die alten
+# Dateien `<name>.vor-sqlite` und bleiben als Sicherheitsnetz liegen.
+ALTE_JSON = ["worklog.json", "assignments.json", "receipts.json",
+             "checklists.json", "inventory.json", "cleanings.json",
+             "damages.json", "restock.json"]
 
 
 def p(*teile):

@@ -4,12 +4,7 @@ from datetime import date, datetime
 from app import feiertage, timetrack
 
 
-def _setup(tmp_path, monkeypatch):
-    monkeypatch.setattr(timetrack, "LOG", str(tmp_path / "worklog.json"))
-
-
-def test_checkin_checkout(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_checkin_checkout():
     e = timetrack.check_in("putzi", now=datetime(2026, 7, 2, 8, 0, 0))
     assert e and timetrack.get_open("putzi")
     assert timetrack.check_in("putzi", now=datetime(2026, 7, 2, 8, 5)) is None
@@ -19,8 +14,7 @@ def test_checkin_checkout(tmp_path, monkeypatch):
     assert timetrack.fmt_dur(150) == "2:30 h"
 
 
-def test_getrennte_benutzer(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_getrennte_benutzer():
     timetrack.check_in("a", now=datetime(2026, 7, 2, 8))
     timetrack.check_in("b", now=datetime(2026, 7, 2, 9))
     assert timetrack.get_open("a") and timetrack.get_open("b")
@@ -28,8 +22,7 @@ def test_getrennte_benutzer(tmp_path, monkeypatch):
     assert len(timetrack.entries()) == 2
 
 
-def test_offene_dauer(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_offene_dauer():
     e = timetrack.check_in("a", now=datetime(2026, 7, 2, 8))
     assert timetrack.duration_minutes(e) is None
     assert timetrack.fmt_dur(None) == "läuft…"
@@ -118,8 +111,7 @@ def test_aggregate_ohne_saetze_liefert_null_betraege():
 
 
 # --------------------------------------------------- Abrechnungsstatus
-def test_abrechnen_markieren_und_zuruecknehmen(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_abrechnen_markieren_und_zuruecknehmen():
     a = timetrack.add_manual("putzi", datetime(2026, 7, 2, 8), datetime(2026, 7, 2, 10))
     b = timetrack.add_manual("putzi", datetime(2026, 7, 3, 8), datetime(2026, 7, 3, 11))
     assert not timetrack.is_billed(a) and not timetrack.is_billed(b)
@@ -140,8 +132,7 @@ def test_abrechnen_markieren_und_zuruecknehmen(tmp_path, monkeypatch):
     assert not timetrack.is_billed(timetrack.get_entry(a["id"]))
 
 
-def test_summary_kennzahlen(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_summary_kennzahlen():
     a = timetrack.add_manual("putzi", datetime(2026, 7, 2, 8), datetime(2026, 7, 2, 10),
                              apartment="Cottaer Straße")          # Do, 120 min
     timetrack.add_manual("putzi", datetime(2026, 7, 4, 8), datetime(2026, 7, 4, 11),
@@ -162,8 +153,7 @@ def test_summary_kennzahlen(tmp_path, monkeypatch):
     assert s["last_date"] == date(2026, 7, 4)
 
 
-def test_summary_ignoriert_laufende_einsaetze(tmp_path, monkeypatch):
-    _setup(tmp_path, monkeypatch)
+def test_summary_ignoriert_laufende_einsaetze():
     timetrack.check_in("putzi", now=datetime(2026, 7, 2, 8))
     s = timetrack.summary(timetrack.entries("putzi"))
     assert s["count"] == 0 and s["minutes"] == 0 and s["avg_minutes"] == 0

@@ -2,7 +2,7 @@
 """Belege/Rechnungen: Upload durch Mitarbeiter, chronologische Ablage, OCR.
 
 Fotos werden über housekeeping.save_photo unter media/beleg/ gespeichert (+ Spiegel
-nach Nextcloud). Metadaten je Beleg in receipts.json (gitignored, betrieblich).
+nach Nextcloud). Metadaten je Beleg in der Tabelle `belege` (siehe app/db.py).
 OCR über die Tesseract-CLI (best-effort; ohne Tesseract bleibt der Text leer).
 """
 import os
@@ -11,29 +11,16 @@ import shutil
 import subprocess
 from datetime import datetime
 
-from app import housekeeping, paths, store
+from app import db, housekeeping, paths
 
 HERE = paths.ROOT
-RECEIPTS = paths.p("receipts.json")
+TABELLE = "belege"
 
 _EDITABLE = {"merchant", "amount", "note", "kategorie", "apartment_id", "apartment_name"}
 _KNOWN_MERCHANTS = ["ALDI", "LIDL", "REWE", "EDEKA", "KAUFLAND", "PENNY", "NETTO",
                     "ROSSMANN", "IKEA", "OBI", "BAUHAUS", "HORNBACH", "METRO",
                     "TEDI", "ACTION", "MÜLLER", "MEDIAMARKT", "SATURN", "AMAZON",
                     "DM"]
-
-
-def _read():
-    return store.read(RECEIPTS, [])
-
-
-def _write(items):
-    store.write(RECEIPTS, items)
-
-
-def _aendern():
-    """Belegliste unter Sperre ändern (siehe app/store.py)."""
-    return store.edit(RECEIPTS, [])
 
 
 def now_iso():
@@ -47,37 +34,31 @@ def add_receipt(uploader, photo, ocr_text="", amount="", merchant="", note="",
          "apartment_name": apartment_name or "", "ocr_text": ocr_text or "",
          "amount": amount or "", "merchant": merchant or "", "note": note or "",
          "kategorie": kategorie or ""}
-    with _aendern() as a:
-        a.wert.append(r)
+    db.anlegen(TABELLE, r)
     return r
 
 
 def list_receipts(limit=500):
-    return list(reversed(_read()))[:limit]
+    return db.alle(TABELLE, neueste_zuerst=True)[:limit]
 
 
 def update_receipt(receipt_id, **fields):
-    with _aendern() as a:
-        for r in a.wert:
-            if r["id"] == receipt_id:
-                for k, v in fields.items():
-                    if k in _EDITABLE:
-                        r[k] = v
+    with db.transaktion():
+        r = db.holen(TABELLE, receipt_id)
+        if r is None:
+            return
+        for k, v in fields.items():
+            if k in _EDITABLE:
+                r[k] = v
+        db.speichern(TABELLE, receipt_id, r)
 
 
 def delete_receipt(receipt_id):
     """Beleg-Eintrag + lokale Bilddatei entfernen (Nextcloud-Spiegel bleibt Archiv)."""
-    with _aendern() as a:
-        keep, gone = [], None
-        for r in a.wert:
-            if r["id"] == receipt_id:
-                gone = r
-            else:
-                keep.append(r)
+    with db.transaktion():
+        gone = db.holen(TABELLE, receipt_id)
         if gone:
-            a.wert = keep
-        else:
-            a.verwerfen()
+            db.loeschen(TABELLE, receipt_id)
     if gone:
         for rel in (gone.get("photo"), gone.get("pdf")):
             try:

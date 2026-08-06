@@ -54,13 +54,14 @@ zeilentreu: jede der 175 Definitionen wurde vorher/nachher verglichen, einzige
 inhaltliche Änderung sind zwei Seiten-Dekoratoren, die jetzt über
 `zugang.seiten_registrieren()` laufen. Siehe README → „Architektur".
 
-### AP5 · SQLite statt JSON — offen
+### AP5 · SQLite statt JSON — ✅ erledigt (6.8.2026)
 
-Hinter AP2 versteckt und deshalb ohne Bruch: Zeiten, Zuweisungen, Belege und
-Reinigungsdaten in eine Datenbank. `config.json` bleibt JSON. Ab ~5 Wohnungen
-wirklich nötig, danach nicht mehr schmerzfrei nachrüstbar.
-
-*Abhängigkeit:* AP2. *Größe:* M.
+Zeiten, Zuweisungen, Belege und Reinigungsdaten liegen in `rentaltool.db`
+(`app/db.py`): Satz als JSON, generierte Spalten für die Suche, Transaktionen.
+Die Fachmodule arbeiten unverändert mit Dicts. `config.json` und die
+Ledger-Datei des Steuerarchivs bleiben Dateien. Übernahme über
+`tools/migrate_db.py` mit Gegenlesen; die alten Dateien bleiben als
+`*.vor-sqlite` liegen. Siehe README → „Datenhaltung: SQLite".
 
 ---
 

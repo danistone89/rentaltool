@@ -327,10 +327,8 @@ def _photo_thumb(src, size="w-16 h-16"):
 
 
 def _run_ist(run_id, task_id):
-    for r in housekeeping._read(housekeeping.CLEANINGS, []):
-        if r["id"] == run_id:
-            return r["tasks"].get(task_id, {}).get("ist_photo")
-    return None
+    r = housekeeping.get_run(run_id)
+    return r["tasks"].get(task_id, {}).get("ist_photo") if r else None
 
 
 _MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",

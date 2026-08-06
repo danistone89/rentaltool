@@ -5,8 +5,6 @@ from app import housekeeping as hk
 
 
 def _setup(tmp_path, monkeypatch):
-    for attr in ("CHECKLISTS", "INVENTORY", "CLEANINGS", "DAMAGES", "RESTOCK"):
-        monkeypatch.setattr(hk, attr, str(tmp_path / (attr.lower() + ".json")))
     monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path / "media"))
 
 
