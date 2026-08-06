@@ -45,12 +45,18 @@ AUFNAHMEN = [
     ("02-buchungen-meine", ["@login"]),
     ("03-buchungen-alle", ["@login", "Alle Reinigungen"]),
     ("04-buchung-dialog", ["@login", "Alle Reinigungen", "Cottaer Straße"]),
-    ("05-zeiterfassung", ["@login", "@nav:Zeiterfassung"]),
-    ("06-belege", ["@login", "@nav:Belege"]),
-    ("07-uebersicht", ["@login", "@nav:Übersicht"]),
-    ("08-kennzahlen", ["@login", "@nav:Übersicht", "Kennzahlen"]),
-    ("09-mein-konto", ["@login", "Mein Konto"]),
-    ("10-einstellungen", ["@login", "Einstellungen"]),
+    # Seit AP-D1 stehen Bereiche in der Leiste unten; ihre Beschriftung ist
+    # anklickbarer Text. Was dort keinen Platz hat, liegt im Menü (@menue:).
+    ("05-zeiterfassung", ["@login", "@menue:Zeiterfassung"]),
+    ("06-belege", ["@login", "Belege"]),
+    ("07-uebersicht", ["@login", "Übersicht"]),
+    ("08-kennzahlen", ["@login", "Übersicht", "Kennzahlen"]),
+    ("09-mein-konto", ["@login", "@menue:Mein Konto"]),
+    ("10-einstellungen", ["@login", "@menue:Einstellungen"]),
+    # Das Menü-Blatt gibt es nur am Handy – am Rechner steht alles in der
+    # Schublade. Das "?" macht den Schritt freiwillig: fehlt er dort, ist das
+    # kein Befund, sondern erwartet.
+    ("11-menue", ["@login", "?Menü"]),
 ]
 
 
@@ -286,21 +292,18 @@ async def aufnehmen(app_port, ziel, breite, hoehe, suffix=""):
             for schritt in schritte:
                 if schritt == "@login":
                     await b.anmelden(BENUTZER, PASSWORT)
-                elif schritt.startswith("@nav:"):
-                    # Am Handy ist die Schublade zugeklappt; ihr Griff trägt nur
-                    # ein Symbol, keinen Text.
-                    await b.symbolklick("menu")
-                    await asyncio.sleep(0.8)
-                    if not await b.klick(schritt[5:]):
+                elif schritt.startswith("@menue:"):
+                    # Am Handy liegt der Eintrag im Menü-Blatt, ab Tablet steht
+                    # er direkt in der Schublade. Also erst das Blatt öffnen –
+                    # gibt es keines, führt der Klick auf „Menü" ins Leere und
+                    # der Eintrag wird gleich darauf direkt gefunden.
+                    await b.klick("Menü")
+                    await asyncio.sleep(0.6)
+                    if not await b.klick(schritt[7:]):
                         fehlend.append(schritt)
-                    # …und sie bleibt nach der Auswahl offen, liegt also über dem
-                    # Inhalt. Derselbe Griff klappt sie wieder zu. (Dass sie sich
-                    # nicht von allein schliesst, ist ein Befund für die
-                    # Gestaltung – kein Problem dieses Werkzeugs.)
-                    await b.symbolklick("menu")
-                    await asyncio.sleep(1.0)
                 else:
-                    if not await b.klick(schritt):
+                    freiwillig = schritt.startswith("?")
+                    if not await b.klick(schritt.lstrip("?")) and not freiwillig:
                         fehlend.append(schritt)
             pfad = os.path.join(ziel, f"{name}{suffix}.png")
             await b.foto(pfad)

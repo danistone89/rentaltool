@@ -85,7 +85,7 @@ async def test_summen_tabelle_zeigt_die_kette(user: User, mock_backend):
 
 async def test_einstellungen_dialog(user: User, mock_backend):
     await _login(user)
-    user.find("Einstellungen").click()
+    user.find(marker="nav-einstellungen").click()
     await user.should_see("Ablage-Ordner")   # Ordner-Ablage
     await user.should_see("Betreiberdaten")
     await user.should_see("Standorte")        # GPS-Standorte-Tab
@@ -114,14 +114,14 @@ async def test_uebersicht_admin(user: User, mock_backend, tmp_path, monkeypatch)
 
 async def test_benutzerverwaltung_admin(user: User, mock_backend):
     await _login(user)
-    user.find("Benutzer").click()
+    user.find(marker="nav-benutzer").click()
     await user.should_see("Benutzer verwalten")
     await user.should_see("Neuen Benutzer einladen")
 
 
 async def test_mein_konto(user: User, mock_backend):
     await _login(user)
-    user.find("Mein Konto").click()
+    user.find(marker="nav-konto").click()
     await user.should_see("Angemeldet als test")
     await user.should_see("2FA aktivieren")
 
@@ -188,7 +188,7 @@ async def test_archiv_dialog(user: User, mock_backend, tmp_path, monkeypatch):
     monkeypatch.setattr(archive, "LEDGER_PATH", str(tmp_path / "ledger.jsonl"))
     await _login(user)
     user.find(marker="nav-beherbergungssteuer").click()
-    user.find("Archiv").click()
+    user.find(marker="steuer-archiv").click()
     await user.should_see("revisionssicher abgelegte")
 
 
@@ -196,7 +196,7 @@ async def test_satzfelder_ohne_wochenendsatz(user: User, mock_backend):
     """Werktagsfeld und Schalter rendern; das Wochenend-Feld bleibt verborgen,
     solange der Schalter aus ist."""
     await _login(user)
-    user.find("Benutzer").click()
+    user.find(marker="nav-benutzer").click()
     await user.should_see("Stundensatz Werktag")
     await user.should_see("Abweichender Satz an Wochenende/Feiertagen")
     await user.should_not_see("Stundensatz Wochenende/Feiertag")
@@ -206,14 +206,14 @@ async def test_satzfelder_mit_aktiviertem_wochenendsatz(user: User, mock_backend
     """Ist der Satz beim Mitarbeiter aktiviert, ist das zweite Feld sichtbar."""
     monkeypatch.setitem(web.USERS["test"], "wochenendsatz_aktiv", True)
     await _login(user)
-    user.find("Benutzer").click()
+    user.find(marker="nav-benutzer").click()
     await user.should_see("Stundensatz Werktag")
     await user.should_see("Stundensatz Wochenende/Feiertag")
 
 
 async def test_vorgabesaetze_in_einstellungen(user: User, mock_backend):
     await _login(user)
-    user.find("Einstellungen").click()
+    user.find(marker="nav-einstellungen").click()
     user.find("Steuerberater").click()
     await user.should_see("Stundensätze (Vorgabe)")
     await user.should_see("Wochenende/Feiertag")
@@ -268,7 +268,7 @@ async def test_oberflaeche_bleibt_deutsch_ohne_profilsprache(user: User, mock_ba
 
 async def test_sprachwahl_im_konto_dialog(user: User, mock_backend):
     await _login(user)
-    user.find("Mein Konto").click()
+    user.find(marker="nav-konto").click()
     await user.should_see("Sprache")
     await user.should_see("Angemeldet als test")
 
@@ -379,7 +379,7 @@ async def test_scanner_dialog_zeigt_neue_bedienung(user: User, mock_backend, tmp
 
 async def test_standorterfassung_schalter_in_einstellungen(user: User, mock_backend):
     await _login(user)
-    user.find("Einstellungen").click()
+    user.find(marker="nav-einstellungen").click()
     user.find("Standorte").click()
     await user.should_see("Standort bei der Zeiterfassung erfassen")
     await user.should_see("Wirkt erst, wenn die Standorterfassung oben eingeschaltet ist.")
@@ -447,7 +447,7 @@ async def test_einladen_verschickt_mail(user: User, mock_backend, monkeypatch):
     monkeypatch.setattr(mailer, "send_notify",
                         lambda cfg, to, subj, body: gesendet.append((to, subj, body)))
     await _login(user)
-    user.find("Benutzer").click()
+    user.find(marker="nav-benutzer").click()
     await user.should_see("Neuen Benutzer einladen")
     user.find(marker="new-user").type("bea")
     user.find(marker="new-user-mail").type("bea@example.com")

@@ -169,9 +169,14 @@ def _fetch_events(days_ahead=21, days_back=1):
     return evs
 
 
-def _cleaning_jobs(days_ahead=21, days_back=1):
+def _cleaning_jobs(days_ahead=21, days_back=1, quiet=False):
     """Reinigungs-Jobs: jede Abreise im Fenster + die nächste Anreise (Folgebuchung)
-    derselben Wohnung – damit die Putzkraft weiß, für wie viele Personen vorzubereiten."""
+    derselben Wohnung – damit die Putzkraft weiß, für wie viele Personen vorzubereiten.
+
+    `quiet` unterdrückt die Fehlermeldung. Das braucht der Zähler in der Leiste:
+    er läuft auf jeder Seite mit, und zwei gleiche Meldungen zu einer Störung
+    sind eine zu viel – gemeldet wird sie von der Liste, die man ansieht.
+    """
     from datetime import timedelta
     today = date.today()
     d_from = (today - timedelta(days=days_back)).isoformat()
@@ -180,7 +185,8 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
     try:
         raw = data._reservations(d_from, look_to)
     except smoobu.SmoobuError as ex:
-        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
+        if not quiet:
+            ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=8000)
         return []
     norm = [bookings.normalize(b) for b in raw if bookings.is_real(b)]
     by_apt = {}
@@ -199,6 +205,38 @@ def _cleaning_jobs(days_ahead=21, days_back=1):
         jobs.append({**nb, "next": nxt})
     jobs.sort(key=lambda j: (j["departure"], j["checkout_time"] or "99:99", j["apartment_name"]))
     return jobs
+
+
+def nav_zaehler(user, verwaltung):
+    """Die eine Zahl auf dem Platz „Reinigungen“ in der Leiste.
+
+    Genau ein Zähler in der ganzen App – mehr Zähler heißt: keiner wird mehr
+    gelesen. Was er zählt, hängt davon ab, wofür man die App öffnet:
+
+    * **Putzkraft** – was heute ansteht: die eigenen Aufträge von heute, die
+      noch nicht fertig sind.
+    * **Verwaltung** – was in sieben Tagen noch niemandem gehört.
+
+    Gibt 0 zurück, wenn nichts zu zeigen ist; 0 heißt „kein Zähler“. Eine Null
+    anzuschreiben wäre eine Zahl, die nichts sagt, und entwertet die anderen.
+    """
+    from datetime import timedelta
+    # Bewusst dasselbe Fenster wie die Reinigungsliste: so trifft der Abruf
+    # denselben Zwischenspeicher und kostet Smoobu keinen zweiten Aufruf.
+    jobs = _cleaning_jobs(quiet=True)
+    heute = date.today()
+    if verwaltung:
+        grenze = (heute + timedelta(days=7)).isoformat()
+        # Bewusst am Fehlen der Zuweisung gemessen, nicht am Status: eine
+        # ueberfaellige Reinigung heisst "nachtragen" und gehoert trotzdem
+        # niemandem – gerade die darf hier nicht durchrutschen.
+        return sum(1 for j in jobs
+                   if heute.isoformat() <= j["departure"] <= grenze
+                   and not bookings.assignee_of(j["id"]))
+    return sum(1 for j in jobs
+               if j["departure"] == heute.isoformat()
+               and bookings.assignee_of(j["id"]) == user
+               and _booking_status(j) != "abgeschlossen")
 
 
 def _open_checkliste(job, activate):

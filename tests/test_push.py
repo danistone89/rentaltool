@@ -241,7 +241,7 @@ async def test_konto_zeigt_den_abschnitt_und_die_geraete(user, mock_backend):  #
     _priv, abo = _browser_abo()
     push.anmelden("test", abo, "iPhone")
     await _login(user)
-    user.find("Mein Konto").click()
+    user.find(marker="nav-konto").click()
     await user.should_see("Benachrichtigungen")
     await user.should_see("Auf diesem Gerät einschalten")
     await user.should_see("iPhone")                     # angemeldetes Gerät
@@ -252,6 +252,6 @@ async def test_konto_zeigt_den_abschnitt_und_die_geraete(user, mock_backend):  #
 async def test_ohne_geraet_keine_feineinstellung(user, mock_backend):  # noqa: F811
     """Schalter für Meldearten ohne ein einziges Gerät wären Kulisse."""
     await _login(user)
-    user.find("Mein Konto").click()
+    user.find(marker="nav-konto").click()
     await user.should_see("Auf diesem Gerät einschalten")
     await user.should_not_see("Wobei möchtest du Bescheid bekommen?")

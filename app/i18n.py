@@ -110,8 +110,19 @@ _EN = {
     "Kein angemeldeter Benutzer.": "No user signed in.",
     "Aktivieren": "Enable",
 
-    # ------------------------------------------------------------- Allgemein
+    # ------------------------------------------------------- Navigation (AP-D1)
+    # Leiste unten, Menue-Blatt und Schublade. Die Kurzformen stehen in der
+    # Leiste, wo nur ein Wort Platz hat – sie muessen auch englisch kurz sein.
     "Bereiche": "Sections",
+    "Weitere Bereiche": "More sections",
+    "Mein Zugang": "My access",
+    "Verwaltung": "Administration",
+    "Menü": "Menu",
+    "Zeiten": "Hours",
+    "Steuer": "Tax",
+    "Archiv": "Archive",
+
+    # ------------------------------------------------------------- Allgemein
     "Speichern": "Save",
     "Abbrechen": "Cancel",
     "Schließen": "Close",

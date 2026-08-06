@@ -110,7 +110,7 @@ async def test_icons_und_manifest_sind_ohne_login_erreichbar(user: User):
 # ------------------------------------------------------------------ Anleitung
 async def test_anleitung_steht_in_mein_konto(user: User, mock_backend):  # noqa: F811
     await _login(user)
-    user.find("Mein Konto").click()
+    user.find(marker="nav-konto").click()
     await user.should_see("Als App einrichten")
     await user.should_see("Zum Home-Bildschirm")      # iPhone-Weg
     await user.should_see("App installieren")          # Android-Weg

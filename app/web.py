@@ -35,13 +35,16 @@ from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  
 from app.ui import basis, belege, buchungen, dialog, einstellungen  # noqa: E402,F401
 from app.ui import pwa  # noqa: E402,F401
 from app.ui import kalender, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
-from app.ui.basis import (AREAS, AUTH, CFG, ROLE_AREAS, ROLES, STORAGE_SECRET,  # noqa: E402,F401
-                          USERS, _APARTMENTS, _apts, _checklisten_an, _cur_area,
-                          _cur_role, _cur_user, _is_admin, _load_apartments,
-                          _probe_hinweis, _role_areas, _role_label, _t, logo, t)
+from app.ui.basis import (AREAS, AUTH, BAR_PLAETZE, CFG, ROLE_AREAS, ROLES,  # noqa: E402,F401
+                          STORAGE_SECRET, USERS, _APARTMENTS, _apts,
+                          _checklisten_an, _cur_area, _cur_role, _cur_user,
+                          _is_admin, _lang_select, _load_apartments,
+                          _probe_hinweis, _role_areas, _role_label, _t, logo,
+                          nav_plan, platz_von, t)
 from app.ui.belege import render_belege  # noqa: E402,F401
 from app.ui.buchungen import (_booking_status, _open_checkliste,  # noqa: E402,F401
-                              _PENDING_REINIGUNG, _staff_users, render_buchungen)
+                              _PENDING_REINIGUNG, _staff_users, nav_zaehler,
+                              render_buchungen)
 from app.ui.einstellungen import open_settings  # noqa: E402,F401
 from app.ui.reinigung import reinigung_uebersicht, render_reinigung  # noqa: E402,F401
 from app.ui.standort import (_geo_enabled, _match_geofence, _presence,  # noqa: E402,F401
@@ -132,39 +135,56 @@ def main_page():
     .hk-upload .q-uploader__list { display:none !important; }
     .hk-upload .q-uploader__spinner { display:none !important; }
     .hk-upload .q-uploader__title { font-size:.8rem; font-weight:600; line-height:1; white-space:nowrap; }
+    /* Leiste unten (Handy). Sie sitzt ueber dem Home-Balken des iPhones,
+       sonst tippt man daneben. Der aktive Platz ist doppelt markiert –
+       Farbe UND Strich: Farbe allein traegt nicht, wenn die Sonne aufs
+       Display faellt oder jemand Farben schlecht unterscheidet. */
+    .nav-leiste { padding-bottom: env(safe-area-inset-bottom); }
+    .nav-platz { color:#64748b; }
+    /* Das Menue-Blatt endet ueber der Leiste, statt sie zu verdecken: sonst
+       ist waehrend des Blaetterns nicht mehr zu sehen, in welchem Bereich man
+       steht – und ohne Adressleiste ist die Leiste die einzige Orientierung. */
+    .nav-blatt { margin-bottom: calc(56px + env(safe-area-inset-bottom)); }
+    .nav-platz .nav-strich { position:absolute; top:0; left:50%;
+        transform:translateX(-50%); width:26px; height:3px;
+        border-radius:0 0 3px 3px; background:transparent; }
+    /* Der Zaehler gehoert sichtbar zu SEINEM Symbol. Quasars "floating" setzt
+       ihn ausserhalb des Platzes – er stand dann ueber dem Nachbarn und las
+       sich, als zaehle der. */
+    .nav-platz .nav-zaehler { position:absolute; top:-5px; left:13px;
+        min-width:16px; height:16px; padding:0 4px; font-size:10px;
+        line-height:16px; font-weight:700; }
+    .nav-platz.nav-aktiv { color:#5E2A84; }
+    .nav-platz.nav-aktiv .nav-strich { background:#5E2A84; }
+    .nav-platz.nav-aktiv .nav-etikett { font-weight:650; }
     """)
     today = date.today()
     role = _cur_role()
-    areas = _role_areas(role)
+    leiste_plan, menue_plan = nav_plan(role)
+    visible = leiste_plan + menue_plan
 
+    # Die Kopfzeile ist schlank: Logo und – auf der Probe-Instanz – das orange
+    # Kennzeichen. Benutzer, Einstellungen, Mein Konto und Abmelden stehen im
+    # Menue; das gibt am Handy eine Zeile Inhalt zurueck.
     with ui.header(elevated=True).classes("items-center px-4 bg-white text-slate-800 border-b border-slate-200"):
-        ui.button(icon="menu", on_click=lambda: drawer.toggle()) \
-            .props("flat round color=primary dense").classes("lg:hidden")
         logo(42)
         _probe_hinweis()
-        ui.space()
-        if _is_admin():
-            ui.button("Benutzer", icon="group", on_click=open_users) \
-                .props("flat color=primary no-caps")
-            ui.button("Einstellungen", icon="settings", on_click=open_settings) \
-                .props("flat color=primary no-caps")
-        ui.button(t("Mein Konto"), icon="account_circle", on_click=open_account) \
-            .props("flat color=primary no-caps")
-        ui.button(icon="logout", on_click=logout).props("flat round color=primary") \
-            .tooltip(t("Abmelden"))
 
-    with ui.left_drawer(bordered=True).props("width=230").classes("bg-white") as drawer:
-        ui.label(t("Bereiche")).classes("text-xs uppercase tracking-wide text-gray-400 px-3 pt-3 pb-1")
-        nav = ui.column().classes("w-full gap-1")
-        ui.space()
-        with ui.column().classes("px-3 pb-3 gap-0"):
+    # Ab Tablet bleibt die Schublade links (Quasar blendet sie unter 1024 px
+    # selbst aus, dort uebernimmt die Leiste unten).
+    with ui.left_drawer(bordered=True).props("width=248 show-if-above breakpoint=1024") \
+            .classes("bg-white") as drawer:
+        schublade = ui.column().classes("w-full gap-0 grow")
+        with ui.column().classes("px-4 pb-3 gap-0"):
             ui.label(_cur_user()).classes("text-sm font-medium text-slate-700")
             ui.label(_role_label(role)).classes("text-xs text-gray-400")
+
+    # Das Menue faehrt von unten aus und bleibt damit in Daumennaehe.
+    menue_blatt = ui.dialog().props("position=bottom")
 
     content = ui.column().classes("w-full max-w-6xl mx-auto p-3 sm:p-6 gap-4 sm:gap-5")
     with content:
         pwa.einrichten_banner()
-    visible = [a for a in AREAS if a["key"] in areas]
 
     def _feature_header(icon, title, subtitle, action=None):
         with ui.row().classes("w-full items-center gap-3"):
@@ -180,7 +200,8 @@ def main_page():
         apts = _load_apartments()
         _feature_header("receipt_long", "Beherbergungssteuer", "Dresden · monatliche Steueranmeldung",
                         lambda: ui.button("Archiv", icon="inventory_2",
-                                          on_click=open_archive).props("outline no-caps"))
+                                          on_click=open_archive).props("outline no-caps")
+                        .mark("steuer-archiv"))
         with ui.card().classes("w-full rounded-xl shadow-sm border border-slate-100"):
             with ui.row().classes("items-end gap-4 flex-wrap"):
                 year = ui.select(list(range(2023, today.year + 2)), label="Jahr",
@@ -317,25 +338,125 @@ def main_page():
                 "belege": build_belege,
                 "zeiterfassung": build_zeiterfassung}
 
-    _BASE_NAV = "items-center gap-2 mx-2 px-2 py-2 rounded-lg no-wrap cursor-pointer "
-    nav_rows = {}
-    with nav:
-        for a in visible:
-            row = ui.row().classes(_BASE_NAV).mark(f"nav-{a['key']}")
-            with row:
-                ui.icon(a["icon"]).classes("text-xl")
-                ui.label(t(a["label"])).classes("font-medium")
-            row.on("click", lambda e, k=a["key"]: activate(k))
-            nav_rows[a["key"]] = row
+    # ------------------------------------------------------------ Navigation
+    # Leiste unten (Handy), Schublade links (ab Tablet) und das Menue-Blatt
+    # entstehen aus EINER Liste – siehe basis.nav_plan(). Zwei getrennt
+    # gepflegte Listen laufen garantiert auseinander.
+    # "flex flex-row" bzw. "flex flex-col" muessen hier drinstehen: das Markieren
+    # unten setzt die Klassen per replace= neu und wirft dabei auch NiceGUIs
+    # eigene .nicegui-row/.nicegui-column weg – ohne sie faellt das Element auf
+    # display:block zurueck, und Symbol und Beschriftung rutschen auseinander.
+    _BASE_NAV = ("flex flex-row items-center gap-3 mx-2 px-3 py-2 rounded-lg "
+                 "no-wrap cursor-pointer min-h-[44px] ")
+    _BASE_PLATZ = ("nav-platz flex flex-col items-center justify-center gap-1 "
+                   "py-1 min-h-[56px] cursor-pointer relative ")
+    nav_rows = {}     # Schublade: key -> Zeile
+    bar_slots = {}    # Leiste: key -> Platz ("menue" fuer den vierten)
+
+    def _bereichszeile(area, marker):
+        row = ui.row().classes(_BASE_NAV).mark(marker)
+        with row:
+            ui.icon(area["icon"]).classes("text-xl")
+            ui.label(t(area["label"])).classes("font-medium text-sm")
+        row.on("click", lambda e, k=area["key"]: activate(k))
+        return row
+
+    def _menue_zeile(icon, text, on_click, marker, klasse=""):
+        zeile = ui.row().classes(
+            "items-center gap-3 mx-2 px-3 py-2 rounded-lg no-wrap cursor-pointer "
+            "min-h-[44px] hover:bg-slate-100 " + klasse).mark(marker)
+        with zeile:
+            ui.icon(icon).classes("text-xl")
+            ui.label(text).classes("text-sm")
+        zeile.on("click", on_click)
+        return zeile
+
+    def _gruppe(titel):
+        ui.label(t(titel)).classes(
+            "text-[11px] uppercase tracking-wider text-gray-400 px-5 pt-3 pb-1")
+
+    def _menue_inhalt(bereiche, gruppentitel, praefix, danach=None):
+        """Menue-Inhalt – einmal fuer das Blatt von unten, einmal fuer die
+        Schublade. `danach` schliesst das Blatt, bevor ein Dialog aufgeht."""
+        def _tap(fn):
+            def _run():
+                if danach:
+                    danach()
+                fn()
+            return _run
+
+        if bereiche:
+            _gruppe(gruppentitel)
+            for area in bereiche:
+                nav_rows[(praefix, area["key"])] = _bereichszeile(
+                    area, f"{praefix}-{area['key']}")
+        _gruppe("Mein Zugang")
+        _menue_zeile("account_circle", t("Mein Konto"), _tap(open_account),
+                     f"{praefix}-konto")
+        with ui.element("div").classes("px-4 py-2 w-full"):
+            _lang_select().classes("w-full")
+        if _is_admin():
+            _gruppe("Verwaltung")
+            _menue_zeile("group", t("Benutzer"), _tap(open_users), f"{praefix}-benutzer")
+            _menue_zeile("settings", t("Einstellungen"), _tap(open_settings),
+                         f"{praefix}-einstellungen")
+            _menue_zeile("inventory_2", t("Archiv"), _tap(open_archive), f"{praefix}-archiv")
+        ui.separator().classes("my-2")
+        _menue_zeile("logout", t("Abmelden"), _tap(logout), f"{praefix}-abmelden",
+                     klasse="text-red-700")
+
+    def _platz(key, label, icon, on_click=None, zaehler=0):
+        slot = ui.column().classes(_BASE_PLATZ).mark(f"bar-{key}")
+        with slot:
+            ui.element("div").classes("nav-strich")
+            with ui.element("div").classes("relative leading-none"):
+                ui.icon(icon).classes("text-2xl")
+                if zaehler:
+                    ui.badge(str(zaehler)).props("color=warning rounded") \
+                        .classes("nav-zaehler").mark(f"bar-zaehler-{key}")
+            ui.label(t(label)).classes("nav-etikett text-[11px] leading-tight text-center")
+        slot.on("click", on_click or (lambda e, k=key: activate(k)))
+        bar_slots[key] = slot
+        return slot
+
+    # Schublade (ab Tablet): alle Bereiche, danach Zugang und Verwaltung.
+    with schublade:
+        _menue_inhalt(visible, "Bereiche", "nav")
+
+    # Menue-Blatt (Handy): nur, was nicht in die Leiste passt – plus Zugang.
+    with menue_blatt, ui.card().classes(
+            "nav-blatt w-full m-0 p-0 pb-3 rounded-t-2xl rounded-b-none gap-0"):
+        ui.element("div").classes("w-9 h-1 rounded bg-slate-200 mx-auto mt-2 mb-1")
+        _menue_inhalt(menue_plan, "Weitere Bereiche", "menu", danach=menue_blatt.close)
+
+    # Leiste unten (Handy): drei Bereiche, vierter Platz immer das Menue.
+    if visible:
+        with ui.footer(fixed=True).classes(
+                "nav-leiste lg:hidden bg-white border-t border-slate-200 p-0"):
+            with ui.element("div").classes("w-full grid grid-cols-4"):
+                for a in leiste_plan:
+                    _platz(a["key"], a["bar_label"], a["icon"],
+                           zaehler=(nav_zaehler(_cur_user(), role in ("admin", "manager"))
+                                    if a["key"] == "buchungen" else 0))
+                _platz("menue", "Menü", "menu", on_click=menue_blatt.open)
 
     def activate(key):
-        # "reinigung" ist kein Menüpunkt, sondern ein Zwischenschritt – der
-        # merkt sich nicht als Rücksprungziel.
+        # "reinigung" ist kein Menuepunkt, sondern ein Zwischenschritt – der
+        # merkt sich nicht als Ruecksprungziel.
         if key != "reinigung":
             app.storage.user["area"] = key
-        for k, row in nav_rows.items():
+        menue_blatt.close()
+        platz = platz_von(key)
+        for (_praefix, k), row in nav_rows.items():
             row.classes(replace=_BASE_NAV + (
-                "bg-violet-50 text-primary" if k == key else "text-slate-600 hover:bg-slate-100"))
+                "bg-violet-50 text-primary" if k == platz
+                else "text-slate-600 hover:bg-slate-100"))
+        # Liegt der Bereich im Menue, leuchtet der Menue-Platz – sonst waere in
+        # der Leiste nirgends zu sehen, wo man ist.
+        if platz not in bar_slots:
+            platz = "menue"
+        for k, slot in bar_slots.items():
+            slot.classes(replace=_BASE_PLATZ + ("nav-aktiv" if k == platz else ""))
         content.clear()
         with content:
             builders.get(key, lambda: None)()

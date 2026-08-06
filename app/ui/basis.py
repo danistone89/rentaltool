@@ -95,6 +95,71 @@ ROLE_AREAS = {
     "putzkraft": {"buchungen", "belege", "zeiterfassung"},  # Putzkräfte
 }
 
+# ---- Navigation: Leiste unten und Menü -------------------------------------
+# Ein Bereich darf je Rolle anders heißen. Die Putzkraft findet unter
+# "buchungen" ihre Reinigungsaufträge – "Buchungen" wäre für sie schlicht
+# falsch beschriftet.
+ROLE_AREA_LABEL = {
+    "putzkraft": {"buchungen": "Reinigungen"},
+}
+
+# In der Leiste ist Platz für ein Wort. Die Beschriftung bleibt trotzdem immer
+# sichtbar (reine Symbole muss man raten), also muss sie kurz sein.
+BAR_KURZ = {"zeiterfassung": "Zeiten", "beherbergungssteuer": "Steuer"}
+
+# Vier Plätze, nie mehr – ab fünf werden die Ziele schmaler als ein Daumen.
+# Der vierte ist immer das Menü, also bleiben drei für Bereiche.
+BAR_PLAETZE = 3
+
+# Welche drei Bereiche unten stehen, hängt von der Rolle ab: die Putzkraft
+# öffnet die App, um zu sehen, was sie heute putzt; die Verwaltung, um zu sehen,
+# ob etwas offen ist. Nicht genannte erlaubte Bereiche hängen sich hinten an.
+ROLE_BAR = {
+    "putzkraft": ["buchungen", "zeiterfassung", "belege"],
+    "manager": ["buchungen", "uebersicht", "belege"],
+    "admin": ["buchungen", "uebersicht", "belege"],
+}
+
+
+# Zwischenschritte behalten ihren Platz. Der Checklisten-Durchgang ist kein
+# eigener Bereich, sondern wird aus einer Buchung geöffnet – solange er läuft,
+# bleibt „Reinigungen“ markiert. Sonst verliert man beim Zurückgehen die Spur.
+PLATZ_VON = {"reinigung": "buchungen"}
+
+
+def platz_von(key):
+    """Auf welchem Platz der Leiste ein Bereich sichtbar wird."""
+    return PLATZ_VON.get(key, key)
+
+
+def nav_plan(role):
+    """Navigationsplan einer Rolle als Paar `(leiste, menue)`.
+
+    **Eine Quelle für beide Ansichten.** Die Leiste unten am Handy und die
+    Schublade ab Tablet entstehen aus derselben Liste – zwei getrennt gepflegte
+    Listen laufen garantiert auseinander.
+
+    Die Rechte selbst stehen weiterhin allein in `ROLE_AREAS`: hier wird nur
+    sortiert und aufgeteilt, nie etwas freigeschaltet. Was nicht in die Leiste
+    passt, verschwindet nicht, sondern steht im Menü.
+
+    Jeder Eintrag ist ein `AREAS`-Eintrag mit rollenrichtigem `label` und
+    zusätzlichem `bar_label` (Kurzform). Beide bleiben unübersetzt – `t()`
+    greift erst beim Zeichnen, sonst friert die Sprache beim Import ein.
+    """
+    erlaubt = _role_areas(role)
+    nach_key = {a["key"]: a for a in AREAS}
+    umbenannt = ROLE_AREA_LABEL.get(role, {})
+    reihenfolge = [k for k in ROLE_BAR.get(role, ()) if k in erlaubt]
+    reihenfolge += [a["key"] for a in AREAS
+                    if a["key"] in erlaubt and a["key"] not in reihenfolge]
+    plan = []
+    for key in reihenfolge:
+        label = umbenannt.get(key, nach_key[key]["label"])
+        plan.append({**nach_key[key], "label": label,
+                     "bar_label": BAR_KURZ.get(key, label)})
+    return plan[:BAR_PLAETZE], plan[BAR_PLAETZE:]
+
 
 def _cur_user():
     return app.storage.user.get("user", "")

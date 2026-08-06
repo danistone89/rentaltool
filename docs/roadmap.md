@@ -133,12 +133,31 @@ Bewusst nicht: runder Knopf in der Mitte (keine eindeutige Hauptaktion – „Ze
 starten" steht in der Reinigungskarte, wo der Zusammenhang ist), Symbole ohne
 Beschriftung, Wischen zwischen Bereichen (in den Buchungen wird schon gewischt).
 
-### AP-D1 · Leiste unten und Menü — offen
+### AP-D1 · Leiste unten und Menü — ✅ erledigt (6.8.2026)
 
-Bereichsliste um Symbol und Reihenfolge je Rolle ergänzen, Leiste bauen, Menü als
-Blatt von unten, Kopfzeile ausräumen (Benutzer/Einstellungen/Mein Konto/Abmelden
-ziehen ins Menü), Zähler auf „Reinigungen". Zwischenschritte wie der
-Checklisten-Durchgang halten „Reinigungen" aktiv.
+Leiste unten am Handy, Menü als Blatt von unten, ab 1024 px weiter die Schublade.
+Die Kopfzeile trägt nur noch Logo und Probe-Kennzeichen; Benutzer, Einstellungen,
+Archiv, Mein Konto, Sprache und Abmelden sind ins Menü gezogen.
+
+Alle drei Ansichten entstehen aus **einer** Quelle: `basis.nav_plan(rolle)` gibt
+`(leiste, menue)` zurück – die ersten drei erlaubten Bereiche in der Reihenfolge
+aus `ROLE_BAR`, der Rest ins Menü. Freigeschaltet wird dort nichts, die Rechte
+bleiben allein in `ROLE_AREAS`. Beschriftungen sind rollenabhängig
+(`ROLE_AREA_LABEL`: die Putzkraft liest „Reinigungen", nicht „Buchungen") und in
+der Leiste gekürzt (`BAR_KURZ`: „Zeiten", „Steuer").
+
+Der Zähler (`buchungen.nav_zaehler`) sitzt auf „Reinigungen" und ist der einzige
+der App: für die Putzkraft, was heute noch ansteht, für die Verwaltung, was in
+sieben Tagen niemandem gehört – am Fehlen der Zuweisung gemessen, damit
+Überfälliges nicht durchrutscht. Er nutzt dasselbe Abruffenster wie die
+Reinigungsliste und kostet Smoobu daher keinen zweiten Aufruf.
+
+Der aktive Platz ist doppelt markiert (Farbe **und** Strich). Der
+Checklisten-Durchgang ist kein eigener Platz, sondern hält „Reinigungen" aktiv
+(`basis.PLATZ_VON`); liegt der Bereich im Menü, leuchtet der Menü-Platz.
+
+30 Tests in `tests/test_navigation.py`. `tools/uishot.py` kennt die neuen Wege
+(`@menue:`) und nimmt das Menü-Blatt mit auf.
 
 *Größe:* M.
 

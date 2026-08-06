@@ -210,12 +210,21 @@ die App den Link **einmalig zum Kopieren** an. Die Links zeigen auf die
 `config.app_url`, Vorgabe `https://app.ds-apartments.de`) – lokal zum Testen auf
 `http://127.0.0.1:3001` stellen.
 
-**Mehrbenutzer & Rollen:** Über **„Benutzer"** (nur Admin) lassen sich weitere
-Konten einladen, Zugänge zurücksetzen, Rollen ändern oder löschen. Rollen:
-`admin` (sieht alles, verwaltet Nutzer/Einstellungen) und `putzkraft`. **Welche
-Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/web.py`** (aktuell:
-Admin = alles, Putzkraft = noch nichts – wird später definiert). Nutzer ohne
-freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
+**Mehrbenutzer & Rollen:** Über **„Benutzer"** (im Menü, nur Admin) lassen sich
+weitere Konten einladen, Zugänge zurücksetzen, Rollen ändern oder löschen.
+Rollen: `admin` (sieht alles, verwaltet Nutzer/Einstellungen), `manager`
+(operative Koordination ohne Steuer und Verwaltung) und `putzkraft`. **Welche
+Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/ui/basis.py`.** Nutzer
+ohne freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
+
+**Navigation:** Am Handy stehen die Bereiche in einer Leiste unten, ab 1024 px
+in der Schublade links. Beides kommt aus `basis.nav_plan(rolle)` – **eine**
+Liste für beide Ansichten, sonst laufen sie auseinander. Unten ist Platz für
+drei Bereiche plus das Menü; welche drei, sagt `ROLE_BAR` (Putzkraft:
+Reinigungen · Zeiten · Belege; Verwaltung: Buchungen · Übersicht · Belege).
+Alles Weitere – Zeiterfassung, Beherbergungssteuer, Benutzer, Einstellungen,
+Archiv, Mein Konto, Sprache, Abmelden – liegt im Menü. `nav_plan` sortiert nur;
+freigeschaltet wird ausschließlich über `ROLE_AREAS`.
 
 **Mein Konto** (jeder Nutzer): eigenes Passwort ändern und **2FA (Google
 Authenticator / TOTP)** aktivieren/deaktivieren → ab dann Login mit Passwort **+**
