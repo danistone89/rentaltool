@@ -159,6 +159,46 @@ def test_das_laengste_muster_gewinnt():
     assert st.kreditor_zu("dm drogerie markt GmbH")["name"] == "Lang"
 
 
+# ------------------------------------------------------------------ Lernen
+def test_eine_zuordnung_von_hand_wird_gemerkt():
+    """Der Kern von AP15: ohne das rät die App beim nächsten Beleg desselben
+    Händlers wieder – und die Kreditoren sparen keine Zeit."""
+    assert st.kreditor_zu("BAUHAUS 4711") is None
+    k = st.kategorie_lernen("BAUHAUS 4711", "Instandhaltung")
+    assert k is not None and k["quelle"] == "gelernt"
+    assert st.vorbelegung("Bauhaus Dresden")[0] == "Instandhaltung"
+
+
+def test_gelerntes_traegt_das_normalisierte_muster():
+    """„BAUHAUS 4711" muss auch „Bauhaus GmbH" treffen – sonst entstünde je
+    Filiale ein eigener Kreditor."""
+    k = st.kategorie_lernen("BAUHAUS 4711", "Instandhaltung")
+    assert k["muster"] == ["bauhaus"]
+
+
+def test_eine_gepflegte_kategorie_wird_nicht_ueberschrieben(lieferanten):
+    """Sonst kippte ein einzelner falsch zugeordneter Beleg die Stammdaten."""
+    vorher = st.vorbelegung("ROSSMANN 2540")[0]
+    st.kategorie_lernen("ROSSMANN 2540", "Versehentlich falsch")
+    assert st.vorbelegung("ROSSMANN 2540")[0] == vorher
+
+
+def test_ein_gelernter_kreditor_darf_sich_korrigieren():
+    """Was die App selbst geraten hat, darf sie auch wieder ändern."""
+    st.kategorie_lernen("BAUHAUS 4711", "Falsch geraten")
+    st.kategorie_lernen("BAUHAUS Dresden", "Instandhaltung")
+    assert st.vorbelegung("Bauhaus")[0] == "Instandhaltung"
+    assert len(st.kreditoren()) == 1, "Es darf kein zweiter Kreditor entstehen"
+
+
+def test_ohne_kategorie_oder_haendler_wird_nichts_angelegt():
+    """Ein leeres Feld darf keine Karteileiche erzeugen."""
+    assert st.kategorie_lernen("BAUHAUS", "") is None
+    assert st.kategorie_lernen("", "Instandhaltung") is None
+    assert st.kategorie_lernen(None, None) is None
+    assert st.kreditoren() == []
+
+
 def test_kreditor_traegt_kostenstelle_und_dauerbeleg():
     """Beides braucht AP15: die Wohnung für die Kennzahlen, der Dauerbeleg,
     damit die Miete nicht jeden Monat nach einem Beleg fragt."""

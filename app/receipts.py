@@ -20,7 +20,7 @@ TABELLE = "belege"
 # der am 2. fotografiert wird, gehoert in den alten Monat – siehe
 # buchhaltung.belegdatum().
 _EDITABLE = {"merchant", "amount", "note", "kategorie", "klasse", "datum",
-             "apartment_id", "apartment_name"}
+             "apartment_id", "apartment_name", "kreditor_id"}
 _KNOWN_MERCHANTS = ["ALDI", "LIDL", "REWE", "EDEKA", "KAUFLAND", "PENNY", "NETTO",
                     "ROSSMANN", "IKEA", "OBI", "BAUHAUS", "HORNBACH", "METRO",
                     "TEDI", "ACTION", "MÜLLER", "MEDIAMARKT", "SATURN", "AMAZON",

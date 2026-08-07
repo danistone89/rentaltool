@@ -482,12 +482,24 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
                                         value=r.get("kategorie") or "") \
                             .props("dense borderless options-dense").classes("min-w-0 flex-grow") \
                             .mark(f"beleg-kategorie-{r['id']}")
-                        kat.on_value_change(lambda e, i=r["id"]: (
+                        def _kategorie_gesetzt(e, beleg=r):
+                            # Die Zuordnung von Hand ist der Lernmoment: beim
+                            # nächsten Beleg desselben Händlers steht die
+                            # Kategorie schon da (AP15).
                             receipts.update_receipt(
-                                i, kategorie=e.value or "",
-                                klasse=buchhaltung.klasse_fuer(e.value)),
-                            ui.notify(t("Kategorie gesetzt ✓"), type="positive",
-                                      timeout=1500)))
+                                beleg["id"], kategorie=e.value or "",
+                                klasse=buchhaltung.klasse_fuer(e.value))
+                            k = stammdaten.kategorie_lernen(
+                                beleg.get("merchant"), e.value or "",
+                                beleg.get("apartment_id"))
+                            if k:
+                                receipts.update_receipt(beleg["id"], kreditor_id=k["id"])
+                            hinweis = (t("Kategorie gesetzt ✓ – für {name} gemerkt",
+                                         name=k["name"]) if k
+                                       else t("Kategorie gesetzt ✓"))
+                            ui.notify(hinweis, type="positive", timeout=1500)
+
+                        kat.on_value_change(_kategorie_gesetzt)
                 else:
                     ui.label(_d(buchhaltung.belegdatum(r))).classes("text-xs text-slate-400")
                 ui.label(f"{t('erfasst')} {_d(r['ts'])} · {r.get('uploader', '')}") \

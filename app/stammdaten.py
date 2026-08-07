@@ -156,15 +156,26 @@ def kreditor(kreditor_id):
 
 
 def kreditor_anlegen(name, kategorie="", muster=None, wohnung=None,
-                     dauerbeleg="", kreditor_id=None):
+                     dauerbeleg="", kreditor_id=None, quelle="", klasse=""):
     """Einen Lieferanten anlegen.
 
     `muster` sind Textstücke, an denen er im Händlernamen eines Belegs erkannt
     wird – „rossmann" trifft auch „ROSSMANN 2540". Ohne Muster gilt der Name.
+    `quelle="gelernt"` markiert einen, der aus einer Beleg-Zuordnung entstanden
+    ist – gepflegte Stammdaten sollen von selbst entstandenen unterscheidbar
+    bleiben.
+
+    `klasse` sagt, **wie** die Zahlung ins Ergebnis eingeht (siehe
+    `buchhaltung.KLASSEN`). Sie steht hier und nicht im Programm, weil das je
+    Betrieb verschieden ist: die eigene Privatentnahme, die Stadtkasse, die
+    Bank des Darlehens, die Angestellten – das sind gepflegte Daten, keine
+    Fachlogik. Leer heißt: aus der Kategorie ableiten, also im Regelfall
+    „Ausgabe".
     """
     eintrag = {"id": kreditor_id or uuid.uuid4().hex[:10], "name": name,
                "kategorie": kategorie or "", "muster": [m.lower() for m in (muster or [])],
-               "wohnung": wohnung, "dauerbeleg": dauerbeleg or "", "angelegt": _jetzt()}
+               "wohnung": wohnung, "dauerbeleg": dauerbeleg or "",
+               "quelle": quelle or "", "klasse": klasse or "", "angelegt": _jetzt()}
     db.anlegen(KREDITOREN, eintrag)
     return eintrag
 
@@ -177,7 +188,7 @@ def kreditor_aendern(kreditor_id, **felder):
         for feld, wert in felder.items():
             if feld == "muster":
                 k[feld] = [m.lower().strip() for m in (wert or []) if m and m.strip()]
-            elif feld in ("name", "kategorie", "wohnung", "dauerbeleg"):
+            elif feld in ("name", "kategorie", "wohnung", "dauerbeleg", "klasse"):
                 k[feld] = wert
         db.speichern(KREDITOREN, kreditor_id, k)
     return k
@@ -216,6 +227,46 @@ def kreditor_zu(haendler):
     if not treffer:
         return None
     return max(treffer, key=lambda x: x[0])[1]
+
+
+def kategorie_lernen(haendler, kategorie, wohnung=None):
+    """Eine von Hand gesetzte Kategorie für diesen Händler merken.
+
+    Ohne das rät die App beim nächsten Beleg desselben Händlers wieder – die
+    Zeitersparnis, die die Kreditoren versprechen, entsteht erst hier.
+
+    Trifft ein vorhandener Kreditor, bekommt er die Kategorie. Trifft keiner,
+    wird einer angelegt; er trägt `quelle="gelernt"`, damit die selbst
+    entstandenen von den gepflegten unterscheidbar bleiben. Das Muster ist der
+    normalisierte Händlername – dieselbe Form, in der `kreditor_zu()` sucht.
+
+    **Eine gepflegte Kategorie wird nicht überschrieben.** Sonst kippte ein
+    einzelner falsch zugeordneter Beleg die Stammdaten. Geändert wird nur, was
+    leer ist oder selbst gelernt wurde.
+
+    Gibt den Kreditor zurück oder None, wenn nichts zu lernen war.
+    """
+    name = (haendler or "").strip()
+    kategorie = (kategorie or "").strip()
+    if not name or not kategorie:
+        return None
+    muster = _normal(name)
+    if not muster:
+        return None
+    # Die Klasse ergibt sich aus der Kategorie – sie mitzulernen ist der Kern:
+    # ordnet jemand eine Abbuchung „Privatentnahme" zu, ist der Empfänger ab
+    # dann als privat bekannt und fällt aus dem Ergebnis heraus.
+    from app import buchhaltung
+    klasse = buchhaltung.klasse_fuer(kategorie)
+    vorhanden = kreditor_zu(name)
+    if vorhanden is None:
+        return kreditor_anlegen(name, kategorie, [muster], wohnung,
+                                quelle="gelernt", klasse=klasse)
+    if vorhanden.get("kategorie") and vorhanden.get("quelle") != "gelernt":
+        return vorhanden
+    if (vorhanden.get("kategorie"), vorhanden.get("klasse")) != (kategorie, klasse):
+        return kreditor_aendern(vorhanden["id"], kategorie=kategorie, klasse=klasse)
+    return vorhanden
 
 
 def vorbelegung(haendler):
