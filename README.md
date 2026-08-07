@@ -788,16 +788,20 @@ Steuersatz, Smoobu-API-Key, Airbnb-Kanalname. Gespeichert wird in `config.json`
 * **Steuerbasis je Buchung = Buchungspreis ohne durchlaufende
   Übernachtungssteuer** (Reinigungsgebühr bleibt enthalten). Die vom Gast
   gezahlte Übernachtungssteuer ist ein Durchlaufposten und wird nicht erneut
-  besteuert. Der Smoobu-`price` ist **immer brutto inklusive** dieser Steuer:
-  steht sie als Zeile in `price-details`, wird dieser Betrag abgezogen; fehlt
-  die Zeile, wird `price / 1,06` herausgerechnet (siehe unten).
+  besteuert. Der Smoobu-`price` ist **immer brutto inklusive** dieser Steuer
+  und die **einzige Zahl, die von Smoobu übernommen wird**: die Steuer wird mit
+  `price / 1,06` herausgerechnet. Der von den Portalen ausgewiesene
+  Steuerbetrag wird **nicht** verwendet (siehe unten, „Warum der ausgewiesene
+  Betrag nicht gilt").
 * **Steuer = 6 %** der steuerpflichtigen Umsätze, kaufmännisch gerundet.
 
 Validiert gegen zwei Monate:
-* **Dezember 2025**: 137 verbl. ÜN · 15 Airbnb · 152 insgesamt · 5.698,29 € ·
-  **341,90 € Steuer**. (Das eingereichte Formular hatte Airbnb falsch mit 7
-  angegeben – ohne Auswirkung auf die Steuer.)
-* **Mai 2026**: 14 Buchungen · 7.155,86 € verbleibender Umsatz.
+* **Dezember 2025**: 137 verbl. ÜN · 15 Airbnb · 152 insgesamt · 5.652,71 € ·
+  **339,16 € Steuer**. (Das eingereichte Formular hatte Airbnb falsch mit 7
+  angegeben – ohne Auswirkung auf die Steuer – und nannte 5.698,29 € /
+  341,90 €, weil damals der ausgewiesene Steuerbetrag galt.)
+* **Mai 2026**: 14 Buchungen · 7.177,01 € verbleibender Umsatz (vorher
+  7.155,86 €).
 
 ### Warum nicht auf die Summe der Rechnungsbeträge?
 
@@ -861,19 +865,160 @@ eigene Position mit 0 % USt ausweisen:
 | 71 Christian Michael | Booking.com | 584,39 € | 95,00 € | 679,39 € | 47,56 € | **7,00 %** |
 
 `400,07 / 1,06 = 377,42` – die Umrechnung trifft die Rechnung auf den Cent.
-Deshalb: **ausgewiesener Betrag schlägt Umrechnung** (nur so werden die 7 %
-der Wernerstraße korrekt abgezogen), sonst `price / 1,06`. Airbnb bleibt außen
-vor. Alle sechs Rechnungen liegen als Golden-Tests in
+Alle sechs Rechnungen liegen als Golden-Tests in
 `tests/test_steuer.py::TestGastrechnungen`.
 
-> **Offen:** Die Wernerstraße rechnet mit **7 %** statt 6 %. Die Gäste zahlen
-> dort zu viel (bei Rechnung 71: 47,56 € statt 40,76 €), abgeführt werden
-> korrekt 6 %. Die Einstellung gehört in Smoobu/Booking.com auf 6 % korrigiert.
+### Warum der ausgewiesene Betrag nicht gilt
 
-> Randfall: Buchungen **ohne** ausgewiesene `Übernachtungssteuer`-Zeile
-> (typisch Direktbuchungen) gehen mit dem **vollen Betrag** in die Basis. Ist
-> dort die Steuer im Preis schon enthalten, wird sie mitbesteuert. Bei
-> Direktbuchungen die Beherbergungssteuer daher separat ausweisen.
+Bis zum 7.8.2026 galt: *ausgewiesener Betrag schlägt Umrechnung*. Die Prüfung
+an den 135 Buchungen der beiden Fixture-Monate hat das widerlegt. **Booking.com
+rechnet auf denselben zwei Wohnungen nach drei Formeln:**
+
+| Formel hinter dem ausgewiesenen Betrag | Buchungen |
+|---|---:|
+| 6 % **nur auf die Übernachtung** (Reinigung fehlt in der Basis) | 76 |
+| 6 % auf Übernachtung + Reinigung (richtig) | 37 |
+| **7 %** auf Übernachtung + Reinigung (Wernerstraße) | 18 |
+| nicht eindeutig (Reinigung = 0) | 4 |
+
+Richtig ist nach **§ 4 Abs. 1 der Satzung** und **FAQ 5.2** das Entgelt
+**einschließlich** Reinigungsgebühr – also nur die mittlere Zeile.
+
+Den Betrag zu übernehmen, ging nicht auf: die Gastrechnung wies dann die Zahl
+des Portals aus, angemeldet wurden 6 % der Basis. Über dieselben 135 Buchungen
+klafften zwischen beidem **263,31 €**, die in keiner der beiden Zahlen
+vorkamen. Größter Einzelfall: Rechnungsbetrag 991,16 € – der Gast zahlte
+64,84 € Steuer, angemeldet wurden 55,58 €.
+
+Aus dem Gesamtbetrag gerechnet nennen Rechnung und Anmeldung **zwangsläufig
+dieselbe Zahl**; die Probe geht auf null auf. Rechnet ein Portal zu viel
+(Wernerstraße), bleibt der Überhang dort, wo er hingehört: im Entgelt. Er ist
+keine Steuer, die wir schulden, sondern Geld, das wir bekommen haben.
+
+> **Offen:** Die Wernerstraße rechnet gegenüber dem Gast weiter mit **7 %**
+> statt 6 %. Die Gäste zahlen dort zu viel; die Einstellung gehört in
+> Smoobu/Booking.com auf 6 % korrigiert. Auf unsere Zahlen wirkt sich das nicht
+> mehr aus, auf die Gäste schon.
+>
+> Nachgemessen am 7.8.2026 über 90 Tage: sauber getrennt nach Wohnung –
+> Cottaer Straße 19 Buchungen mit 6 %, Wernerstraße 26 mit 7 %, keine Ausnahme.
+> Die jüngste betroffene Abreise ist der 9.8.2026, die Fehleinstellung läuft
+> also noch. Auf der Ausgangsrechnung steht deshalb bewusst **kein
+> Prozentsatz** an der Beherbergungssteuer.
+
+> **Ebenfalls offen:** Die Dezember-Anmeldung wurde mit 5.698,29 € / 341,90 €
+> eingereicht, nach der jetzigen Regel wären es 5.652,71 € / 339,16 €. Ob
+> berichtigt wird, entscheidet der Betreiber.
+
+## Was auf der Ausgangsrechnung steht
+
+`app/rechnung_pdf.py` setzt die Rechnung frei (kein Formular). Der **Aufbau**
+folgt der abgestimmten Vorlage (`Beispielrechnung_B2B_Ferienzimmer`), die
+**Gestaltung** nicht: gesetzt wird zurückhaltend wie im Rest des Werkzeugs –
+Haarlinien statt farbiger Flächen, die Hausfarbe nur für Titel und
+Gesamtbetrag.
+
+Die Blöcke in dieser Reihenfolge: Logo oben links und Anbieterdaten oben
+rechts · Anschriftfeld · Titel mit Nummer und Datum daneben ·
+Aufenthalt/Gast/Zeitraum · Aufstellung · Gesamtbetrag · Steuerinformation ·
+Hinweis · Fußzeile aus drei Spalten.
+
+### Die Abstände: DIN 5008 Form A
+
+Maßgeblich ist **DIN 5008** (die Norm für Geschäftsbriefe); ISO 269 regelt nur
+die Fensterformate der Umschläge. Entscheidend ist das **Anschriftfeld**: es
+beginnt 27 mm unter der Blattkante und teilt sich in die Zusatz- und
+Vermerkzone (27,0–44,7 mm, dort steht die kleine Rücksendeangabe) und die
+**Anschriftzone ab 44,7 mm**. Steht der Empfänger tiefer, sitzt er im Fenster
+eines DIN-Umschlags nicht richtig.
+
+Nachgemessen an der bisherigen Fassung – beides korrigiert:
+
+| | war | ist |
+|---|---:|---:|
+| linker Rand (Schreibbereich) | 22,0 mm | **24,1 mm** |
+| Rücksendeangabe | 44,7 mm (auf der Zonengrenze) | **42,5 mm** |
+| erste Anschriftzeile | 50,7 mm | **44,7 mm** (Oberkante) |
+| Betreffzeile (Titel) | 79,8 mm | 79,8 mm |
+
+Die erste Anschriftzeile wird über die **Oberkante** gesetzt, nicht über die
+Grundlinie: `ANSCHRIFT_ZONE + Font.ascender × Schriftgröße`. Sonst ragt sie
+über 44,7 mm hinaus, obwohl die Grundlinie stimmt.
+
+### Logo
+
+Hochzuladen unter **Einstellungen → Betreiber**. Die Datei liegt wie die Fotos
+im Medienordner, in `betreiber["logo"]` steht der Name relativ dazu – dieselbe
+Angabe zeigt das Bild in der Oberfläche unter `/media/…` und im PDF. Es wird
+oben links eingepasst (max. 46 × 20 mm, Seitenverhältnis bleibt). Fehlt die
+Datei oder ist sie unlesbar, bleibt die Ecke leer; ein kaputtes Logo darf
+keinen Beleg verhindern.
+
+```
+Leistung                      Netto        USt.        Brutto
+─────────────────────────────────────────────────────────────
+Übernachtung / Beherbergung  906,19 €       7 %      969,62 €
+Endreinigung                  88,79 €       7 %       95,00 €
+─────────────────────────────────────────────────────────────
+Beherbergungsleistungen      994,98 €    69,64 €   1.064,62 €
+Beherbergungssteuer Dresden          nicht steuerbar  74,52 €
+                                          ───────────────────
+Gesamtbetrag                                       1.139,14 €
+
+Steuerinformation
+7 % Umsatzsteuer auf Beherbergungsleistungen:
+                    Netto 994,98 €  ·  USt. 69,64 €  ·  Brutto 1.064,62 €
+```
+
+Zwei Flächen aus der Vorlage sind übernommen: die **Zwischensumme ist hell
+hinterlegt** (sonst liest sie sich wie eine weitere Position) und der
+**Gesamtbetrag steht in einem Kasten in der Hausfarbe** – der einzige Betrag,
+den der Gast wirklich sucht. Sonst bleibt es bei Haarlinien.
+
+Fünf Festlegungen, alle aus der Praxis heraus getroffen:
+
+* **Netto, Satz und Brutto je Zeile.** Die Buchhaltung liest die Netto-Spalte
+  zuerst, der Gast findet seinen Betrag rechts (fett).
+* **Die Zwischensumme steht da, weil sie sonst niemand hat.** Sie ist der
+  eigentliche Rechnungsbetrag der Leistung. Ohne diese Zeile muss die
+  Buchhaltung ihn für jede Rechnung selbst bilden, weil zwischen ihr und dem
+  Gesamtbetrag die Beherbergungssteuer steht, die nicht dazugehört.
+* **Die Steuerinformation nennt Entgelt, Satz und Steuerbetrag** (§ 14 Abs. 4
+  Nr. 8 UStG). Kommen mehrere Steuersätze vor (Frühstück, Parkplatz, Haustier
+  wären 19 %), bekommt jeder eine eigene Zeile. Die Beträge stammen aus
+  `rechnung.summen()`, also aus der Summe der **einzeln gerundeten**
+  Positionen; direkt aus der Zwischensumme gerechnet käme ein Cent Unterschied
+  heraus.
+* **„€" statt „EUR".** Geschrieben wird mit `fitz.TextWriter`; `insert_text`
+  kodierte nach Latin-1 und machte aus „€" und „–" still einen Punkt.
+* **Lesereihenfolge vor Schreibaufwand.** Ein `TextWriter` kann nur eine Farbe
+  je Durchgang. Würde nur nach Farbe gruppiert, stünde der Gesamtbetrag im
+  Textstrom vor der Aufstellung – Kopieren und Vorlesen bekämen Unsinn.
+  `_in_lesereihenfolge()` sortiert vorher zeilenweise.
+* **„nicht steuerbar", nicht „steuerfrei".** Der Unterschied entscheidet die
+  Buchung: *steuerfrei* nach § 4 UStG ist ein Umsatz – Erlös, geht in die
+  Voranmeldung. Ein *durchlaufender Posten* nach § 10 Abs. 1 UStG ist gar kein
+  Entgelt und gehört auf ein Verbindlichkeitskonto. Das steht im Hinweis unter
+  der Aufstellung.
+* **Kein Prozentsatz an der Beherbergungssteuer.** Solange die Wernerstraße
+  über Booking.com mit 7 % abgerechnet wird (siehe oben), ließe sich ein
+  aufgedruckter Satz nachrechnen und ginge nicht auf. Lieber keine Angabe als
+  eine falsche. Sobald die Einstellung korrigiert ist, kann der Satz zurück.
+
+Dass die Beherbergungssteuer hier überhaupt als durchlaufender Posten
+ausgewiesen werden **darf**, hängt an der Dresdner Satzung: Steuerschuldner ist
+der **Gast**, der Betrieb behält nur ein und führt ab. Wo eine Kommune den
+Betrieb selbst zum Steuerschuldner macht, wäre diese Behandlung falsch – der
+Betrag gehörte dann ins Entgelt und in die Umsatzsteuer.
+
+Auf dem Blatt heißt es **„Übernachtung / Beherbergung"** und
+**„Beherbergungssteuer Dresden"**; die *gespeicherten* Bezeichnungen bleiben
+unangetastet, an ihnen hängen Produktpreise, Auswertungen und die
+festgeschriebenen Rechnungen.
+
+Abgesichert in `tests/test_rechnung_pdf.py`, das am erzeugten PDF prüft und
+nicht am Rechenweg – ein Betrag, der stimmt, aber nicht auf dem Blatt landet,
+nützt niemandem.
 
 ## Datenordner: Code und Betriebsdaten getrennt
 

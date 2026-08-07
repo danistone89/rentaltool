@@ -375,6 +375,8 @@ Gemessen am Prüfbild: die Schrift beginnt 24 statt 16 Punkte vom Rand und endet
   (`rechnung-automation` liest Postfächer über Microsoft Graph), aber es bringt
   Postfachzugang, Filterregeln je Absender und Dublettenschutz mit. Hochladen
   reicht.
+  **Erneut offen seit AP28** – die Begründung „Hochladen reicht" gilt für
+  E-Rechnungen nicht mehr (siehe die offene Frage bei AP28a).
 * **Automatisierte Gästekommunikation** – Nachrichten lesen/senden gibt es
   bereits; Vorlagen und Automatik sind ein eigenes Thema.
 
@@ -555,10 +557,584 @@ Bereich.
 
 *Größe:* L.
 
-### AP15 · Eingangsrechnungen mit Kreditor und Kostenstelle — offen
+### AP14b · Rechnung so aufstellen, wie der Gast sie liest — ✅ erledigt (7.8.2026)
 
-### AP16 · Kontoauszug einlesen und zuordnen — offen
+Die Rechnung zeigte drei Spalten (Netto, USt, Brutto), eine Summenstaffel und
+darunter einen Steuernachweis. Fachlich vollständig, aber der Gast sucht darin
+den Betrag, den er bezahlt hat – und findet ihn erst nach dem Zusammenzählen.
 
-### AP17 · EÜR im Werkzeug — offen
+**Der Aufbau folgt jetzt der abgestimmten Vorlage**
+(`Beispielrechnung_B2B_Ferienzimmer`), die Gestaltung ausdrücklich nicht:
+Logo oben links · Anbieterdaten oben rechts · Anschriftfeld · Titel mit Nummer
+und Datum daneben · ein Block Aufenthalt/Gast/Zeitraum · die Aufstellung mit
+Netto/USt./Brutto · die Zwischensumme „Beherbergungsleistungen" · die
+Beherbergungssteuer mit „nicht steuerbar" · Gesamtbetrag · Steuerinformation ·
+Hinweis · eine Fußzeile aus drei Spalten (Betreiber, Steuerdaten,
+Bankverbindung). Gesetzt wird zurückhaltend – Haarlinien statt großflächiger
+Farbe. Zwei Flächen sind übernommen: die **hell hinterlegte Zwischensumme**
+(sonst liest sie sich wie eine weitere Position) und der **Gesamtbetrag in
+einem Kasten in der Hausfarbe**.
 
-### AP18 · Ablage in der Nextcloud — offen
+**Die Abstände folgen DIN 5008 Form A** (ISO 269 regelt nur die Fensterformate
+der Umschläge). Zwei Abweichungen der bisherigen Fassung sind damit behoben:
+der linke Rand stand auf 22 mm statt 24,1 mm, und die Empfängeranschrift begann
+auf 50,7 mm statt in der **Anschriftzone ab 44,7 mm** – im Fenster eines
+DIN-Umschlags saß sie damit zu tief. Die Rücksendeangabe stand genau auf der
+Zonengrenze und ist jetzt darüber. Vier Tests messen die Millimeter am
+erzeugten PDF.
+
+**Ein Logo lässt sich hochladen** (Einstellungen → Betreiber). Es liegt wie die
+Fotos im Medienordner; derselbe Name zeigt es in der Oberfläche unter
+`/media/…` und im PDF. Ein fehlendes oder unlesbares Bild lässt die Ecke leer,
+statt den Beleg zu verhindern.
+
+Die Steuerinformation nennt Entgelt, Satz und Steuerbetrag in einer Zeile
+(§ 14 Abs. 4 Nr. 8 UStG); bei mehreren Steuersätzen bekommt jeder eine eigene.
+
+Auf dem Blatt heißt es „Übernachtung / Beherbergung" und „Beherbergungssteuer
+Dresden". Die **gespeicherten** Bezeichnungen bleiben unangetastet – an ihnen
+hängen Produktpreise, Auswertungen und die festgeschriebenen Rechnungen.
+
+*Nebenbei zwei technische Funde:* Geschrieben wird jetzt mit `fitz.TextWriter`
+statt `insert_text` – letzteres kodierte nach Latin-1 und machte aus „€" und
+„–" still einen Punkt, weshalb auf der Rechnung „EUR" stand. Und weil ein
+TextWriter nur eine Farbe je Durchgang kann, hätte eine Gruppierung nach Farbe
+die **Lesereihenfolge** im PDF zerstört (der Gesamtbetrag stand im Textstrom
+vor der Aufstellung); `_in_lesereihenfolge()` sortiert vorher zeilenweise.
+
+25 Tests in `tests/test_rechnung_pdf.py`.
+
+*Größe:* M.
+
+### AP14c · Von Smoobu nur noch den Gesamtbetrag glauben — ✅ erledigt (7.8.2026)
+
+Die Beherbergungssteuer wurde übernommen, wenn Smoobu sie auswies. Nachgemessen
+an den 135 Buchungen der beiden Fixture-Monate rechnet **Booking.com auf
+denselben zwei Wohnungen nach drei Formeln**: 76× sechs Prozent nur auf die
+Übernachtung (die Reinigung fehlt in der Basis), 37× sechs Prozent richtig,
+18× sieben Prozent (Wernerstraße). Richtig ist nach § 4 Abs. 1 der Satzung und
+FAQ 5.2 das Entgelt einschließlich Reinigungsgebühr.
+
+**Was das anrichtete:** Die Gastrechnung wies die Zahl des Portals aus,
+angemeldet wurden 6 % der Basis. Über dieselben 135 Buchungen klafften
+zwischen beidem **263,31 €**, die in keiner der beiden Zahlen vorkamen –
+größter Einzelfall 9,26 € bei einer Rechnung über 991,16 €.
+
+**Jetzt:** von Smoobu kommen nur noch der **Gesamtbetrag** und die
+**Reinigungsgebühr**. Die Steuer wird gerechnet (`price / 1,06`), an einer
+einzigen Stelle für Rechnung, Anmeldung und Auswertung. Damit gilt für jede
+Buchung: Basis + Steuer = Rechnungsbetrag **und** Steuer = 6 % der Basis. Die
+Probe geht auf null auf. Rechnet ein Portal zu viel, bleibt der Überhang im
+Entgelt – er ist keine Steuer, die wir schulden. Airbnb bleibt unberührt.
+
+**Folge, die eine Entscheidung braucht:** Die Dezember-Anmeldung wurde mit
+5.698,29 € / 341,90 € eingereicht, nach der neuen Regel wären es 5.652,71 € /
+339,16 € (−2,74 €). Mai 2026 geht in die andere Richtung: +1,27 €. Ob
+berichtigt wird, entscheidet der Betreiber.
+
+*Größe:* M.
+
+### AP15 · Eingangsrechnungen mit Kreditor und Kostenstelle — in Arbeit (7.8.2026)
+
+AP13 hat die Kreditoren angelegt und die Erkennung gebaut: `kreditor_zu()` findet
+zu einem Händlernamen den Lieferanten, `vorbelegung()` liefert dessen Kategorie
+und Wohnung. Beim **Anlegen** eines Belegs wird das schon genutzt.
+
+Was fehlt, ist der Rückweg:
+
+1. **Der Kreditor steht nicht am Beleg.** Nur seine Kategorie fließt ein; wer
+   später hineinsieht, erfährt nicht, welcher Lieferant erkannt wurde.
+2. **Die Zuordnung lernt nicht.** Setzt man die Kategorie von Hand, merkt sich
+   das niemand – beim nächsten Beleg desselben Händlers rät die App wieder.
+   Genau das ist die Zeitersparnis, die AP13 versprochen hat.
+3. **Die Kostenstelle ist die Wohnung.** Für Verwaltungskosten, die keiner
+   Wohnung gehören, gibt es keine Ablage.
+
+**Schritt 1 (dieser):** Kategorie von Hand setzen lernt den Kreditor.
+Trifft ein vorhandener Kreditor, bekommt er die Kategorie; trifft keiner, wird
+einer angelegt – mit `quelle: "gelernt"`, damit man die selbst entstandenen von
+den gepflegten unterscheiden kann. Das Muster ist der normalisierte
+Händlername („ROSSMANN 2540" → „rossmann"), also dieselbe Form, die
+`kreditor_zu()` beim Suchen benutzt. Der Kreditor wird am Beleg gespeichert
+(`kreditor_id`), damit die Zuordnung nachvollziehbar bleibt.
+
+Bewusst **kein** stilles Überschreiben: eine von Hand gepflegte Kategorie am
+Kreditor wird nur geändert, wenn sie leer ist oder der Kreditor selbst gelernt
+wurde. Sonst kippt ein einzelner falsch zugeordneter Beleg die Stammdaten.
+
+**Schritt 2:** Kreditor am Beleg sichtbar und änderbar.
+**Schritt 3:** Kostenstelle als eigenes Feld (Wohnung oder Verwaltung).
+
+*Größe:* M.
+
+---
+
+## Phase 7 — Die Zahlen jederzeit sehen (geprüft und neu gefasst am 7.8.2026)
+
+### Wofür das hier ist – und wofür nicht
+
+**Festgelegt am 7.8.2026:** Das Werkzeug rechnet **nicht für das Finanzamt.**
+Steuererklärung, Umsatzsteuer-Voranmeldung und EÜR macht der Steuerberater. Das
+Werkzeug soll **einen aktuellen Überblick** geben: was kommt rein, was geht
+raus, was bleibt – je Monat und je Wohnung.
+
+**Der Anlass ist der Verzug.** Der Steuerberater hinkt gelegentlich acht bis
+zehn Monate hinterher. So lange ist der Betrieb im Blindflug: kein Ergebnis,
+keine Kostenentwicklung, keine Grundlage für Preise oder Anschaffungen. Genau
+diese Lücke schließt das Werkzeug – heute tut das ein Excel-Workbook von Hand,
+und auch das nur bis zum 30.6.
+
+**Was das streicht.** Ein Überblick muss *stimmen*, aber er muss nicht
+*prüfungsfest* sein. Damit fallen weg:
+
+| Gestrichen | Warum |
+|---|---|
+| **USt-Voranmeldung als Formular** (AP21) | Macht der Steuerberater. Bleibt: die Umsatzsteuer als **Liquiditätszahl** – wie viel vom Kontostand gehört dem Finanzamt. |
+| **GoBD-Verfahrensdokumentation** | Nötig für eine Buchhaltung *of record*. Die führt der Steuerberater. |
+| **Anlagenverzeichnis mit AfA** (AP22) | Die Abschreibung rechnet der Steuerberater. Für den Überblick genügt ein fester Monatswert, damit das Ergebnis nicht zu gut aussieht. |
+| **§ 13b in aller Feinheit** | Für die Voranmeldung entscheidend, fürs Ergebnis nicht – die Steuer ist geschuldet und abziehbar zugleich, ein Nullsummenspiel. |
+| **Die Zwei-Stichtage-Asymmetrie** | War die Konsequenz der Ist-Versteuerung für eine *korrekte Voranmeldung*. Für den Überblick gilt schlicht: wann das Geld geflossen ist. |
+
+Die Ist-Versteuerung bleibt trotzdem die richtige Grundlage – ein Überblick auf
+Zahlungsbasis zeigt, was tatsächlich da ist. Keine Barzahlungen heißt: **alles
+läuft über die Bank**, es gibt keine zweite Quelle.
+
+### Was übrig bleibt – und was der erste Durchgang übersah
+
+Nachgesehen im Code: fünf Bausteine fehlten ganz, und die Reihenfolge stimmte
+nicht.
+
+### Was fehlt (nachgeprüft, nicht vermutet)
+
+| Fehlt | Warum es auch für einen bloßen Überblick zählt |
+|---|---|
+| **Vorsteuer je Beleg** | Ein Beleg trägt nur `amount` – brutto. Die Umsatzsteuer ist für den Betrieb ein durchlaufender Posten; wer sie mitzählt, hält seine Kosten für höher, als sie sind. Der Überblick braucht **netto**. |
+| **Zahlungsabgleich** | Eine Ausgangsrechnung kennt `entwurf/festgeschrieben/gesendet/storniert` – aber nicht **bezahlt**. Ohne Zahlungsdatum kein Zufluss, und ohne Zufluss kein aktuelles Ergebnis. |
+| **Umsatzsteuer als Liquiditätszahl** | Nicht als Formular, sondern als Frage: wie viel vom Kontostand gehört schon dem Finanzamt? Ohne das sieht der Kontostand besser aus als die Lage. |
+| **Anlagen und Darlehen** | Nicht als Verzeichnis. Aber **Tilgung ist keine Ausgabe** und **Abschreibung ist eine** – wer beides ignoriert, liest ein Ergebnis, das es nicht gibt. Feste Monatswerte genügen. |
+| **Portalprovision** | Siehe unten – der schwerste Fund. |
+
+### Warum die Reihenfolge falsch war
+
+Ein Überblick auf Zahlungsbasis (und die Ist-Versteuerung sagt dasselbe) zählt
+den Tag, an dem das Geld fließt. Das Werkzeug bucht Belege heute nach
+*Belegdatum* und Rechnungen nach *Rechnungsdatum*.
+
+**Die Kontobewegungen sind deshalb nicht ein Paket neben der Auswertung,
+sondern ihr Fundament.** AP17 kann nicht vor AP16 fertig werden.
+
+### Zweiter Durchgang: die Erlösseite fehlte ganz
+
+Die erste Fassung dieser Phase sah nur auf die **Ausgabenseite**. Nachgeprüft:
+**„Provision" kommt im Code nicht vor** – nur als Prosa in zwei Kommentaren.
+Das ist die größte Lücke von allen:
+
+> **Airbnb und Booking zahlen NETTO aus.** Was auf dem Konto ankommt, ist der
+> Gastpreis **minus Provision**. Bucht man diesen Betrag als Erlös, ist die EÜR
+> auf **beiden** Seiten zu niedrig: der Erlös um die Provision, die
+> Betriebsausgabe um denselben Betrag. Das Ergebnis stimmt zufällig – die
+> Umsätze nicht, und die USt-Voranmeldung erst recht nicht.
+
+Dazu kommt: **Nicht jede Einnahme hat eine Rechnung.** Die EÜR muss alles
+erfassen, was zugeflossen ist. Ein Zahlungseingang ohne Gegenpart darf kein
+stiller Rest bleiben.
+
+Und im Zahlungseingang eines Gastes steckt die **Beherbergungssteuer** – ein
+durchlaufender Posten, der kein Erlös ist. Die Zuordnung muss ihn heraustrennen.
+
+### Weitere Funde des zweiten Durchgangs
+
+| Fehlt | Befund |
+|---|---|
+| **Dauerbelege** | `dauerbeleg` ist ein Textfeld am Kreditor mit Tooltip – mehr nicht. Miete, Darlehen und Smoobu werden monatlich abgebucht, ohne dass jemand einen Beleg fotografiert. Sie müssen ohne Monatsbeleg buchbar sein. |
+| **Übernahmestichtag** | Das Workbook ist auf den 30.6.2026 gebucht. Beginnt das Werkzeug zu rechnen, ohne dass ein Stichtag feststeht, zählt das Halbjahr doppelt. |
+| **Vollständigkeit und Abstimmung** | Eine Lücke im Bank-CSV meldet niemand – sie sieht aus wie ein ruhiger Monat. Nötig: Saldo-Abgleich, lückenlose Zeiträume, „Bewegung ohne Gegenpart" (das Blatt „Fehlende Belege" des Workbooks). |
+| **GoBD-Verfahrensdokumentation** | Pflicht, sobald die Buchhaltung im Werkzeug entsteht. Kommt in keinem Paket vor. |
+
+### Entschieden am 7.8.2026: Ist-Versteuerung, keine Barzahlungen
+
+**Ist-Versteuerung** (§ 20 UStG): die Umsatzsteuer entsteht mit dem
+**Zahlungseingang**, nicht mit der Rechnung. Damit hängt die Voranmeldung
+(AP21) zwingend am Zahlungsabgleich (AP20) – der teurere der beiden Wege.
+
+**Keine Barzahlungen**: kein Kassenbuch nötig. Und weil damit **jeder** Erlös
+über die Bank läuft, ist der Kontoimport (AP16) nicht nur das Fundament der
+EÜR, sondern auch das der Umsatzsteuer.
+
+> **Die Asymmetrie, die daraus folgt – und die man leicht übersieht:**
+> Die Ist-Versteuerung betrifft nur die **eigene** Umsatzsteuer. Der
+> **Vorsteuerabzug** hängt nach § 15 UStG am Rechnungseingang und der
+> erbrachten Leistung, **nicht** an der Zahlung (Ausnahme: Anzahlungen).
+> Die Voranmeldung zieht also aus **zwei verschiedenen Stichtagen**:
+>
+> | Zeile | Stichtag | Quelle |
+> |---|---|---|
+> | Umsatzsteuer 7 %/19 % | Zahlungs**eingang** | AP20 |
+> | Vorsteuer | **Rechnungsdatum** des Belegs | AP15/AP19 |
+> | § 13b (Booking, Meta) | Leistungs-/Rechnungsmonat | AP19/AP23 |
+>
+> Ein Werkzeug, das alles über einen Stichtag rechnet, liefert eine falsche
+> Voranmeldung. **Vom Steuerberater bestätigen lassen**, bevor AP21 gebaut wird.
+
+Zweite Folge: Gäste zahlen oft **vor** dem Aufenthalt. Bei Ist-Versteuerung
+entsteht die Umsatzsteuer schon mit dieser Zahlung – der Umsatzmonat ist also
+nicht der Aufenthaltsmonat. Für die Beherbergungssteuer gilt weiter der
+**Abreisemonat** (§ 6 der Satzung). Zwei Steuern, zwei Stichtage, dieselbe
+Buchung.
+
+### Die Kette, in dieser Reihenfolge
+
+```
+Ausgaben:  Beleg (AP15) ──► Vorsteuer (AP19) ──┐
+                                               ├──► Zuordnung ──► EÜR (AP17)
+Erlöse:    Rechnung (AP14) ──► Provision (AP23)┤     (AP20)         USt-VA (AP21)
+                                               │
+Geld:      Konto (AP16) ───────────────────────┘
+```
+
+AP19 und AP16 hängen nicht voneinander ab und können nebeneinander laufen.
+Alles läuft in **AP20** zusammen – das ist das schwerste Paket, nicht AP17.
+
+### AP19 · Vorsteuer und Steuersätze am Beleg — offen *(vor AP17)*
+
+Netto, Steuersatz und Steuerbetrag je Beleg statt nur eines Bruttobetrags; ein
+Kennzeichen für **§ 13b** (Booking, Meta) und für „ohne Vorsteuerabzug". Die
+OCR liest den Steuerbetrag, wo er auf dem Beleg steht.
+
+**Zusammen mit AP28a bauen.** Bei einer E-Rechnung stehen genau diese Felder
+exakt im eingebetteten XML – Raten ist dort weder nötig noch erlaubt. Wer AP19
+allein auf die OCR baut, baut den schwierigeren Fall zuerst. *Größe:* M.
+
+### AP16 · Kontobewegungen einlesen — ✅ erledigt (7.8.2026)
+
+Beide Auszüge werden eingelesen: DKB-Business und DKB-VISA-Karte. Gebaut gegen
+die **echten Exporte** vom 24.7.2026, nicht gegen erfundene Muster – zwei
+Fallen wären sonst nicht aufgefallen.
+
+**Das Format erkennt sich am Inhalt**, nicht am Dateinamen: beide Dateien haben
+vier Kopfzeilen (Kontoname, Zeitraum, Saldo) vor der Spaltenzeile, gesucht wird
+nach `Buchungsdatum` (Konto) bzw. `Belegdatum` (Karte). Eine fremde Datei sagt
+das in einem Satz – eine stumm leere Liste sähe aus wie ein Monat ohne Umsätze.
+
+**Falle 1: die zweistellige Jahreszahl.** Die DKB schreibt `24.07.26`. Ohne
+Auslegung wäre das das Jahr 26. Ausgelegt wird ins Jahrhundert von heute; was
+mehr als ein Jahr in der Zukunft läge, gilt als Vorjahrhundert (`01.01.99` →
+1999).
+
+**Falle 2: der Kreditkarten-Ausgleich steht in BEIDEN Auszügen** – im Girokonto
+als Abbuchung („KREDITKARTENABRECHNUNG VISA"), auf der Karte als Gutschrift
+(„Ausgleich Kreditkarte"). Wer beide einliest und alles zusammenzählt, zählt
+die Kartenkäufe doppelt. Es ist keine Ausgabe, sondern eine **Umbuchung
+zwischen eigenen Konten**: erkannt, gekennzeichnet und aus Summen
+herausgehalten – aber im Auszug sichtbar, denn passiert ist sie.
+
+**Ein zweiter Import darf nichts kaputtmachen.** Auszüge überschneiden sich.
+Der Satzschlüssel ist der Fingerabdruck der Bewegung (Konto, Datum, Betrag,
+Text) statt einer laufenden Nummer, die in jedem Export neu beginnt. Beim
+erneuten Einlesen werden die Bankfelder aufgefrischt, die eigenen Zuordnungen
+(Beleg, Rechnung, Kategorie) **nicht angerührt** – sonst wäre jede Wiederholung
+ein Rückschritt.
+
+Neuer Bereich **Konto** in der Oberfläche: Auszug hochladen, Summen je Monat,
+Bewegungsliste. Die Rückmeldung nennt bewusst auch die Dubletten – bei
+überlappenden Auszügen ist es der Normalfall, dass aus 169 Zeilen 12 neue Sätze
+werden.
+
+Gegen die echten Dateien geprüft: 169 + 24 Bewegungen, je 6 Umbuchungen auf
+beiden Seiten erkannt, keine Dublette. `app/kontoauszug.py` (Lesen, ohne
+Datenbank) und `app/konto.py` (Ablage) getrennt, 26 Tests in
+`tests/test_kontoauszug.py`.
+
+*Größe:* L.
+
+### AP23 · Portalabrechnung: brutto buchen, Provision als Ausgabe — offen
+
+Der Erlös ist der **Gastpreis**, die Provision eine **Betriebsausgabe** – auch
+wenn nur die Differenz auf dem Konto ankommt. Je Kanal verschieden: Airbnb
+zahlt netto aus (earnings-PDF), Booking rechnet die Provision teils getrennt ab.
+
+Fürs Ergebnis ist das ein Nullsummenspiel – für den **Überblick** nicht: ohne
+dieses Paket kennt man weder den echten Umsatz noch, was die Portale kosten.
+Das ist eine der Zahlen, wegen derer das Werkzeug überhaupt gebaut wird.
+*Größe:* M.
+
+### AP24 · Bewegungen erkennen: Dauerbelege und was keine Ausgabe ist — ✅ erledigt (7.8.2026)
+
+**Als nächstes gebaut, weil die echten Daten es so sagen.** Ausgezählt über die
+193 eingelesenen Bewegungen: **93 von 122 Ausgängen (76 %, 87 % des Volumens)
+gehen an immer denselben Empfänger** – Miete, Hausgeld, Löhne, Wäscherei,
+Strom, Wasser, Software, Darlehen. Für keinen davon wird je ein Beleg
+fotografiert.
+
+Zum Vergleich: im Bestand liegen **vier** Belege. AP19 (Vorsteuer je Beleg)
+zuerst zu bauen hieße, mit dem kleinsten Teil anzufangen.
+
+**Drei der größten Posten sind gar keine Betriebsausgaben:**
+
+| Empfänger | | Summe | |
+|---|---:|---:|---|
+| Daniel Steinhauß | 8× | −5.335 € | **Privatentnahme** |
+| Landeshauptstadt Dresden | 10× | −2.428 € | **abgeführte Beherbergungssteuer**, durchlaufend |
+| TARGOBANK | 7× | −1.077 € | Darlehen – **Tilgung ist keine Ausgabe** |
+
+Wer die Kontosummen als Ergebnis liest, rechnet sich um über 8.000 € arm.
+Damit fällt der Kern von AP22 hier mit ab.
+
+**Gebaut wird auf Vorhandenem:** `stammdaten.kreditor_zu()` erkennt heute schon
+Lieferanten am Händlernamen eines Belegs – dieselbe Erkennung greift auf dem
+**Empfänger einer Kontobewegung**. Und `buchhaltung.KLASSEN` unterscheidet
+bereits `Ausgabe`, `Privat/prüfen`, `Durchlaufend`, `Neutral`, `Einnahme` –
+genau die Trennung, die hier fehlt.
+
+**Ohne dieses Paket ist AP25 unbrauchbar:** „Bewegung ohne Beleg" meldete sonst
+93 Dauer-Fehlalarme, jeden Monat dieselben. Eine Liste, die immer rot ist,
+liest niemand.
+
+**Gebaut:** `konto.erkennen()` in drei Stufen – Dauerarten zuerst (sie
+entscheiden über die Klasse, ein Kreditor-Treffer würde eine Privatentnahme
+sonst zur Ausgabe machen), dann die Kreditoren, dann nichts. **Raten wäre
+schlimmer als schweigen:** was unbekannt ist, bleibt leer und wartet auf einen
+Menschen. Eingänge bekommen keine Kategorie – was ein Erlös ist, entscheiden
+erst AP20 und AP23. Was von Hand gesetzt wurde, wird nie überschrieben.
+
+**Zwei Zahlen statt einer:** `monatssummen()` liefert jetzt `geldfluss` **und**
+`ergebnis`. Der Geldfluss ist, was auf dem Konto passiert ist; das Ergebnis
+lässt Privatentnahmen, durchlaufende Posten und Neutrales weg. Dazu `unklar`,
+die Zahl der noch nicht zugeordneten Ausgänge – solange sie größer als null
+ist, sagt die Anzeige, dass das Ergebnis eine Näherung ist.
+
+**An den echten Daten:** 154 von 193 Bewegungen erkannt, 39 Ausgänge offen.
+
+| | Geldfluss | Ergebnis |
+|---|---:|---:|
+| Januar–Juni 2026 | −834,93 € | **6.235,60 €** |
+
+> **Gegenprobe gegen das Workbook:** Es weist für dasselbe Halbjahr
+> **6.048,85 €** aus – **3,1 % Unterschied**, bei 33 noch unzugeordneten
+> Ausgängen, ungetrennter Darlehenstilgung und fehlender Abschreibung. Der
+> Weg über die Kontobewegungen trägt also.
+
+8 neue Tests (34 in `tests/test_kontoauszug.py`), gegengeprüft: ohne die
+Dauerarten fallen fünf durch.
+
+*Größe:* M *(vorher S – die Klassen kamen dazu).*
+
+### AP20 · Zahlungsabgleich: Bewegung ↔ Beleg/Rechnung — offen *(das schwerste)*
+
+Hier läuft alles zusammen. Jede Kontobewegung bekommt ihren Gegenpart: eine
+Ausgangsrechnung wird **bezahlt** (und trägt ein Zahlungsdatum), ein Beleg wird
+beglichen, ein Dauerbeleg erkannt. Erkennung über Betrag, Datum und
+Verwendungszweck; was nicht eindeutig ist, bleibt ein **Klärfall** statt still
+zu raten.
+
+Drei Fälle, die nicht einfach „Bewegung = Beleg" sind:
+
+* **Plattform-Auszahlung** – ein Betrag für viele Buchungen, netto nach
+  Provision (siehe AP23).
+* **Zahlungseingang eines Gastes** – darin steckt die Beherbergungssteuer, ein
+  durchlaufender Posten, der kein Erlös ist.
+* **Eingang ohne Rechnung** – muss trotzdem in die EÜR und darf kein stiller
+  Rest bleiben.
+
+**Der Weg muss in beide Richtungen gehen** (geschärft 7.8.2026). Bisher stand
+hier nur „Bewegung bekommt ihren Gegenpart". Im Alltag ist der häufigere Weg
+der umgekehrte: man sieht eine Abbuchung, zu der der Beleg fehlt, und lädt ihn
+**von dort aus** hoch – nicht erst in den Belegen, um ihn danach zu suchen.
+Genau das unterscheidet ein Werkzeug von einem Ordner voller Belege.
+
+Also: aus einer Bewegung heraus einen Beleg hochladen oder einen vorhandenen
+auswählen, und aus einem Beleg heraus die passende Bewegung. *Größe:* XL.
+
+### AP25 · Vollständigkeit und Abstimmung — offen *(Pflicht, nicht Kür)*
+
+Für den Überblick wäre eine Lücke ein Schönheitsfehler. **Für die Übergabe ist
+sie der Mangel**, den das Steuerbüro Monate später zurückfragt – und dann weiß
+niemand mehr, wofür die 84,90 € waren.
+
+Saldo-Abgleich gegen den Kontoauszug, lückenlose Zeiträume beim Import (eine
+fehlende Woche sieht sonst aus wie ein ruhiger Monat), und vor allem die Liste
+**„Bewegung ohne Beleg"** – das Blatt „Fehlende Belege" des Workbooks, nur
+laufend statt einmal im Jahr. Sie ist das Maß dafür, ob die Übergabe
+vollständig ist.
+
+> **Belegpflicht gehört an die Kategorie** (ergänzt 7.8.2026, beim Nachprüfen
+> gefunden). **Nicht jede Bewegung braucht einen Beleg:** für eine
+> Privatentnahme, eine Darlehenstilgung, einen Lohn oder die an die Stadt
+> abgeführte Steuer gibt es keinen Lieferantenbeleg. Meldete die Liste alle
+> 122 Ausgänge, wäre sie so unbrauchbar wie eine Liste, die immer rot ist –
+> genau der Fehler, den AP24 auf der anderen Seite vermieden hat.
+>
+> Je Kategorie also ein Kennzeichen: **Beleg erwartet – ja/nein**. Erst dann
+> misst „Bewegung ohne Beleg" etwas.
+
+*Die GoBD-Verfahrensdokumentation ist am 7.8.2026 entfallen* – sie gehört zu
+einer Buchhaltung, die dem Finanzamt vorgelegt wird. Die führt der
+Steuerberater. *Größe:* M.
+
+### AP26 · Übernahmestichtag aus dem Workbook — offen
+
+Das Workbook ist auf den 30.6.2026 gebucht. Ohne festen Stichtag zählt das
+erste Halbjahr doppelt, sobald das Werkzeug rechnet. Klein, aber es muss vor
+der ersten echten EÜR stehen. *Größe:* S.
+
+### AP21 · Umsatzsteuer als Liquiditätszahl — offen *(war: Voranmeldung)*
+
+**Zurückgeschnitten am 7.8.2026.** Die Voranmeldung macht der Steuerberater.
+Was bleibt, ist die Frage, die im Alltag zählt: **wie viel vom Kontostand
+gehört schon dem Finanzamt?** Vereinnahmte Umsatzsteuer minus Vorsteuer, je
+Monat, als eine Zahl neben dem Ergebnis – damit ein guter Kontostand nicht über
+eine fällige Zahlung hinwegtäuscht. Kein Formular, keine Feldnummern.
+*Größe:* S *(vorher L).*
+
+### AP17 · Der Überblick: Einnahmen, Ausgaben, Ergebnis — offen *(nach AP20, AP26)*
+
+**Das Ziel der ganzen Phase.** Aus den zugeordneten Kontobewegungen: Einnahmen,
+Ausgaben und Ergebnis je Monat und je Wohnung, dazu die Entwicklung über das
+Jahr und die Umsatzsteuer-Zahl aus AP21. Das, was heute das Workbook liefert –
+nur ohne acht Monate Verzug und ohne Handarbeit.
+
+Der CSV-Export in den acht Spalten des Kontenjournals bleibt, solange der
+Steuerberater und das Workbook damit arbeiten. Er ist die **Übergabe**, nicht
+mehr das Ergebnis. *Größe:* L.
+
+### AP22 · Was das Ergebnis sonst verzerrt: Darlehen und Abschreibung — offen
+
+**Zurückgeschnitten am 7.8.2026** – kein Anlagenverzeichnis, das rechnet der
+Steuerberater. Es geht nur darum, dass der Überblick nicht lügt:
+
+* **Tilgung ist keine Ausgabe**, Zins schon. Wer die ganze Rate abzieht, hält
+  sein Ergebnis für schlechter, als es ist.
+* **Abschreibung ist eine Ausgabe**, taucht aber auf keinem Kontoauszug auf.
+  Ohne sie sieht das Ergebnis besser aus, als es ist.
+* **Privatentnahmen** sind weder das eine noch das andere und müssen aus dem
+  Ergebnis heraus.
+
+Feste Monatswerte, von Hand gepflegt, wie heute im Workbook. *Größe:* S
+*(vorher M).*
+
+---
+
+## Der zweite Zweck: die Übergabe ans Steuerbüro (festgelegt 7.8.2026)
+
+Das Werkzeug hat **zwei** Aufgaben, nicht eine:
+
+1. **Der laufende Überblick** – für den Betrieb, gegen den Verzug (oben).
+2. **Das Sammeln und Übergeben** – am Ende bekommt der Steuerberater alle
+   Belege. Gesammelt wird im Werkzeug, abgelegt in der Nextcloud.
+
+Damit ändert sich der Rang von AP18: **es ist kein Anhängsel, sondern der
+zweite Ausgang.** Und es stellt eine Anforderung an alles davor, die der
+Überblick allein nicht stellt: **Vollständigkeit als Pflicht.** Für eine
+Übersicht ist ein fehlender Beleg ein Schönheitsfehler – für die Übergabe ist
+er die Rückfrage, die Monate später niemand mehr aufklären kann.
+
+**Vier Belegströme, zwei davon gibt es noch nicht:**
+
+| Strom | Stand |
+|---|---|
+| Eingangsbelege (Foto/PDF) | ✅ vorhanden, wird gespiegelt |
+| Ausgangsrechnungen (PDF) | ✅ vorhanden, revisionssicher abgelegt |
+| **Kontoauszüge** | ❌ – kommt mit AP16 |
+| **Portalabrechnungen** (Airbnb earnings, Booking) | ❌ – kommt mit AP23 |
+
+### AP18 · Ablage in der Nextcloud: Sammeln und Übergeben — offen *(neu gefasst)*
+
+Heute spiegelt das Werkzeug Datei für Datei in einen Ordner (`archiv_spiegel`,
+wahlweise WebDAV) – ohne Ordnung, ohne Vollzähligkeit, ohne Bezug zur Buchung.
+Nötig ist eine Ablage, in der das Steuerbüro **allein zurechtkommt**:
+
+* **Ordnung nach Jahr und Monat**, je Strom ein Ordner.
+* **Sprechende Dateinamen** mit Datum, Lieferant und Betrag – nicht `a3f9c1.jpg`.
+* **Eine Belegnummer**, die auf dem Dokument *und* im Buchungssatz steht.
+  Ohne sie kann niemand vom einen zum anderen finden.
+* **Ein Monat wird abgeschlossen und dann nicht mehr angefasst** – der
+  Monatsabschluss gibt es schon, er muss nur die Ablage mitnehmen.
+
+*Größe:* L *(vorher unbeziffert).*
+
+### AP28 · E-Rechnung: empfangen (gilt schon) und senden (ab 2028) — offen
+
+Zwei Hälften mit sehr verschiedener Dringlichkeit. **Die eine ist keine
+Vorbereitung, sondern Rückstand.**
+
+#### a) Empfangen — Pflicht seit 1.1.2025
+
+Jedes inländische Unternehmen muss strukturierte Rechnungen **entgegennehmen
+können**. Das Werkzeug kann es nicht: Belege laufen als Foto oder PDF durch die
+OCR. Eine reine **XRechnung** (XML) lässt sich gar nicht erst sinnvoll
+hochladen, und eine **ZUGFeRD**-Rechnung (PDF mit eingebettetem XML) wird wie
+ein Bild behandelt – die exakten Daten stecken darin und werden weggeworfen,
+während die OCR daneben rät.
+
+> **Das ist kein Aufwand, das ist eine Abkürzung.** Aus dem XML kommen
+> Lieferant, Rechnungsnummer, Datum, Netto, Steuersatz und Steuerbetrag
+> **exakt** – genau die Felder, für die AP19 gebaut wird. Für jede so
+> gelieferte Rechnung entfällt das Raten vollständig.
+
+Nötig: XML aus dem PDF ziehen bzw. eine `.xml` direkt annehmen, die Felder
+übernehmen statt zu erkennen, und das **XML unverändert aufbewahren** – ein
+PDF-Ausdruck davon genügt der Aufbewahrung nicht (betrifft AP18).
+
+> **Offene Frage: reicht Hochladen noch?**
+>
+> „Belege aus dem Postfach holen" steht unter *Bewusst nicht auf dem Fahrplan* –
+> verworfen am 7.8.2026 mit der Begründung, Hochladen genüge. **Für
+> E-Rechnungen trifft diese Begründung nicht mehr zu:** sie kommen praktisch
+> immer per Mail, und was am Handy davon fotografiert oder als Bild
+> weitergereicht wird, ist keine E-Rechnung mehr – das XML fehlt, und damit
+> genau der Teil, der aufbewahrt werden muss und der die Felder liefert.
+>
+> Drei Wege, noch nicht entschieden:
+>
+> 1. **Postfachabruf** wie in `rechnung-automation` (Microsoft Graph). Löst es
+>    vollständig, bringt aber Postfachzugang, Filterregeln je Absender und
+>    Dublettenschutz mit – genau das, was 7.8. zu teuer erschien.
+> 2. **Datei-Upload aus der Mail heraus**: der Anhang wird von Hand
+>    weitergereicht, aber als Datei (`.pdf`/`.xml`), nicht als Foto. Kostet
+>    nichts und deckt den Normalfall – setzt aber Disziplin voraus.
+> 3. **Eigene Sammeladresse**, an die Lieferantenrechnungen weitergeleitet
+>    werden und die das Werkzeug leert. Zwischen 1 und 2.
+>
+> Zu klären, bevor AP28a gebaut wird – die Antwort ändert seinen Zuschnitt.
+
+#### b) Senden — für diesen Betrieb ab 1.1.2028
+
+Die Übergangsfristen: bis Ende 2026 dürfen Papier und PDF weiter verwendet
+werden, ab 1.1.2027 müssen Unternehmen über 800.000 € Vorjahresumsatz senden,
+ab **1.1.2028 alle** – im inländischen **B2B**. Nach den vorliegenden Zahlen
+liegt der Betrieb weit unter der Schwelle, es gilt also 2028.
+
+Zwei Einschränkungen, die den Umfang klein halten:
+
+* **Gäste als Privatpersonen sind nicht betroffen.** Die Pflicht gilt B2B. Für
+  die große Mehrheit der Rechnungen ändert sich nichts.
+* **Betroffen sind Geschäftskunden** – und die gibt es (die abgestimmte Vorlage
+  heißt nicht ohne Grund „B2B"). Für sie braucht es ab 2028 ein strukturiertes
+  Format.
+
+**Vorschlag ZUGFeRD statt reiner XRechnung.** ZUGFeRD ist ein PDF mit
+eingebettetem XML: die Rechnung bleibt lesbar – das eben erst gesetzte Layout
+bleibt erhalten – und ist zugleich maschinenlesbar. Eine reine XRechnung wäre
+nur XML und für den Gast unbrauchbar. *(Nur wer an Behörden fakturiert, braucht
+XRechnung; für Ferienwohnungen der Ausnahmefall.)*
+
+**Technischer Stolperstein:** ZUGFeRD verlangt **PDF/A-3**. Das erzeugt PyMuPDF
+nicht von selbst – das ist der eigentliche Aufwand dieses Pakets, nicht das XML.
+
+**Fristen und Schwellen vom Steuerberater bestätigen lassen**, bevor gebaut
+wird. *Größe:* a) M · b) L.
+
+### AP27 · Vorkontierung: dem Steuerbüro die Arbeit abnehmen — offen
+
+Die Kategorien des Werkzeugs sind heute die SUMIF-Kriterien des Workbooks –
+Klartext, keine Konten. Ein Steuerbüro braucht **Konto, Gegenkonto,
+Steuerschlüssel, Belegfeld und Kostenstelle**.
+
+Vorgesehen: eine Zuordnung **Kategorie → Konto** in den Stammdaten (einmal
+gepflegt, danach automatisch), der Steuerschlüssel aus dem Steuersatz des
+Belegs (AP19), das Belegfeld aus der Belegnummer (AP18) und die Kostenstelle
+aus der Wohnung. Der Mensch prüft, das Werkzeug schlägt vor.
+
+**Offen und zu klären, bevor das gebaut wird:** *womit* arbeitet das Steuerbüro?
+Davon hängt alles ab – Kontenrahmen (SKR03 oder SKR04), Steuerschlüssel und das
+Übergabeformat. *Größe:* M–L, je nach Antwort.
