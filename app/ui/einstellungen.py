@@ -505,22 +505,36 @@ def _preiszeile(produkt, wohnung_id, wohnung_name, neu_zeichnen):
             .props("type=date outlined dense").classes("w-40") \
             .mark(f"preis-ab-{wohnung_id}")
 
-        def setzen(w=wohnung_id, b=betrag, a=ab):
+        def setzen(w=wohnung_id, b=betrag, a=ab, still=False):
+            """Preis uebernehmen. `still` unterdrueckt die Meckerei – das
+            braucht der Blur-Weg, der auch bei leerem Feld ausloest."""
             wert = buchhaltung.betrag_zahl(b.value)
             if not wert:
-                ui.notify("Bitte einen Betrag eintragen, z. B. 65,00.", type="warning")
+                if not still:
+                    ui.notify("Bitte einen Betrag eintragen, z. B. 65,00.",
+                              type="warning")
                 return
             if not (a.value or "").strip():
-                ui.notify("Bitte ein Datum wählen, ab dem der Preis gilt.",
-                          type="warning")
+                if not still:
+                    ui.notify("Bitte ein Datum wählen, ab dem der Preis gilt.",
+                              type="warning")
                 return
             stammdaten.preis_setzen(produkt["id"], w, a.value, wert)
             b.value = ""
             ui.notify(f"{wohnung_name}: {wert:.2f} € ab {a.value}", type="positive")
             spaeter(neu_zeichnen)
+
+        # Drei Wege zum selben Ziel, weil dieser Bildschirm in einem Dialog mit
+        # eigenem „Speichern" steht: wer den Preis eintippt und dann Speichern
+        # drueckt, erwartet zu Recht, dass er gespeichert ist. Der Preis haengt
+        # aber an dieser Zeile, nicht am Dialog. Deshalb uebernimmt schon das
+        # Verlassen des Feldes – Enter und der Knopf tun dasselbe.
+        betrag.on("blur", lambda: setzen(still=True))
         betrag.on("keydown.enter", lambda: setzen())
-        ui.button(icon="add", on_click=setzen).props("flat dense round color=primary") \
-            .tooltip("Preis ab diesem Buchungsdatum").mark(f"preis-setzen-{wohnung_id}")
+        ui.button("Übernehmen", icon="add", on_click=lambda: setzen()) \
+            .props("flat dense no-caps color=primary") \
+            .tooltip("Gilt für Buchungen ab diesem Datum") \
+            .mark(f"preis-setzen-{wohnung_id}")
 
 
 def _kreditoren_liste(neu_zeichnen):

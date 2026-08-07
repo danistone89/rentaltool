@@ -374,3 +374,24 @@ async def test_die_managerin_sieht_den_bereich_nicht(user: User, app_bereit, mon
     user.find("Anmelden").click()
     await user.open("/")
     await user.should_not_see(marker="nav-rechnungen")
+
+
+def test_die_rechnungssuche_hat_ihr_eigenes_fenster():
+    """Der Fehler vom 7.8.2026: „Entwürfe suchen" nahm die Reinigungsliste, und
+    die blickt nur EINEN Tag zurück – sie ist für den Alltag gebaut, nicht für
+    die Buchhaltung. Von 48 abgereisten Buchungen war damit genau eine
+    erreichbar; der Knopf schien nichts zu tun."""
+    from datetime import date, timedelta
+    assert rechnung.RUECKBLICK_TAGE >= 60, \
+        "Zu kurz – Rechnungen entstehen nach dem Aufenthalt, oft mit Verzug."
+    heute = date.today()
+    alt = [{"id": 1, "departure": (heute - timedelta(days=40)).isoformat()}]
+    assert rechnung.faellige_buchungen(alt, heute), \
+        "Eine Abreise vor 40 Tagen muss eine faellige Rechnung sein"
+
+
+def test_kuenftige_abreisen_bleiben_aussen_vor():
+    from datetime import date, timedelta
+    heute = date.today()
+    kuenftig = [{"id": 1, "departure": (heute + timedelta(days=2)).isoformat()}]
+    assert rechnung.faellige_buchungen(kuenftig, heute) == []

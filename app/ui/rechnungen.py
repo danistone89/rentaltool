@@ -186,10 +186,15 @@ def _aktionen(r):
 # ------------------------------------------------------------------ Aktionen
 def _entwuerfe_erzeugen(neu_laden):
     from app.ui import buchungen as ui_buchungen
-    jobs = ui_buchungen._cleaning_jobs(quiet=True)
+    # Bewusst mit eigenem Fenster: die Reinigungsliste blickt einen Tag zurück,
+    # weil sie für den Alltag gebaut ist. Eine Rechnung entsteht nach dem
+    # Aufenthalt, oft mit Verzug – hier zählt die Vergangenheit.
+    tage = rechnung.RUECKBLICK_TAGE
+    jobs = ui_buchungen._cleaning_jobs(days_ahead=0, days_back=tage, quiet=True)
     faellig = rechnung.faellige_buchungen(jobs)
     if not faellig:
-        ui.notify("Keine abgereiste Buchung ohne Rechnung.", type="info")
+        ui.notify(f"In den letzten {tage} Tagen hat jede abgereiste Buchung "
+                  f"schon eine Rechnung.", type="info", timeout=6000)
         return
     gaeste = data.gastdaten()
     neu, mit_befund = 0, 0
@@ -198,9 +203,9 @@ def _entwuerfe_erzeugen(neu_laden):
         if e:
             neu += 1
             mit_befund += 1 if befunde else 0
-    ui.notify(f"{neu} Entwurf/Entwürfe angelegt"
+    ui.notify(f"{neu} Entwurf/Entwürfe aus den letzten {tage} Tagen angelegt"
               + (f", davon {mit_befund} mit offenen Punkten." if mit_befund else "."),
-              type="positive", timeout=6000)
+              type="positive", timeout=8000)
     spaeter(neu_laden)
 
 

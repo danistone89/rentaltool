@@ -46,6 +46,11 @@ VORGABE_STARTNUMMER = 76
 
 USTSATZ = 0.07
 
+# Wie weit „Entwürfe suchen" zurückblickt. Die Reinigungsliste schaut nur einen
+# Tag zurück – sie ist für den Alltag gebaut, nicht für die Buchhaltung. Eine
+# Rechnung entsteht aber nach dem Aufenthalt, oft mit Verzug.
+RUECKBLICK_TAGE = 90
+
 
 def _jetzt():
     return datetime.now().isoformat(timespec="seconds")

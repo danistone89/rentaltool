@@ -286,3 +286,43 @@ async def test_ohne_betrag_sagt_es_die_oberflaeche(user: User, app_bereit):
     await user.should_see("Bitte einen Betrag eintragen")
     p = st.produkt_der_art(st.FEST)
     assert st.preisverlauf(p["id"], COTTAER) == []
+
+
+async def test_das_verlassen_des_feldes_reicht(user: User, app_bereit):
+    """Der Bildschirm steht in einem Dialog mit eigenem „Speichern". Wer den
+    Preis eintippt und dann Speichern drückt, erwartet zu Recht, dass er
+    gespeichert ist – der Preis hängt aber an seiner Zeile. Deshalb übernimmt
+    schon das Verlassen des Feldes."""
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see(marker=f"preis-betrag-{COTTAER}")
+    with user.client:
+        feld = next(iter(user.find(marker=f"preis-betrag-{COTTAER}").elements))
+        feld.value = "65,00"
+        blur = [x for x in feld._event_listeners.values() if x.type == "blur"]
+        assert blur, "Das Feld übernimmt beim Verlassen nicht"
+        blur[0].handler()                      # genau das, was der Browser tut
+    p = st.produkt_der_art(st.FEST)
+    assert st.preisverlauf(p["id"], COTTAER)[0]["betrag"] == 65.0
+
+
+async def test_verlassen_eines_leeren_feldes_meckert_nicht(user: User, app_bereit):
+    """Sonst käme bei jedem Klick daneben eine Warnung."""
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see(marker=f"preis-betrag-{COTTAER}")
+    with user.client:
+        feld = next(iter(user.find(marker=f"preis-betrag-{COTTAER}").elements))
+        blur = [x for x in feld._event_listeners.values() if x.type == "blur"]
+        blur[0].handler()
+    await user.should_not_see("Bitte einen Betrag eintragen")
+
+
+async def test_der_knopf_heisst_jetzt_uebernehmen(user: User, app_bereit):
+    """Ein Pluszeichen sagt nicht, dass es speichert."""
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see("Übernehmen")
