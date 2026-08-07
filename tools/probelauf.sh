@@ -80,15 +80,19 @@ PY
   QUELLE="$ZIEL"        # ab hier ist die entschaerfte Kopie die Quelle
 fi
 
-if [ ! -f "$QUELLE/config.json" ]; then
-  echo "Keine config.json in $QUELLE gefunden." >&2
-  echo "Beim ersten Mal mit --von-live starten." >&2
-  exit 1
-fi
-# Konfiguration bei jedem Start frisch – damit geaenderte Einstellungen
-# (Betreiberdaten, Nummernkreis) mitkommen. Die Datenbank bleibt stehen.
-# Nach --von-live ist die Quelle schon das Ziel; dann waere es dieselbe Datei.
-if [ "$QUELLE" != "$ZIEL" ]; then
+# Eine vorhandene Konfiguration im Probeordner bleibt stehen.
+#
+# Frueher wurde sie bei jedem Start aus dem Projektordner ueberschrieben – und
+# hat damit die Konten zerstoert, die --von-live gerade geholt hatte. Ein
+# Neustart darf nicht wegwerfen, was ein anderer Aufruf aufgebaut hat. Wer die
+# lokale Konfiguration wieder will, loescht den Ordner oder nimmt --von-live.
+if [ ! -f "$ZIEL/config.json" ]; then
+  if [ ! -f "$QUELLE/config.json" ]; then
+    echo "Keine config.json in $QUELLE gefunden." >&2
+    echo "Beim ersten Mal mit --von-live starten." >&2
+    exit 1
+  fi
+  echo "Erster Start – Konfiguration aus $QUELLE uebernommen."
   cp "$QUELLE/config.json" "$ZIEL/config.json"
 fi
 for ORDNER in templates assets; do
