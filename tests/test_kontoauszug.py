@@ -325,3 +325,84 @@ def test_eine_zuordnung_von_hand_wird_nicht_ueberschrieben():
     b = _zuordnen("Irgendwer Neu GmbH", "Strom (SachsenEnergie)")
     konto.zuordnen()
     assert db.holen(konto.TABELLE, b["id"])["kategorie"] == "Strom (SachsenEnergie)"
+
+
+# ------------------------------------------- Beleg zur Buchung (AP20, Schritt 1)
+# Die Frage aus dem Alltag: welche Belege fehlen noch? Sie ist nur brauchbar,
+# wenn sie NICHT jede Bewegung ohne Beleg meldet - sonst staenden dort auch
+# Privatentnahmen, Loehne und Darlehensraten, also 93 der 122 echten Ausgaenge.
+def test_ein_normaler_lieferant_braucht_einen_beleg():
+    b = _bewegungen()["Rena Textilpflege GmbH"]
+    assert konto.beleg_erwartet(b)
+    assert any(x["gegenpartei"] == "Rena Textilpflege GmbH"
+               for x in konto.ohne_beleg())
+
+
+def test_eine_privatentnahme_braucht_keinen():
+    """Dafuer stellt niemand eine Rechnung."""
+    b = _zuordnen("Muster Privatkonto", "Eigenübertrag / Entnahme")
+    assert not konto.beleg_erwartet(b)
+    assert not any(x["id"] == b["id"] for x in konto.ohne_beleg())
+
+
+def test_eine_umbuchung_und_ein_eingang_brauchen_keinen():
+    konto.importieren(GIRO.encode("utf-8-sig"), heute=HEUTE)
+    for b in konto.alle():
+        if b.get("umbuchung") or b["betrag"] > 0:
+            assert not konto.beleg_erwartet(b), b["gegenpartei"]
+
+
+def test_ein_dauerbeleg_am_kreditor_befreit_von_der_belegpflicht():
+    """Miete, Darlehen, Software: der Vertrag liegt einmal vor, die monatliche
+    Abbuchung braucht kein eigenes Blatt. Genau dafuer gibt es das Feld."""
+    from app import stammdaten
+    stammdaten.kreditor_anlegen("Beiden und Gareis", "Miete/Raumkosten Wernerstr. 34c (Weitervermietung)",
+                                ["beiden und gareis"], dauerbeleg="Mietvertrag vom 1.3.2024")
+    b = {"gegenpartei": "Beiden und Gareis Immobilien", "betrag": -1213.0,
+         "klasse": "Ausgabe"}
+    assert not konto.beleg_erwartet(b)
+
+
+def test_von_hand_abgehakt_verschwindet_aus_der_liste():
+    """Ohne diesen Weg bliebe jede Ausnahme fuer immer stehen - und eine Liste,
+    die man nicht leer bekommt, hoert man auf zu lesen."""
+    b = _bewegungen()["Rena Textilpflege GmbH"]
+    assert konto.beleg_erwartet(b)
+    nachher = konto.beleg_nicht_noetig(b["id"])
+    assert not konto.beleg_erwartet(nachher)
+    assert not any(x["id"] == b["id"] for x in konto.ohne_beleg())
+
+
+def test_ein_zugeordneter_beleg_verschwindet_aus_der_liste():
+    b = _bewegungen()["Rena Textilpflege GmbH"]
+    konto.beleg_setzen(b["id"], "beleg-1")
+    assert not any(x["id"] == b["id"] for x in konto.ohne_beleg())
+    # und laesst sich wieder loesen
+    konto.beleg_setzen(b["id"], "")
+    assert any(x["id"] == b["id"] for x in konto.ohne_beleg())
+
+
+def test_unzugeordnetes_steht_noch_nicht_in_der_belegliste():
+    """Erst zuordnen, dann Beleg. Solange nicht feststeht, WAS die Buchung ist,
+    laesst sich nicht sagen, ob es dazu einen Beleg gibt – eine Privatentnahme
+    sieht auf dem Auszug aus wie jede andere Abbuchung.
+
+    An den echten Daten waeren es sonst 121 von 122 Ausgaengen: wieder eine
+    Liste, die immer rot ist. Die unzugeordneten stehen ohnehin in ihrer
+    eigenen Liste (`ohne_zuordnung`)."""
+    b = _bewegungen()["Irgendwer Neu GmbH"]
+    assert not b.get("kategorie")
+    assert not konto.beleg_erwartet(b)
+    assert any(x["id"] == b["id"] for x in konto.ohne_zuordnung()), \
+        "sie darf nicht ganz verschwinden, nur in der anderen Liste stehen"
+
+
+def test_die_liste_meldet_nicht_alles():
+    """Die Probe: von den zugeordneten Ausgaengen brauchen nicht alle einen
+    Beleg. Meldete die Liste jeden, waere sie unbrauchbar."""
+    _zuordnen("Muster Privatkonto", "Eigenübertrag / Entnahme")
+    _zuordnen("Stadtkasse Musterstadt", "Beherbergungssteuer an Stadt (durchlaufender Posten)")
+    fehlen = {x["gegenpartei"] for x in konto.ohne_beleg()}
+    assert "Rena Textilpflege GmbH" in fehlen, "ein Lieferant braucht einen Beleg"
+    assert "Muster Privatkonto" not in fehlen
+    assert "Stadtkasse Musterstadt" not in fehlen

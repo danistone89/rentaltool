@@ -34,7 +34,7 @@ TABELLE = "bewegungen"
 # Felder, die dem Werkzeug gehören und nicht der Bank. Ein erneuter Import
 # lässt sie in Ruhe.
 _EIGENE = ("beleg_id", "rechnung_id", "kategorie", "klasse", "herkunft",
-           "notiz", "geprueft")
+           "beleg_noetig", "notiz", "geprueft")
 
 def _jetzt():
     return datetime.now().isoformat(timespec="seconds")
@@ -99,6 +99,83 @@ def ohne_zuordnung():
     return [b for b in alle()
             if b.get("betrag", 0) < 0 and not b.get("umbuchung")
             and not (b.get("kategorie") or "").strip()]
+
+
+# ----------------------------------------------------------- Beleg zur Buchung
+# Klassen, zu denen es keinen Lieferantenbeleg gibt. Eine Privatentnahme, eine
+# abgefuehrte Steuer, eine Umbuchung – dafuer stellt niemand eine Rechnung.
+_OHNE_BELEG = {"Privat/prüfen", "Durchlaufend", "Neutral", "Einnahme"}
+
+
+def beleg_erwartet(bewegung):
+    """Braucht diese Bewegung einen Beleg?
+
+    **Die Frage entscheidet, ob die Liste „fehlt noch" brauchbar ist.** Meldete
+    sie jede Bewegung ohne Beleg, stuenden dort auch Privatentnahmen, Loehne,
+    Darlehensraten und die an die Stadt abgefuehrte Steuer – 93 der 122
+    Ausgaenge. Eine Liste, die immer rot ist, liest niemand; genau daran waere
+    sie gescheitert.
+
+    Vier Gruende, warum kein Beleg erwartet wird:
+
+    1. **Von Hand entschieden** (`beleg_noetig=False`) – gewinnt immer.
+    2. **Eingang oder Umbuchung** – die Erloesseite haengt an Rechnungen
+       (AP20 spaeter), eine Umbuchung ist gar kein Geschaeftsvorfall.
+    3. **Die Klasse** – privat, durchlaufend, neutral.
+    4. **Ein Dauerbeleg am Kreditor** – Miete, Darlehen, Software: der Vertrag
+       liegt einmal vor, die monatliche Abbuchung braucht kein eigenes Blatt.
+       Genau dafuer gibt es das Feld seit AP13.
+    """
+    if bewegung.get("beleg_noetig") is not None:
+        return bool(bewegung["beleg_noetig"])
+    if bewegung.get("umbuchung") or bewegung.get("betrag", 0) >= 0:
+        return False
+    # **Erst zuordnen, dann Beleg.** Solange nicht feststeht, WAS die Buchung
+    # ist, laesst sich nicht sagen, ob es dazu einen Beleg gibt – eine
+    # Privatentnahme sieht auf dem Auszug aus wie jede andere Abbuchung. Ohne
+    # diese Zeile stuenden alle noch nicht zugeordneten Bewegungen in der
+    # Liste: an den echten Daten 121 von 122, also wieder eine Liste, die immer
+    # rot ist. Die unzugeordneten stehen ohnehin schon in ihrer eigenen Liste.
+    if not (bewegung.get("kategorie") or "").strip():
+        return False
+    if (bewegung.get("klasse") or "") in _OHNE_BELEG:
+        return False
+    k = stammdaten.kreditor_zu(bewegung.get("gegenpartei") or "")
+    if k and (k.get("dauerbeleg") or "").strip():
+        return False
+    return True
+
+
+def beleg_setzen(bewegung_id, beleg_id):
+    """Einen Beleg an eine Bewegung haengen (oder mit '' wieder loesen)."""
+    b = db.holen(TABELLE, bewegung_id)
+    if b is None:
+        return None
+    db.speichern(TABELLE, bewegung_id, dict(b, beleg_id=beleg_id or ""))
+    return db.holen(TABELLE, bewegung_id)
+
+
+def beleg_nicht_noetig(bewegung_id, noetig=False):
+    """Von Hand festhalten, dass es zu dieser Buchung keinen Beleg gibt.
+
+    Ohne diesen Weg bliebe jede Ausnahme fuer immer in der Liste stehen – und
+    eine Liste, die man nicht leer bekommt, hoert man auf zu lesen.
+    """
+    b = db.holen(TABELLE, bewegung_id)
+    if b is None:
+        return None
+    db.speichern(TABELLE, bewegung_id, dict(b, beleg_noetig=bool(noetig)))
+    return db.holen(TABELLE, bewegung_id)
+
+
+def ohne_beleg(von="", bis=""):
+    """Bewegungen, die einen Beleg brauchen und keinen haben – die Arbeitsliste.
+
+    Das ist die Frage aus dem Alltag: *welche Belege fehlen noch?* Und spaeter
+    das Mass dafuer, ob die Uebergabe ans Steuerbuero vollstaendig ist (AP25).
+    """
+    return [b for b in alle(von, bis)
+            if beleg_erwartet(b) and not (b.get("beleg_id") or "").strip()]
 
 
 def importieren(rohdaten, heute=None):

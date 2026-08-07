@@ -51,6 +51,60 @@ def _kategorie_wahl(bewegung):
         .mark(f"kat-{bewegung['id']}")
 
 
+def _beleg_knopf(bewegung, neu_zeichnen):
+    """Beleg zu dieser Buchung: hochladen, ansehen oder als nicht nötig abhaken.
+
+    **Der Weg geht von der Buchung aus, nicht vom Beleg.** Im Alltag sieht man
+    eine Abbuchung und hat das Papier in der Hand – nicht umgekehrt. Wer erst
+    in die Belege wechseln, hochladen und dann die passende Buchung suchen
+    müsste, tut es nicht.
+    """
+    from app import housekeeping, receipts
+    from app.ui.basis import _read_upload
+
+    beleg_id = (bewegung.get("beleg_id") or "").strip()
+    if beleg_id:
+        ui.button(icon="description",
+                  on_click=lambda: konto.beleg_setzen(bewegung["id"], "") or neu_zeichnen()) \
+            .props("flat dense round color=positive") \
+            .tooltip("Beleg hängt dran – klicken löst ihn wieder").classes("shrink-0")
+        return
+    if not konto.beleg_erwartet(bewegung):
+        return
+
+    async def hochladen(e):
+        try:
+            rohdaten, name = await _read_upload(e)
+            endung = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4]
+            doc = receipts.save_document(rohdaten, endung,
+                                         crop=not receipts.ist_pdf(rohdaten))
+            # Was die Bank schon weiß, muss niemand abtippen: Betrag, Datum und
+            # Händler stehen in der Bewegung.
+            beleg = receipts.add_receipt(
+                "konto", doc["photo"], pdf=doc.get("pdf"),
+                amount=f"{abs(bewegung['betrag']):.2f}".replace(".", ","),
+                merchant=bewegung.get("gegenpartei", ""),
+                kategorie=bewegung.get("kategorie", ""))
+            receipts.update_receipt(beleg["id"], datum=bewegung.get("datum", ""))
+            konto.beleg_setzen(bewegung["id"], beleg["id"])
+        except Exception as fehler:
+            ui.notify(f"Beleg konnte nicht gespeichert werden: {fehler}", type="negative")
+            return
+        ui.notify("Beleg gespeichert und zugeordnet ✓", type="positive")
+        neu_zeichnen()
+
+    with ui.row().classes("items-center gap-0 shrink-0 no-wrap"):
+        ui.upload(auto_upload=True, on_upload=hochladen, label="") \
+            .props('accept="image/*,application/pdf" flat dense') \
+            .classes("hk-upload w-[34px]").tooltip("Beleg hochladen") \
+            .mark(f"beleg-up-{bewegung['id']}")
+        ui.button(icon="block",
+                  on_click=lambda: (konto.beleg_nicht_noetig(bewegung["id"]),
+                                    neu_zeichnen())) \
+            .props("flat dense round").classes("text-slate-300") \
+            .tooltip("Zu dieser Buchung gibt es keinen Beleg")
+
+
 def render_konto():
     ui.label("Konto").classes("text-xl font-bold")
     ui.label("Kontoauszüge einlesen – Geschäftskonto und Kreditkarte. "
@@ -133,6 +187,40 @@ def render_konto():
                                  "Näherung.").classes("text-xs mt-2 " + ton.AUF_HINWEIS) \
                             .mark("konto-unklar")
 
+            # ---- Welche Belege fehlen noch? --------------------------------
+            # Die Frage aus dem Alltag, und spaeter das Mass dafuer, ob die
+            # Uebergabe ans Steuerbuero vollstaendig ist. Sie zaehlt nur, wo
+            # ueberhaupt ein Beleg zu erwarten ist - sonst staenden hier auch
+            # Privatentnahmen, Loehne und Darlehensraten.
+            fehlen = konto.ohne_beleg()
+            with ui.card().classes("w-full").mark("konto-fehlende-belege"):
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.icon("description").classes(
+                        "text-lg " + (ton.AUF_HINWEIS if fehlen else "text-slate-300"))
+                    ui.label("Fehlende Belege").classes("font-medium")
+                    ui.space()
+                    ui.label(str(len(fehlen))).classes(
+                        "text-sm " + (ton.AUF_HINWEIS if fehlen else "text-slate-400"))
+                if not fehlen:
+                    ui.label("Zu jeder Buchung, die einen Beleg braucht, liegt "
+                             "einer vor.").classes("text-xs text-slate-400")
+                else:
+                    ui.label("Privatentnahmen, Löhne, Darlehen und Dauerbelege "
+                             "stehen hier bewusst nicht – dafür gibt es keinen "
+                             "Lieferantenbeleg.").classes("text-xs text-slate-400")
+                    for b in fehlen[:30]:
+                        with ui.row().classes("w-full items-center gap-2 no-wrap py-1"):
+                            ui.label(_d(b["datum"])).classes(
+                                "text-xs text-slate-400 w-20 shrink-0")
+                            ui.label(b.get("gegenpartei") or "—") \
+                                .classes("text-sm truncate flex-grow min-w-0")
+                            ui.label(_eur(b["betrag"])).classes(
+                                "text-sm text-right w-24 shrink-0")
+                            _beleg_knopf(b, zeichnen)
+                    if len(fehlen) > 30:
+                        ui.label(f"… und {len(fehlen) - 30} weitere") \
+                            .classes("text-xs text-slate-400")
+
             # ---- Die Bewegungen selbst --------------------------------------
             with ui.card().classes("w-full").mark("konto-liste"):
                 ui.label("Bewegungen").classes("font-medium")
@@ -149,6 +237,7 @@ def render_konto():
                             ui.label("Umbuchung").classes("text-xs text-slate-400 shrink-0")
                         elif b["betrag"] < 0:
                             _kategorie_wahl(b)
+                            _beleg_knopf(b, zeichnen)
                         ui.label(_eur(b["betrag"])).classes(
                             "text-sm text-right w-28 shrink-0 "
                             + ("" if b["betrag"] > 0 else "text-slate-600"))
