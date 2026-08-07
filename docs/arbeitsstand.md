@@ -29,8 +29,13 @@ dazu: **AP27 Vorkontierung** (Konto, Steuerschlüssel, Belegfeld, Kostenstelle).
 Zwei der vier Belegströme fehlen noch ganz: **Kontoauszüge** (kommt mit AP16)
 und **Portalabrechnungen** (AP23).
 
-**Offen und blockierend für AP27:** Womit arbeitet das Steuerbüro? Davon hängen
-Kontenrahmen (SKR03/SKR04), Steuerschlüssel und Übergabeformat ab.
+**AP27 ist nicht mehr blockiert (7.8.2026): kein Kontenrahmen.** Kein SKR03,
+kein SKR04, keine DATEV-Nummern — die Vorkontierung macht der Betreiber selbst.
+Stattdessen **eigene Kategorien in den Einstellungen** und eine Auswertung
+darüber: „wie viel für Putzmittel, wie viel für Gastgeschenke". Der Anschluss
+fehlt nur halb — `buchhaltung.kategorien()` liest eigene Kategorien schon aus
+der Konfiguration, es gibt bloß keine Oberfläche dafür; die Auswertung je
+Kategorie gibt es gar nicht.
 
 **E-Rechnung (AP28) — die Empfangsseite ist kein Zukunftsthema.** Strukturierte
 Rechnungen entgegennehmen zu können, ist seit 1.1.2025 Pflicht; das Werkzeug
@@ -84,10 +89,11 @@ das gehört vom Steuerberater bestätigt, bevor AP21 gebaut wird.
 
 ## Offen — braucht eine Entscheidung
 
-**Wird die Dezember-Anmeldung berichtigt?** Eingereicht wurden 5.698,29 € /
-341,90 €. Seit AP14c rechnet die App die Steuer selbst und käme auf 5.652,71 €
-/ 339,16 € — 2,74 € weniger. Mai 2026 geht in die andere Richtung (+1,27 €).
-Der eingereichte Stand ist in `tests/test_steuer.py` dokumentiert.
+**Dezember-Anmeldung: erledigt, wird NICHT berichtigt** (entschieden 7.8.2026).
+Eingereicht wurden 5.698,29 € / 341,90 €; nach der Regel von AP14c wären es
+5.652,71 € / 339,16 € — 2,74 € zu viel gezahlt. „Was vergangen ist, ist
+vergangen." Der eingereichte Stand bleibt in `tests/test_steuer.py`
+dokumentiert, damit die Abweichung später erklärbar ist.
 
 **Die Wernerstraße rechnet gegenüber dem Gast weiter mit 7 %.** Auf unsere
 Zahlen wirkt sich das nicht mehr aus, auf die Gäste schon — sie zahlen zu viel.

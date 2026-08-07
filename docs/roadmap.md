@@ -1045,6 +1045,9 @@ Nötig ist eine Ablage, in der das Steuerbüro **allein zurechtkommt**:
 
 * **Ordnung nach Jahr und Monat**, je Strom ein Ordner.
 * **Sprechende Dateinamen** mit Datum, Lieferant und Betrag – nicht `a3f9c1.jpg`.
+* **Die Kategorie als Beigabe**, nicht als Kontonummer: das Steuerbüro bekommt
+  die Belege und die Information, wofür es war – die Kontierung macht es selbst
+  (siehe AP27).
 * **Eine Belegnummer**, die auf dem Dokument *und* im Buchungssatz steht.
   Ohne sie kann niemand vom einen zum anderen finden.
 * **Ein Monat wird abgeschlossen und dann nicht mehr angefasst** – der
@@ -1124,17 +1127,34 @@ nicht von selbst – das ist der eigentliche Aufwand dieses Pakets, nicht das XM
 **Fristen und Schwellen vom Steuerberater bestätigen lassen**, bevor gebaut
 wird. *Größe:* a) M · b) L.
 
-### AP27 · Vorkontierung: dem Steuerbüro die Arbeit abnehmen — offen
+### AP27 · Eigene Konten und die Frage „wofür ging das Geld?" — offen
 
-Die Kategorien des Werkzeugs sind heute die SUMIF-Kriterien des Workbooks –
-Klartext, keine Konten. Ein Steuerbüro braucht **Konto, Gegenkonto,
-Steuerschlüssel, Belegfeld und Kostenstelle**.
+**Entschieden am 7.8.2026: kein Kontenrahmen.** Kein SKR03, kein SKR04, keine
+DATEV-Nummern. Die Vorkontierung macht der Betreiber selbst; das Werkzeug muss
+sie nicht erraten. Damit ist die Frage, womit das Steuerbüro arbeitet, für
+dieses Paket **erledigt** – sie war der einzige Grund, warum es blockiert war.
 
-Vorgesehen: eine Zuordnung **Kategorie → Konto** in den Stammdaten (einmal
-gepflegt, danach automatisch), der Steuerschlüssel aus dem Steuersatz des
-Belegs (AP19), das Belegfeld aus der Belegnummer (AP18) und die Kostenstelle
-aus der Wohnung. Der Mensch prüft, das Werkzeug schlägt vor.
+Was stattdessen gebraucht wird, ist die Frage aus dem Alltag: **Wie viel habe
+ich für Putzmittel ausgegeben? Wie viel für Gastgeschenke?** Also eigene
+Kategorien, selbst angelegt, und eine Auswertung darüber.
 
-**Offen und zu klären, bevor das gebaut wird:** *womit* arbeitet das Steuerbüro?
-Davon hängt alles ab – Kontenrahmen (SKR03 oder SKR04), Steuerschlüssel und das
-Übergabeformat. *Größe:* M–L, je nach Antwort.
+Nachgesehen im Code – zwei Hälften, beide fehlen zur Hälfte:
+
+| | Stand |
+|---|---|
+| **Eigene Kategorien anlegen** | `buchhaltung.kategorien()` **liest** schon `cfg["beleg_kategorien"]` – es gibt aber **keine Oberfläche**, um welche anzulegen. Der Anschluss fehlt, nicht die Mechanik. |
+| **Auswertung je Kategorie** | Gibt es **gar nicht**. „kategorie" kommt in `kennzahlen.py` und der Auswertung nicht vor. |
+
+Also:
+
+1. **Kategorien pflegen** in den Einstellungen – anlegen, umbenennen, löschen.
+   Umbenennen muss die vorhandenen Belege und Bewegungen mitnehmen, sonst
+   verwaist die Auswertung.
+2. **Auswertung je Kategorie**: was ist wofür ausgegeben worden, je Monat, je
+   Jahr, je Wohnung. Fließt in AP17 (Überblick) ein, statt eine eigene Seite zu
+   bekommen.
+
+Die Vorgabe-Kategorien bleiben wörtlich die des Workbooks (der SUMIF vergleicht
+wortgenau) – eigene kommen daneben.
+
+*Größe:* M *(vorher M–L und blockiert).*
