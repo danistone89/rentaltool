@@ -513,7 +513,47 @@ reicht.
 
 *Größe:* S.
 
-### AP14 · Ausgangsrechnung aus der Buchung — offen
+### AP14 · Ausgangsrechnung aus der Buchung — ✅ erledigt (7.8.2026)
+
+`app/rechnung.py` (Fachlogik), `app/rechnung_pdf.py` (Layout),
+`app/ui/rechnungen.py` (Bereich „Rechnungen", nur Betreiber).
+
+**Rückwärts gerechnet, weil nur der Gesamtbetrag verlässlich ist:** Betrag
+minus Beherbergungssteuer minus Reinigung ergibt die Übernachtung. Die erste
+Zeile kommt aus `steuer.ohne_citytax` – derselben Funktion, die die
+Steueranmeldung trägt. Die Summe der Positionen muss den Smoobu-Betrag auf den
+Cent treffen, sonst entsteht kein Entwurf, sondern ein Klärfall.
+
+**Gegengeprüft an 219 echten Buchungen:** 186 teilen sich sauber auf. Die
+übrigen sind keine Fehler der Rechnung, sondern Funde in den Daten – 29 mit
+abweichender Reinigungsgebühr (die Prüfung schlägt also an), drei ohne Betrag
+und eine, deren Reinigungsgebühr größer ist als der ganze Aufenthalt.
+
+**Die Anschrift** kommt aus `/api/guests/<guestId>` über einen Zwischenspeicher:
+vier Abrufe für den ganzen Bestand statt einer je Buchung. Fehlt sie und liegt
+der Betrag über 250 €, entsteht der Entwurf trotzdem – aber er sagt es, und
+ohne sie geht kein Versand.
+
+**Zweistufig:** Ein Entwurf trägt noch keine Nummer und lässt sich wegwerfen.
+Erst das Festschreiben vergibt sie, legt die Rechnung revisionssicher ab und
+macht sie unveränderlich. Korrigiert wird durch Storno – die Nummer bleibt
+vergeben, denn eine verschwundene Rechnungsnummer ist ein Mangel, den jede
+Prüfung findet. Ein Nummernkreis je Jahr; nur das Umstellungsjahr beginnt bei
+`rechnung_startnummer`, jedes weitere bei 1.
+
+**Versand nie von allein**, einzeln oder als Stapel. `mailer.send_form` kann
+jetzt einen anderen Empfänger als den konfigurierten – der ist die Stadt, und
+eine Gastrechnung dorthin wäre ein Datenschutzvorfall.
+
+*Nebenbei:* Die eingebauten PDF-Schriften kennen nur Latin-1 – „€" und „–"
+werden dort still zu einem Punkt. Auf der Rechnung steht deshalb „EUR" und ein
+schlichter Bindestrich, und `_darstellbar()` fängt den Rest ab. Dazu sechs neue
+Pflichtfelder im Betreiberprofil (§ 14 Abs. 4 UStG); fehlen sie, sagt es der
+Bereich.
+
+36 Tests in `tests/test_rechnung.py`.
+
+*Größe:* L.
 
 ### AP15 · Eingangsrechnungen mit Kreditor und Kostenstelle — offen
 

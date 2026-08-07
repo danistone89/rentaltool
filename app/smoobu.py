@@ -79,6 +79,32 @@ def get_reservation(api_key, reservation_id):
     return _get(f"/reservations/{reservation_id}", api_key)
 
 
+def get_guest(api_key, guest_id):
+    """Gastdaten samt Anschrift: {firstName, lastName, address:{street, postalCode,
+    city, country}, emails, telephoneNumbers, ...}.
+
+    Die Buchung selbst kennt keine Adresse – die steht am Gast. Fuer die
+    Rechnung ist das der einzige Weg an Strasse und Ort (§ 14 UStG).
+    """
+    return _get(f"/guests/{guest_id}", api_key)
+
+
+def get_guests(api_key, page_size=100):
+    """Alle Gaeste samt ihrer Buchungen. Paginiert.
+
+    Vier Abrufe reichen fuer den ganzen Bestand – die Einzelabfrage je Buchung
+    waere achtzigmal so teuer.
+    """
+    out, page = [], 1
+    while True:
+        d = _get("/guests", api_key, {"page": page, "pageSize": page_size})
+        out.extend(d.get("guests", []))
+        if page >= int(d.get("pageCount", 1) or 1):
+            break
+        page += 1
+    return out
+
+
 def get_messages(api_key, reservation_id):
     """Nachrichtenverlauf einer Buchung: [{id, subject, message, type, createdAt}]."""
     return _get(f"/reservations/{reservation_id}/messages", api_key).get("messages", [])

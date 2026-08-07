@@ -38,6 +38,11 @@ BETREIBER_FIELDS = [
     ("strasse", "Straße"), ("hausnummer", "Hausnummer"),
     ("plz", "PLZ"), ("ort", "Ort"),
     ("telefon", "Telefon"), ("kassenzeichen", "Kassenzeichen"),
+    # Pflichtangaben einer Rechnung (§ 14 Abs. 4 UStG) – ohne sie ist der Beleg
+    # unvollstaendig, und der Gast kann keine Vorsteuer ziehen.
+    ("email", "E-Mail"), ("steuernummer", "Steuernummer"),
+    ("ust_id", "USt-IdNr. (falls vorhanden)"),
+    ("bank", "Bank"), ("iban", "IBAN"), ("bic", "BIC"),
 ]
 
 _CACHE = {}
@@ -116,3 +121,34 @@ def detect_cloud_folders():
             if os.path.isdir(p):
                 out.append(p)
     return out
+
+
+# ---------------------------------------------------------- Gastdaten (AP14)
+# Die Anschrift steht am Gast, nicht an der Buchung. Ein Abruf je Buchung waere
+# achtzigmal so teuer wie einer ueber alle Gaeste – deshalb einmal alles holen
+# und nach Buchungsnummer ablegen.
+_GAESTE = {"stand": None, "je_buchung": {}}
+_GAESTE_TTL = 900
+
+
+def gastdaten(force=False):
+    """{buchungs_id: gast} fuer alle Gaeste. Zwischengespeichert (15 Minuten)."""
+    import time
+    jetzt = time.time()
+    if not force and _GAESTE["stand"] and jetzt - _GAESTE["stand"] < _GAESTE_TTL:
+        return _GAESTE["je_buchung"]
+    key = (CONFIG.get("smoobu_api_key") or "").strip()
+    if not key:
+        return {}
+    je_buchung = {}
+    for g in smoobu.get_guests(key):
+        for b in (g.get("bookings") or []):
+            if isinstance(b, dict) and b.get("id"):
+                je_buchung[b["id"]] = g
+    _GAESTE.update(stand=jetzt, je_buchung=je_buchung)
+    return je_buchung
+
+
+def gast_zu_buchung(buchung_id):
+    """Der Gast dieser Buchung – None, wenn unbekannt."""
+    return gastdaten().get(buchung_id)

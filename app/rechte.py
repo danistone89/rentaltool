@@ -28,9 +28,11 @@ BELEGE_LOESCHEN = "belege_loeschen"        # Beleg endgültig entfernen
 BENUTZER = "benutzer"                      # Konten anlegen, Rollen ändern
 EINSTELLUNGEN = "einstellungen"            # Konfiguration der Anwendung
 STEUER = "steuer"                          # Anmeldung erzeugen, senden, bezahlen
+RECHNUNGEN = "rechnungen"                  # Ausgangsrechnungen schreiben und senden
 
 ALLE = [ZUWEISEN, ZEITEN_FREMDE, ZEITEN_ABGERECHNET, AUFTRAG_ZURUECK,
-        BELEGE_BUCHEN, BELEGE_LOESCHEN, BENUTZER, EINSTELLUNGEN, STEUER]
+        BELEGE_BUCHEN, BELEGE_LOESCHEN, BENUTZER, EINSTELLUNGEN, STEUER,
+        RECHNUNGEN]
 
 # Klartext für die Anzeige – der Schlüssel taugt nicht als Beschriftung.
 LABELS = {
@@ -43,6 +45,7 @@ LABELS = {
     BENUTZER: "Benutzer verwalten",
     EINSTELLUNGEN: "Einstellungen ändern",
     STEUER: "Beherbergungssteuer melden und bezahlen",
+    RECHNUNGEN: "Ausgangsrechnungen schreiben und versenden",
 }
 
 

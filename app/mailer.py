@@ -30,9 +30,16 @@ def render(template, context):
     return (template or "").format_map(_SafeDict(context))
 
 
-def build_message(email_cfg, pdf_bytes, filename, context, *, subject=None, body=None):
-    """EmailMessage mit gerendertem Betreff/Text und PDF-Anhang bauen."""
-    to = (email_cfg.get("empfaenger") or "").strip()
+def build_message(email_cfg, pdf_bytes, filename, context, *, subject=None, body=None,
+                  to=None, cc=True):
+    """EmailMessage mit gerendertem Betreff/Text und PDF-Anhang bauen.
+
+    `to` uebersteuert den konfigurierten Empfaenger. Das braucht die
+    Gastrechnung (AP14): der eingestellte Empfaenger ist die Stadt, und eine
+    Rechnung, die dorthin ginge, waere ein Datenschutzvorfall und peinlich
+    zugleich. `cc=False` laesst den Verteiler ebenfalls weg.
+    """
+    to = (to or email_cfg.get("empfaenger") or "").strip()
     if not to:
         raise MailError("Kein Empfänger konfiguriert (Einstellungen → E-Mail).")
     absender = (email_cfg.get("absender") or "").strip()
@@ -42,7 +49,7 @@ def build_message(email_cfg, pdf_bytes, filename, context, *, subject=None, body
     msg = EmailMessage()
     msg["From"] = absender
     msg["To"] = to
-    if (email_cfg.get("cc") or "").strip():
+    if cc and (email_cfg.get("cc") or "").strip():
         msg["Cc"] = email_cfg["cc"].strip()
     msg["Subject"] = subject if subject is not None else render(email_cfg.get("betreff_vorlage", ""), context)
     msg.set_content(body if body is not None else render(email_cfg.get("text_vorlage", ""), context))
@@ -80,9 +87,11 @@ def send(email_cfg, msg):
         raise MailError(f"Versand fehlgeschlagen: {ex}")
 
 
-def send_form(cfg, pdf_bytes, filename, context, *, subject=None, body=None):
+def send_form(cfg, pdf_bytes, filename, context, *, subject=None, body=None,
+              to=None, cc=True):
     email_cfg = cfg.get("email", {})
-    msg = build_message(email_cfg, pdf_bytes, filename, context, subject=subject, body=body)
+    msg = build_message(email_cfg, pdf_bytes, filename, context, subject=subject,
+                        body=body, to=to, cc=cc)
     send(email_cfg, msg)
     return msg["To"]
 
@@ -98,7 +107,7 @@ def build_test_message(email_cfg):
     msg = EmailMessage()
     msg["From"] = absender
     msg["To"] = to
-    if (email_cfg.get("cc") or "").strip():
+    if cc and (email_cfg.get("cc") or "").strip():
         msg["Cc"] = email_cfg["cc"].strip()
     msg["Subject"] = "Test – Beherbergungssteuer-App"
     msg.set_content("Dies ist eine Test-E-Mail der Beherbergungssteuer-App.\n"
