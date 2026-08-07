@@ -52,7 +52,7 @@ from app.ui.standort import (_geo_enabled, _match_geofence, _presence,  # noqa: 
 from app.ui.steuer import (open_archive, render_meldungen,  # noqa: E402,F401
                            render_result)
 from app.ui.zeiten import (_admin_zeiten, _meine_kennzahlen,  # noqa: E402,F401
-                           _time_edit_dialog, _zeit_list)
+                           _time_edit_dialog, _zeit_list, lohn_vorschau)
 from app.ui.zugang import (_RESET_THROTTLE, logout, open_account,  # noqa: E402,F401
                            open_users)
 from app.ui.belege import _SCAN_JS  # noqa: E402,F401
@@ -334,6 +334,9 @@ def main_page():
                 ui.button(t("Zeit manuell erfassen"), icon="add",
                           on_click=lambda: _time_edit_dialog(user, apts, admin, staff, on_saved=render)) \
                     .props("outline no-caps")
+                # Erst was kommt, dann was war: wer sich Reinigungen nimmt,
+                # will wissen, worauf er zulaeuft – nicht nur, was schon war.
+                lohn_vorschau(user, buchungen._cleaning_jobs(quiet=True))
                 _meine_kennzahlen(user)
                 _zeit_list(timetrack.entries(user), apts, admin, staff, render, t("Meine Zeiten"), False)
                 if admin:

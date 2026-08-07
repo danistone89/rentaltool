@@ -238,6 +238,14 @@ def open_settings():
                     .props("outline no-caps mt-1")
 
             with ui.tab_panel(t_smoobu):
+                vorschau = ui.number("Buchungen im Voraus anzeigen (Tage)",
+                                     value=int(CFG.get("buchungen_vorschau_tage", 60)),
+                                     min=7, max=365, step=7).props("outlined dense") \
+                    .classes("w-full").mark("vorschau-tage")
+                ui.label("Wie weit die Reinigungsliste und der Kalender nach vorn "
+                         "blicken. Zwei Monate sind die Vorgabe – mehr kostet bei "
+                         "diesem Buchungsaufkommen praktisch nichts.") \
+                    .classes(f"text-xs {ton.LEISE}")
                 with ui.grid(columns=2).classes("w-full gap-3"):
                     api = ui.input("API-Key (leer = unverändert)", password=True,
                                    placeholder="•••• unverändert").props("outlined dense").classes("w-full")
@@ -366,6 +374,7 @@ def open_settings():
                 betr[key] = inputs[key].value or ""
             v = sig_x.value
             CFG["unterschrift_x"] = int(v) if v == int(v) else v
+            CFG["buchungen_vorschau_tage"] = int(vorschau.value or 60)
             CFG["steuersatz"] = round((steuer_pct.value or 6) / 100, 4)
             CFG["archiv_spiegel"] = spiegel.value or ""
             CFG["reinigung_ordner"] = reinigung_ordner.value or ""

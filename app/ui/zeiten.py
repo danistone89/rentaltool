@@ -6,7 +6,7 @@ Auswertung ueber alle und den Abrechnungsstand (siehe README).
 
 from nicegui import ui
 from datetime import date
-from app import feiertage, mailer, rechte, timetrack
+from app import feiertage, lohn, mailer, rechte, timetrack
 from app.ui.basis import (CFG, USERS, _MONATE, _billing_month, _billing_period,
                           _cur_user, _d, _darf, _eur, _has_rates, _hours_num,
                           _month_label, _rate_defaults, _t, _zeit_aggregat, t)
@@ -488,3 +488,75 @@ def _admin_zeiten(apts, staff, on_change, dlg_slot):
             _abrechnen_block(rows, state["month"], on_change, dlg_slot)
             _zeit_list(rows, apts, True, staff, on_change, "Einzelne Einträge", True)
     render()
+
+
+# ------------------------------------------------- Lohnvorschau (Minijob)
+def lohn_vorschau(user, jobs):
+    """Was dieser Monat voraussichtlich bringt – und wie nah die Grenze ist.
+
+    Wer sich eine Reinigung nimmt, sah bisher erst am 19., was dabei herauskam.
+    Für einen Minijob ist das zu spät: Wird die Grenze überschritten, ist die
+    Beschäftigung nicht mehr geringfügig, und das lässt sich rückwirkend nicht
+    geradebiegen.
+
+    Ohne gepflegten Stundensatz gibt es keine Vorschau – eine Zahl ohne Satz
+    wäre geraten, und geraten hilft hier niemandem.
+    """
+    ucfg, defs = USERS.get(user), _rate_defaults()
+    satz = timetrack.rate_for(feiertage.WERKTAG, ucfg, defs)
+    if not satz:
+        return
+
+    p = lohn.prognose(user, jobs, ucfg, defs)
+    anteil = min(1.0, p["auslastung"])
+    if p["ueber"]:
+        farbe, ton_text = "negative", ton.STOERUNG
+    elif anteil >= 0.85:
+        farbe, ton_text = "warning", ton.DRINGEND
+    else:
+        farbe, ton_text = "primary", ton.ERFOLG
+
+    with ui.card().classes(ton.KARTE_ENG).mark("lohn-vorschau"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("savings").classes("text-primary text-xl shrink-0")
+            ui.label(t("Voraussichtlich in diesem Monat")).classes("font-semibold")
+            ui.space()
+            ui.label(f"{_month_label(p['monat'])}").classes(f"text-xs {ton.STILL}")
+
+        with ui.row().classes("items-baseline gap-2 no-wrap"):
+            ui.label(_eur(p["summe"]) + " €").classes(
+                f"text-3xl font-bold leading-none {ton_text}").mark("lohn-summe")
+            ui.label(t("von {grenze} € Grenze", grenze=p["grenze"])).classes(
+                f"text-sm {ton.LEISE}")
+
+        ui.linear_progress(value=anteil, show_value=False) \
+            .props(f"color={farbe} rounded track-color=grey-3 size=8px").classes("w-full")
+
+        with ui.row().classes("w-full items-center gap-3 flex-wrap"):
+            ui.label(t("erfasst {betrag} €", betrag=_eur(p["verdient"]))) \
+                .classes(f"text-xs {ton.LEISE}")
+            if p["einsaetze_offen"]:
+                ui.label(t("+ {n} zugewiesene Reinigung(en) ≈ {betrag} €",
+                           n=p["einsaetze_offen"], betrag=_eur(p["erwartet"]))) \
+                    .classes(f"text-xs {ton.LEISE}")
+
+        if p["ueber"]:
+            schon = lohn.ueberschreitungen_im_jahr(user, ucfg, defs)
+            rest = lohn.AUSNAHMEN_JE_JAHR - schon
+            with ui.column().classes(f"w-full gap-0 rounded-lg p-2 {ton.FLAECHE_STOERUNG}"):
+                ui.label(t("Über der Minijob-Grenze – {betrag} € zu viel.",
+                           betrag=_eur(abs(p["rest"])))) \
+                    .classes(f"text-sm font-medium {ton.AUF_STOERUNG}")
+                ui.label(
+                    t("Zweimal im Jahr ist das erlaubt; dieses Jahr war es {schon}×. "
+                      "Danach ist die Beschäftigung nicht mehr geringfügig.",
+                      schon=schon) if rest > 0
+                    else t("Die zwei erlaubten Male sind dieses Jahr aufgebraucht – "
+                           "bitte mit der Verwaltung klären.")) \
+                    .classes(f"text-xs {ton.LEISE}")
+        elif anteil >= 0.85:
+            ui.label(t("Noch {betrag} € bis zur Grenze.", betrag=_eur(p["rest"]))) \
+                .classes(f"text-xs font-medium {ton.DRINGEND}")
+
+        ui.label(t("Geschätzt mit {min} Min. je Reinigung – dein bisheriger Schnitt.",
+                   min=p["dauer_schnitt"])).classes(f"text-xs {ton.STILL}")

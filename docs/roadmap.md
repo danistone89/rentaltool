@@ -452,6 +452,52 @@ durch die OCR.
 
 *Größe:* S–M.
 
+### AP-L · Lohnvorschau und Minijob-Grenze — ✅ erledigt (7.8.2026)
+
+Eingeschoben vor AP14. Wer sich eine Reinigung nimmt, sah bisher erst am 19.,
+was dabei herauskam. Für einen Minijob ist das zu spät: **wird die Grenze
+überschritten, ist die Beschäftigung nicht mehr geringfügig** – mit Folgen für
+Sozialversicherung und Steuer, die niemand rückwirkend geradebiegt.
+
+In der Zeiterfassung steht jetzt oben, was der Monat voraussichtlich bringt:
+bereits erfasst, plus die zugewiesenen Reinigungen, die noch anstehen, mit
+Balken gegen die Grenze.
+
+**Die Grenze wird gerechnet, nicht gepflegt** (`app/lohn.py`): Mindestlohn × 130
+÷ 3, aufgerundet (§ 8 Abs. 1a SGB IV). Die Formel trifft alle vier bekannten
+Werte – 538 (2024), 556 (2025), 603 (2026), 633 (2027). Zu pflegen ist nur der
+Mindestlohn; eine fest eingetragene Grenze wäre spätestens im Januar falsch, und
+zwar still.
+
+Die Dauer einer noch offenen Reinigung schätzt der **Median** der bisherigen
+Einsätze dieses Mitarbeiters – ein einziger vergessener Check-out über Nacht
+würde den Durchschnitt für Monate verderben. Ohne Erfahrung 90 Minuten.
+
+Die Warnung bleibt ehrlich: Zweimal im Jahr darf die Grenze überschritten werden
+(§ 8 Abs. 1b SGB IV), und die Anzeige zählt mit, wie oft es schon war. Wer
+pauschal vor etwas Erlaubtem warnt, wird nicht mehr gelesen.
+
+24 Tests in `tests/test_lohn.py`.
+
+*Größe:* S.
+
+### AP-V · Buchungen zwei Monate im Voraus — ✅ erledigt (7.8.2026)
+
+Die Reinigungsliste und der Kalender blickten **21 Tage** nach vorn, zweimal
+fest im Quelltext. Am Monatsanfang reichte das kaum über den laufenden Monat
+hinaus – wer im August für Oktober planen wollte, sah nichts. Jetzt 60 Tage,
+einstellbar unter Einstellungen → Smoobu (`buchungen_vorschau_tage`).
+
+Der Abruf kostet dadurch praktisch nichts mehr: bei knapp hundert Buchungen im
+Jahr bleibt auch das größere Fenster eine einzige Seite bei Smoobu.
+
+Nebenbei behoben: Mit 21 Tagen fehlten der Lohnvorschau am Monatsanfang die
+Reinigungen der letzten Monatswoche – sie versprach zu wenig. Ein Test hält
+jetzt fest, dass das Fenster mindestens bis zum Ende des Abrechnungsmonats
+reicht.
+
+*Größe:* S.
+
 ### AP14 · Ausgangsrechnung aus der Buchung — offen
 
 ### AP15 · Eingangsrechnungen mit Kreditor und Kostenstelle — offen

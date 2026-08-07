@@ -174,17 +174,33 @@ def _events_between(d_from, d_to):
     return evs
 
 
-def _fetch_events(days_ahead=21, days_back=1):
+def vorschau_tage():
+    """Wie weit nach vorn die Buchungsliste blickt (Vorgabe: zwei Monate).
+
+    Bis 7.8.2026 waren es 21 Tage, zweimal fest eingetragen – am Monatsanfang
+    reichte die Liste damit kaum über den laufenden Monat hinaus, und wer im
+    August für Oktober planen wollte, sah nichts. Zwei Monate kosten bei knapp
+    hundert Buchungen im Jahr weiterhin eine einzige Seite bei Smoobu.
+    """
+    from app.ui.basis import CFG
+    try:
+        return max(7, int(CFG.get("buchungen_vorschau_tage", 60)))
+    except (TypeError, ValueError):
+        return 60
+
+
+def _fetch_events(days_ahead=None, days_back=1):
     """An- und Abreise-Ereignisse aus Smoobu im Zeitfenster, chronologisch sortiert."""
     from datetime import timedelta
     today = date.today()
+    days_ahead = vorschau_tage() if days_ahead is None else days_ahead
     evs = _events_between((today - timedelta(days=days_back)).isoformat(),
                           (today + timedelta(days=days_ahead)).isoformat())
     evs.sort(key=lambda e: (e["date"], e["time"] or "99:99", e["apartment_name"]))
     return evs
 
 
-def _cleaning_jobs(days_ahead=21, days_back=1, quiet=False):
+def _cleaning_jobs(days_ahead=None, days_back=1, quiet=False):
     """Reinigungs-Jobs: jede Abreise im Fenster + die nächste Anreise (Folgebuchung)
     derselben Wohnung – damit die Putzkraft weiß, für wie viele Personen vorzubereiten.
 
@@ -193,6 +209,7 @@ def _cleaning_jobs(days_ahead=21, days_back=1, quiet=False):
     sind eine zu viel – gemeldet wird sie von der Liste, die man ansieht.
     """
     from datetime import timedelta
+    days_ahead = vorschau_tage() if days_ahead is None else days_ahead
     today = date.today()
     d_from = (today - timedelta(days=days_back)).isoformat()
     d_to = (today + timedelta(days=days_ahead)).isoformat()
@@ -390,7 +407,8 @@ def _render_cleaning(user, admin, staff, activate, nur_eigene=False, zu_allen=No
             _stoerung()
         else:
             leer("event_available", t("Keine anstehenden Reinigungen."),
-                 t("In den nächsten drei Wochen steht keine Abreise an."))
+                 t("In den nächsten {n} Tagen steht keine Abreise an.",
+                   n=vorschau_tage()))
         return
     today = date.today().isoformat()
     overdue = [j for j in jobs if _booking_status(j) == "nachtragen"]
