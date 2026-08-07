@@ -124,3 +124,72 @@ def test_save_document_nutzt_die_ecken(tmp_path, monkeypatch):
     assert mit["photo"].endswith("_doc.jpg"), "Zuschnitt haette greifen muessen"
     ohne = receipts.save_document(raw, "jpg", None, False)
     assert ohne["photo"].endswith(".jpg") and not ohne["photo"].endswith("_doc.jpg")
+
+
+# ---------------------------------------------------- PDF hochladen (AP13+)
+def test_pdf_wird_als_dokument_erkannt():
+    """Am Inhalt, nicht an der Dateiendung – die lügt bei Mail-Anhängen."""
+    from app import receipts
+    assert receipts.ist_pdf(b"%PDF-1.7\nirgendwas")
+    assert not receipts.ist_pdf(b"\xff\xd8\xff\xe0JFIF")     # JPEG
+    assert not receipts.ist_pdf(b"")
+    assert not receipts.ist_pdf(None)
+
+
+def _pdf_mit_text(text):
+    import fitz
+    doc = fitz.open()
+    seite = doc.new_page()
+    seite.insert_text((60, 90), text, fontsize=11)
+    roh = doc.tobytes()
+    doc.close()
+    return roh
+
+
+def test_lieferanten_pdf_behaelt_ihr_original(tmp_path, monkeypatch):
+    """Eine fertige PDF wird nicht zugeschnitten und nicht neu gebaut – sie
+    IST das Dokument. Erzeugt wird nur ein Vorschaubild."""
+    from app import housekeeping as hk, receipts
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path))
+    roh = _pdf_mit_text("Rechnung 4711  Summe 119,00 EUR")
+
+    doc = receipts.save_document(roh, "pdf")
+    assert doc["pdf"] and doc["pdf"].endswith(".pdf")
+    abgelegt = (tmp_path / doc["pdf"]).read_bytes()
+    assert abgelegt == roh, "PDF wurde veraendert statt uebernommen"
+    assert doc["photo"], "kein Vorschaubild erzeugt"
+    assert (tmp_path / doc["photo"]).exists()
+
+
+def test_text_kommt_aus_der_pdf_statt_aus_der_zeichenerkennung(tmp_path, monkeypatch):
+    """Der eigentliche Gewinn: bei einer echten PDF steht der Betrag exakt
+    drin. OCR würde ihn nur näherungsweise treffen."""
+    from app import housekeeping as hk, receipts
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path))
+    doc = receipts.save_document(
+        _pdf_mit_text("Rena Textilpflege GmbH - Rechnung 4711 - Summe 119,00 EUR"),
+        "pdf")
+    text = receipts.text_aus_pdf(str(tmp_path / doc["pdf"]))
+    assert "119,00" in text
+    assert receipts.guess_amount(text) == "119,00"
+
+
+def test_eingescanntes_papier_liefert_keinen_text(tmp_path, monkeypatch):
+    """Eine PDF ohne Textschicht gibt nichts her – dann muss die OCR ran, und
+    genau dafür ist die Mindestlänge da."""
+    from app import housekeeping as hk, receipts
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path))
+    doc = receipts.save_document(_pdf_mit_text("Seite 1"), "pdf")
+    assert receipts.text_aus_pdf(str(tmp_path / doc["pdf"])) == ""
+
+
+def test_foto_geht_weiter_wie_bisher(tmp_path, monkeypatch):
+    """Der Scanner-Weg darf davon nicht berührt werden."""
+    import fitz
+    from app import housekeeping as hk, receipts
+    monkeypatch.setattr(hk, "MEDIA_DIR", str(tmp_path))
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 400, 600))
+    pix.clear_with(230)
+    doc = receipts.save_document(pix.tobytes("jpg"), "jpg", crop=False)
+    assert doc["photo"].endswith(".jpg")
+    assert doc["pdf"], "aus dem Foto entsteht weiterhin eine PDF"

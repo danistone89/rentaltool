@@ -230,8 +230,17 @@ def render_belege():
         corners: die im Scanner gesetzten Ecken (Anteile 0..1); sie haben
         Vorrang vor der automatischen Erkennung."""
         doc = receipts.save_document(data, ext, _beleg_mirror(), crop, corners)
+        # Bei einer echten PDF steht der Text drin und muss nicht geraten
+        # werden – Lieferantenrechnungen liefern so exakte Betraege statt
+        # OCR-Naeherungen. Nur eingescanntes Papier braucht die Erkennung.
+        text = ""
         try:
-            text = receipts.ocr_image(os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
+            if doc.get("pdf") and receipts.ist_pdf(data):
+                text = receipts.text_aus_pdf(
+                    os.path.join(housekeeping.MEDIA_DIR, doc["pdf"]))
+            if not text and doc.get("photo"):
+                text = receipts.ocr_image(
+                    os.path.join(housekeeping.MEDIA_DIR, doc["photo"]))
         except Exception:
             text = ""
         aid = sc["apt"]
@@ -363,8 +372,8 @@ def render_belege():
             # Upload-Karte
             with ui.card().classes(ton.KARTE_WEIT):
                 ui.label(t("Neuen Beleg hinzufügen")).classes("font-medium")
-                ui.label(t("Live scannen (Rand wird erkannt) oder Foto/Datei wählen. "
-                   "Das Dokument wird als PDF abgelegt und per OCR ausgelesen.")) \
+                ui.label(t("Live scannen (Rand wird erkannt), Foto wählen – oder eine "
+                   "fertige PDF hochladen, wie sie Lieferanten per Mail schicken.")) \
                     .classes("text-xs text-slate-500")
                 apt_sel = ui.select({None: t("— keine Wohnung —"), **apts}, value=sc["apt"],
                                     label=t("Für welche Wohnung?")).props("outlined dense") \
@@ -387,8 +396,9 @@ def render_belege():
                 with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                     ui.button(t("Beleg scannen"), icon="document_scanner", on_click=_open_scanner) \
                         .props("unelevated no-caps").mark("scan-open")
-                    ui.upload(auto_upload=True, on_upload=handle, label=t("Foto / Datei")) \
-                        .props('accept="image/*"').classes("hk-upload max-w-[220px]")
+                    ui.upload(auto_upload=True, on_upload=handle, label=t("Foto oder PDF")) \
+                        .props('accept="image/*,application/pdf"') \
+                        .classes("hk-upload max-w-[220px]")
                 if not receipts.ocr_available():
                     ui.label(t("Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
                        "Belege werden gespeichert, aber nicht automatisch ausgelesen.")) \

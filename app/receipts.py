@@ -286,13 +286,79 @@ def image_to_pdf(img_path, pdf_path, page="a4"):
             return False
 
 
+def ist_pdf(data):
+    """Kommt hier eine PDF an? Am Inhalt erkannt, nicht an der Dateiendung –
+    die lügt bei Anhängen aus Mailprogrammen regelmäßig."""
+    return bytes(data or b"")[:5] == b"%PDF-"
+
+
+def text_aus_pdf(pdf_pfad, mindestens=20):
+    """Text einer PDF lesen. Leerer String, wenn nichts Brauchbares drinsteht.
+
+    Lieferantenrechnungen sind fast immer echte PDFs mit Textschicht – dort
+    steht der Betrag exakt, statt von der Zeichenerkennung geraten zu werden.
+    Nur wenn kaum Text herauskommt (eingescanntes Papier), lohnt sich OCR.
+
+    `mindestens` ist die Grenze dazwischen. Nicht null, weil eingescanntes
+    Papier oft ein paar Zeichen Bodensatz mitbringt – einen Stempel, eine
+    Fusszeile – und den wollen wir nicht fuer den Inhalt halten.
+    """
+    try:
+        import fitz
+    except Exception:
+        return ""
+    try:
+        with fitz.open(pdf_pfad) as doc:
+            text = "\n".join(seite.get_text() for seite in doc)
+    except Exception:
+        return ""
+    return text if len(text.strip()) >= mindestens else ""
+
+
+def _pdf_vorschau(pdf_pfad, bild_pfad):
+    """Erste Seite als JPG – fürs Vorschaubild und als Rückfall für die OCR."""
+    try:
+        import fitz
+        with fitz.open(pdf_pfad) as doc:
+            if not doc.page_count:
+                return False
+            doc[0].get_pixmap(matrix=fitz.Matrix(2, 2)).save(bild_pfad)
+        return True
+    except Exception:
+        return False
+
+
 def save_document(data, ext, mirror_dir=None, crop=True, corners=None):
     """Beleg-Bytes speichern, zuschneiden und als PDF ablegen.
+
+    Nimmt Fotos **und** fertige PDFs an. Eine PDF wird nicht zugeschnitten und
+    nicht neu erzeugt – sie ist bereits das Dokument; erzeugt wird nur ein
+    Vorschaubild aus der ersten Seite. Rechnungen von Lieferanten kommen per
+    Mail und werden nicht abfotografiert.
 
     corners: vom Nutzer im Scanner gesetzte Ecken (Anteile 0..1) – hat Vorrang
     vor der automatischen Erkennung. crop=False lässt das Bild unverändert.
     Gibt {'photo': rel_jpg, 'pdf': rel_pdf|None} zurück (+ Spiegelung nach mirror_dir)."""
     uid = housekeeping._uid()
+    if ist_pdf(data):
+        base = os.path.join(housekeeping.MEDIA_DIR, "beleg")
+        os.makedirs(base, exist_ok=True)
+        pdf_rel = f"beleg/{uid}.pdf"
+        with open(os.path.join(housekeeping.MEDIA_DIR, pdf_rel), "wb") as f:
+            f.write(data)
+        bild_rel = f"beleg/{uid}_seite1.jpg"
+        if not _pdf_vorschau(os.path.join(housekeeping.MEDIA_DIR, pdf_rel),
+                             os.path.join(housekeeping.MEDIA_DIR, bild_rel)):
+            bild_rel = None
+        if mirror_dir:
+            for rel in [x for x in (pdf_rel, bild_rel) if x]:
+                try:
+                    dst = os.path.join(mirror_dir, rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    shutil.copy2(os.path.join(housekeeping.MEDIA_DIR, rel), dst)
+                except Exception:
+                    pass
+        return {"photo": bild_rel, "pdf": pdf_rel}
     base = os.path.join(housekeeping.MEDIA_DIR, "beleg")
     os.makedirs(base, exist_ok=True)
     orig_rel = f"beleg/{uid}.{ext}"

@@ -434,6 +434,18 @@ steckt.
 
 34 Tests in `tests/test_stammdaten.py`.
 
+*Nachgezogen am 7.8.2026:* Der Beleg-Upload nahm bis dahin **nur Bilder** an
+(`accept="image/*"`). Lieferantenrechnungen kommen aber als PDF per Mail und
+werden nicht abfotografiert. Jetzt nimmt er beides. Eine PDF wird dabei **nicht**
+zugeschnitten und nicht neu gebaut – sie ist bereits das Dokument; erzeugt wird
+nur ein Vorschaubild aus der ersten Seite. Erkannt wird sie am Inhalt
+(`%PDF-`), nicht an der Dateiendung, die bei Mail-Anhängen regelmäßig lügt.
+
+Nebengewinn: Aus einer echten PDF wird der **Text gelesen statt geraten** –
+Betrag und Lieferant stehen dort exakt, wo die Zeichenerkennung bisher schätzen
+musste. Nur eingescanntes Papier (unter 20 Zeichen Textschicht) geht weiterhin
+durch die OCR.
+
 *Größe:* S–M.
 
 ### AP14 · Ausgangsrechnung aus der Buchung — offen
