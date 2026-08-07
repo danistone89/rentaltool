@@ -366,3 +366,30 @@ async def test_der_knopf_heisst_jetzt_uebernehmen(user: User, app_bereit):
     await _anmelden(user)
     user.find(marker="nav-einstellungen").click()
     await user.should_see("Übernehmen")
+
+
+async def test_der_knopf_kreditor_hinzufuegen_ist_erreichbar(user: User, app_bereit):
+    """Er stand unter der Liste, in einem Fenster ohne Scrollen – bei mehreren
+    Kreditoren war er schlicht nicht zu sehen. Jetzt steht er oben, und die
+    Einstellungen sind eine Seite."""
+    st.erstbefuellung()          # legt zehn Kreditoren an
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see("Einstellungen")
+    user.find("Produkte & Kreditoren").click()
+    await user.should_see(marker="kreditor-neu")
+
+
+async def test_eigene_kategorien_haben_ein_feld_und_ein_plus(user: User, app_bereit):
+    """Konfigurierbar, nicht vorgegeben: kein „Putzmittel" im Quelltext.
+
+    Geprüft wird hier die Erreichbarkeit – dass Feld und Knopf auf der Seite
+    stehen. Was das Anlegen tut (Dubletten, Umbenennen samt Sätzen, Löschen nur
+    wenn unbenutzt), prüft `tests/test_buchhaltung.py` ohne Oberfläche.
+    """
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    user.find("Produkte & Kreditoren").click()
+    await user.should_see(marker="kategorie-neu")
+    await user.should_see(marker="kategorie-plus")
+    await user.should_see("Eigene Kategorien")

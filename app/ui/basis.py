@@ -87,6 +87,10 @@ AREAS = [
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
     {"key": "rechnungen", "label": "Rechnungen", "icon": "request_quote"},
     {"key": "konto", "label": "Konto", "icon": "account_balance"},
+    # Einstellungen sind ein Bereich wie jeder andere – vorher waren sie ein
+    # Fenster davor, das nicht scrollen konnte. ROLE_BAR führt sie nicht, sie
+    # landen also im Menü, wo sie hingehören.
+    {"key": "einstellungen", "label": "Einstellungen", "icon": "settings"},
 ]
 # "reinigung" ist KEIN Menüpunkt mehr – die Checkliste wird aus einer Buchung geöffnet
 # (activate('reinigung') via _open_checkliste). "uebersicht" ist die Admin-Auswertung.

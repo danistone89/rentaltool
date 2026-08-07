@@ -368,6 +368,9 @@ def main_page():
     def build_konto():
         kontoblatt.render_konto()
 
+    def build_einstellungen():
+        einstellungen.render_einstellungen()
+
     builders = {"buchungen": build_buchungen,
                 "uebersicht": build_uebersicht,
                 "beherbergungssteuer": build_beherbergungssteuer,
@@ -375,6 +378,7 @@ def main_page():
                 "belege": build_belege,
                 "rechnungen": build_rechnungen,
                 "konto": build_konto,
+                "einstellungen": build_einstellungen,
                 "zeiterfassung": build_zeiterfassung}
 
     # ------------------------------------------------------------ Navigation
@@ -437,8 +441,9 @@ def main_page():
         if _is_admin():
             _gruppe("Verwaltung")
             _menue_zeile("group", t("Benutzer"), _tap(open_users), f"{praefix}-benutzer")
-            _menue_zeile("settings", t("Einstellungen"), _tap(open_settings),
-                         f"{praefix}-einstellungen")
+            # „Einstellungen“ steht nicht mehr hier: sie sind seit dem Umbau ein
+            # eigener Bereich und erscheinen weiter oben in der Bereichsliste –
+            # zweimal derselbe Eintrag wäre nur verwirrend.
             _menue_zeile("inventory_2", t("Archiv"), _tap(open_archive), f"{praefix}-archiv")
         ui.separator().classes("my-2")
         _menue_zeile("logout", t("Abmelden"), _tap(logout), f"{praefix}-abmelden",

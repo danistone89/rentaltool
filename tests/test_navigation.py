@@ -302,3 +302,26 @@ async def test_checklisten_durchgang_haelt_reinigungen_aktiv(
     with user.client:
         assert "nav-aktiv" in _klassen(user, "bar-buchungen")
         assert "nav-aktiv" not in _klassen(user, "bar-menue")
+
+
+# ------------------------------------------- Einstellungen als Bereich (7.8.2026)
+# Sie lagen in einem Fenster mit fester Breite und ohne Scrollen. Folge: was
+# unten stand – etwa „Kreditor hinzufügen" – war nicht erreichbar, und es sah
+# aus, als fehle die Funktion.
+def test_einstellungen_sind_ein_bereich():
+    keys = [a["key"] for a in basis.AREAS]
+    assert "einstellungen" in keys
+
+
+def test_einstellungen_stehen_im_menue_nicht_in_der_leiste():
+    """In der Leiste unten ist Platz für drei Bereiche – dort gehören sie nicht
+    hin. Im Menü schon."""
+    leiste, menue = basis.nav_plan("admin")
+    assert "einstellungen" not in [a["key"] for a in leiste]
+    assert "einstellungen" in [a["key"] for a in menue]
+
+
+def test_nur_der_admin_sieht_die_einstellungen():
+    for rolle in ("manager", "putzkraft"):
+        leiste, menue = basis.nav_plan(rolle)
+        assert "einstellungen" not in [a["key"] for a in leiste + menue], rolle

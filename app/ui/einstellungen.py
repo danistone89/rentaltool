@@ -106,12 +106,27 @@ def _logo_feld(betr):
 
 
 # ---------------------------------------------------------------- Einstellungen
-def open_settings():
+def render_einstellungen(schliessen=None):
+    """Die Einstellungen als **Seite**, nicht als Fenster davor.
+
+    Vorher lagen sie in einem `ui.dialog` mit fester Breite und ohne Scrollen.
+    Zwei Folgen, beide gemeldet: Die Reiter „Produkte & Kreditoren" und
+    „E-Mail" sind länger als der Bildschirm, und was unten stand – etwa der
+    Knopf „Kreditor hinzufügen" – war schlicht **nicht erreichbar**. Es sah aus,
+    als fehle die Funktion, dabei fehlte nur der Weg dorthin.
+
+    Als Bereich hat die Seite die volle Höhe, das Scrollen macht die Seite, und
+    die Breite richtet sich nach dem Fenster statt nach 760 Pixeln.
+
+    `schliessen` ist optional: als Seite gibt es nichts zu schließen, aber der
+    Aufruf aus einem Dialog heraus soll weiter möglich bleiben.
+    """
     if not _darf(rechte.EINSTELLUNGEN):
-        ui.notify("Dafür fehlt dir die Berechtigung.", type="negative"); return
+        ui.label("Dafür fehlt dir die Berechtigung.").classes("text-sm")
+        return
     betr = CFG.setdefault("betreiber", {})
     ec = CFG.setdefault("email", {})
-    with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full"):
+    if True:
         with ui.row().classes("w-full items-center"):
             ui.icon("settings").classes("text-xl text-primary")
             ui.label("Einstellungen").classes("text-xl font-bold")
@@ -458,11 +473,24 @@ def open_settings():
             CFG["app_url"] = (app_url_in.value or "").strip().rstrip("/") or DEFAULT_APP_URL
             data.save_config()
             ui.notify("Einstellungen gespeichert", type="positive")
-            dialog.close()
+            if schliessen:
+                schliessen()
 
-        with ui.row().classes("w-full justify-end mt-3"):
-            ui.button("Abbrechen", on_click=dialog.close).props("flat")
-            ui.button("Speichern", on_click=save).props("unelevated")
+        # Die Leiste klebt unten am Bild: bei einer langen Seite soll man nicht
+        # erst ans Ende scrollen müssen, um zu speichern.
+        with ui.row().classes("w-full justify-end mt-3 sticky bottom-0 py-2 "
+                              "bg-white/90 backdrop-blur"):
+            if schliessen:
+                ui.button("Abbrechen", on_click=schliessen).props("flat")
+            ui.button("Speichern", on_click=save).props("unelevated") \
+                .mark("einstellungen-speichern")
+
+
+def open_settings():
+    """Alter Weg über ein Fenster – bleibt für Aufrufe, die keine Seite haben."""
+    with ui.dialog() as dialog, ui.card().classes(
+            "w-[900px] max-w-full").style("max-height:88vh;overflow:auto"):
+        render_einstellungen(schliessen=dialog.close)
     dialog.open()
 
 
@@ -651,9 +679,15 @@ def _preiszeile(produkt, wohnung_id, wohnung_name, neu_zeichnen):
 
 
 def _kreditoren_liste(neu_zeichnen):
+    # Der Knopf steht OBEN, nicht unter der Liste. Unten war er bei langen
+    # Listen nicht zu sehen – und wer ihn nicht sieht, hält die Funktion für
+    # nicht vorhanden. Genau so gemeldet.
     with ui.row().classes("w-full items-center gap-2"):
         ui.label("Kreditoren").classes("font-semibold")
         ui.space()
+        ui.button("Kreditor hinzufügen", icon="add",
+                  on_click=lambda: _kreditor_dialog(None, neu_zeichnen)) \
+            .props("outline no-caps dense").mark("kreditor-neu")
     ui.label("Woran ein Lieferant im Beleg erkannt wird, und was er mitbringt: Kategorie "
              "fürs Kontenjournal, Wohnung als Kostenstelle. Ein Dauerbeleg sagt, dass die "
              "monatliche Abbuchung keinen eigenen Beleg braucht.") \
@@ -676,9 +710,8 @@ def _kreditoren_liste(neu_zeichnen):
             ui.button(icon="edit", on_click=lambda kk=k: _kreditor_dialog(kk, neu_zeichnen)) \
                 .props("flat dense round").tooltip("Bearbeiten")
 
-    ui.button("Kreditor hinzufügen", icon="add",
-              on_click=lambda: _kreditor_dialog(None, neu_zeichnen)) \
-        .props("outline no-caps dense").classes("mt-1").mark("kreditor-neu")
+    if not stammdaten.kreditoren():
+        ui.label("Noch kein Kreditor angelegt.").classes("text-xs text-slate-400")
 
 
 def _kreditor_dialog(k, neu_zeichnen):
