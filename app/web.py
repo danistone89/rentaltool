@@ -140,16 +140,30 @@ def main_page():
        sonst tippt man daneben. Der aktive Platz ist doppelt markiert –
        Farbe UND Strich: Farbe allein traegt nicht, wenn die Sonne aufs
        Display faellt oder jemand Farben schlecht unterscheidet. */
-    .nav-leiste { padding-bottom: env(safe-area-inset-bottom); }
+    /* Auf den neuen iPhones (17 Pro) schnitt das Gehaeuse die aeusseren
+       Beschriftungen an: "Buchungen" links und "Menue" rechts lagen in der
+       Rundung der Displayecke. `safe-area-inset-bottom` allein reicht dafuer
+       nicht – der Inset beschreibt den Home-Balken, nicht den Eckradius.
+       Deshalb dreierlei: mehr Luft nach unten als der reine Inset, ein
+       Mindestabstand zu beiden Seiten, und eine hoehere Leiste, damit die
+       Schrift ueber der Rundung sitzt. Die Hoehe steht als Variable, weil das
+       Menue-Blatt (.nav-blatt) genau darauf aufsetzt. */
+    :root { --leiste-hoehe: 66px; --leiste-seite: 14px; }
+    .nav-leiste {
+        padding-bottom: max(env(safe-area-inset-bottom), 10px);
+        padding-left: max(env(safe-area-inset-left), var(--leiste-seite));
+        padding-right: max(env(safe-area-inset-right), var(--leiste-seite));
+    }
     /* Checklisten-Aufgabe: der Text ist Teil des Kaestchens, damit die ganze
        Zeile das Tap-Ziel ist. Erledigtes bleibt durchgestrichen lesbar. */
     .aufgabe .q-checkbox__label { font-size:.875rem; color:#334155; line-height:1.3; }
     .aufgabe-erledigt .q-checkbox__label { text-decoration:line-through; color:#9ca3af; }
-    .nav-platz { color:#64748b; }
+    .nav-platz { color:#64748b; min-height: var(--leiste-hoehe); }
     /* Das Menue-Blatt endet ueber der Leiste, statt sie zu verdecken: sonst
        ist waehrend des Blaetterns nicht mehr zu sehen, in welchem Bereich man
        steht – und ohne Adressleiste ist die Leiste die einzige Orientierung. */
-    .nav-blatt { margin-bottom: calc(56px + env(safe-area-inset-bottom)); }
+    .nav-blatt { margin-bottom: calc(var(--leiste-hoehe)
+                                + max(env(safe-area-inset-bottom), 10px)); }
     .nav-platz .nav-strich { position:absolute; top:0; left:50%;
         transform:translateX(-50%); width:26px; height:3px;
         border-radius:0 0 3px 3px; background:transparent; }
@@ -358,7 +372,7 @@ def main_page():
     _BASE_NAV = ("flex flex-row items-center gap-3 mx-2 px-3 py-2 rounded-lg "
                  "no-wrap cursor-pointer min-h-[44px] ")
     _BASE_PLATZ = ("nav-platz flex flex-col items-center justify-center gap-1 "
-                   "py-1 min-h-[56px] cursor-pointer relative ")
+                   "py-1.5 px-1 cursor-pointer relative ")
     nav_rows = {}     # Schublade: key -> Zeile
     bar_slots = {}    # Leiste: key -> Platz ("menue" fuer den vierten)
 
@@ -423,7 +437,8 @@ def main_page():
                 if zaehler:
                     ui.badge(str(zaehler)).props("color=warning rounded") \
                         .classes("nav-zaehler").mark(f"bar-zaehler-{key}")
-            ui.label(t(label)).classes("nav-etikett text-[11px] leading-tight text-center")
+            ui.label(t(label)).classes(
+                "nav-etikett text-[11px] leading-tight text-center truncate max-w-full")
         slot.on("click", on_click or (lambda e, k=key: activate(k)))
         bar_slots[key] = slot
         return slot

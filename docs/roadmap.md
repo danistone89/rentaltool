@@ -351,6 +351,16 @@ sichtbar wird. Hinweise stehen jetzt daneben, nicht darin.
 
 30 Tests in `tests/test_rechte.py`.
 
+*Nachgebessert am 7.8.2026 (Gerätebefund iPhone 17 Pro):* Die Leiste war zu
+niedrig – „Buchungen" links und „Menü" rechts lagen in der Rundung der
+Displayecke und waren vom Gehäuse angeschnitten. `safe-area-inset-bottom`
+allein deckt das nicht ab: der Inset beschreibt den Home-Balken, nicht den
+Eckradius. Jetzt 66 statt 56 Punkte hoch, seitlich mindestens 14 Punkte
+Abstand (`safe-area-inset-left/right`, falls größer) und unten mindestens 10.
+Gemessen am Prüfbild: die Schrift beginnt 24 statt 16 Punkte vom Rand und endet
+19 statt 7 Punkte über der Unterkante. Die Höhe steht als CSS-Variable
+`--leiste-hoehe`, weil das Menü-Blatt darauf aufsetzt.
+
 *Größe:* M.
 
 ---
