@@ -473,11 +473,18 @@ Die Dauer einer noch offenen Reinigung schätzt der **Median** der bisherigen
 Einsätze dieses Mitarbeiters – ein einziger vergessener Check-out über Nacht
 würde den Durchschnitt für Monate verderben. Ohne Erfahrung 90 Minuten.
 
-Die Warnung bleibt ehrlich: Zweimal im Jahr darf die Grenze überschritten werden
-(§ 8 Abs. 1b SGB IV), und die Anzeige zählt mit, wie oft es schon war. Wer
-pauschal vor etwas Erlaubtem warnt, wird nicht mehr gelesen.
+**Mehr zu arbeiten ist kein Fehler.** Wer über die Grenze kommt, verliert die
+Stunden nicht: Ausgezahlt wird höchstens bis zur Grenze, der Rest bleibt als
+**Zeitkonto** stehen und kommt in einem Monat mit Luft dazu. Ohne das müsste
+jemand Arbeit ablehnen, die längst getan ist. Der Kontostand wird über alle
+abgeschlossenen Monate von vorn gerechnet, nicht gespeichert – so kann er nicht
+von den erfassten Zeiten abweichen.
 
-24 Tests in `tests/test_lohn.py`.
+Die Karte zeigt deshalb den **auszahlbaren** Betrag, nicht den erarbeiteten, und
+darunter, was aufs Konto geht. Der Balken läuft nie über 100 % – ein voller
+Balken mit Überlauf sähe aus wie ein Fehler und ist keiner.
+
+28 Tests in `tests/test_lohn.py`.
 
 *Größe:* S.
 

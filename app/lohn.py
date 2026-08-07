@@ -16,8 +16,10 @@ Zahl wäre spätestens im Januar falsch, und falsch würde sie still.
 ist der Zeitraum, den das Steuerbüro meldet – die Zahl hier muss zu der dort
 passen, sonst warnt sie vor etwas anderem, als am Ende gemeldet wird.
 
-Zweimal im Jahr darf die Grenze überschritten werden (bis zum Doppelten). Diese
-Ausnahme wird mitgezählt, sonst schreckt die Anzeige vor etwas, das erlaubt ist.
+**Mehr arbeiten ist kein Fehler.** Wer in einem Monat über die Grenze kommt,
+verliert die Stunden nicht: Ausgezahlt wird höchstens bis zur Grenze, der Rest
+bleibt als Zeitkonto stehen und kommt in einem Monat mit Luft dazu. Ohne das
+müsste jemand Arbeit ablehnen, die längst getan ist – oder die Grenze reißen.
 """
 import math
 import statistics
@@ -91,6 +93,42 @@ def offene_einsaetze(user, jobs, von, bis):
     return offen
 
 
+def monatswerte(user, user_cfg=None, defaults=None, heute=None):
+    """Was in jedem Abrechnungsmonat erarbeitet wurde – ältester zuerst."""
+    from app.ui.basis import _billing_month
+    heute = heute or date.today()
+    je_monat = {}
+    for e in timetrack.entries(user):
+        if e.get("checkout"):
+            je_monat.setdefault(_billing_month(e["checkin"]), []).append(e)
+    return [(m, timetrack.summary(rows, user_cfg, defaults)["amount"])
+            for m, rows in sorted(je_monat.items())]
+
+
+def zeitkonto(user, user_cfg=None, defaults=None, heute=None, bis_monat=None):
+    """Was aus früheren Monaten noch offen ist.
+
+    Wer in einem Monat mehr arbeitet, als die Grenze zulässt, verliert die
+    Stunden nicht: Ausgezahlt wird höchstens bis zur Grenze, der Rest bleibt
+    stehen und kommt in einem Monat mit Luft dazu. Das ist der übliche Weg,
+    einen Minijob über Monate mit ungleicher Auslastung zu führen – ohne ihn
+    müsste man Arbeit ablehnen, die längst getan ist.
+
+    Gerechnet wird über alle abgeschlossenen Monate von vorn: jeder Monat
+    zahlt bis zur Grenze aus, was er selbst und das Konto hergeben.
+    """
+    from app.ui.basis import _billing_month
+    heute = heute or date.today()
+    laufend = bis_monat or _billing_month(heute.isoformat())
+    stand = 0.0
+    for monat, wert in monatswerte(user, user_cfg, defaults, heute):
+        if monat >= laufend:
+            break
+        verfuegbar = wert + stand
+        stand = round(max(0.0, verfuegbar - grenze(int(monat[:4]))), 2)
+    return stand
+
+
 def prognose(user, jobs, user_cfg=None, defaults=None, heute=None, abrechnungsmonat=None):
     """Was dieser Monat voraussichtlich bringt – und ob die Grenze hält.
 
@@ -120,18 +158,25 @@ def prognose(user, jobs, user_cfg=None, defaults=None, heute=None, abrechnungsmo
 
     summe = round(verdient + erwartet, 2)
     limit = grenze(bis.year)
+    vortrag = zeitkonto(user, user_cfg, defaults, heute, monat)
+    verfuegbar = round(summe + vortrag, 2)
+    auszahlbar = round(min(verfuegbar, limit), 2)
+    neuer_vortrag = round(verfuegbar - auszahlbar, 2)
     return {
         "monat": monat, "von": von, "bis": bis,
         "verdient": round(verdient, 2),
         "erwartet": round(erwartet, 2),
-        "summe": summe,
+        "summe": summe,                 # was dieser Monat an Arbeit wert ist
+        "vortrag": round(vortrag, 2),   # was vom Zeitkonto dazukommt
+        "auszahlbar": auszahlbar,       # was davon in diesem Monat ausgezahlt wird
+        "zeitkonto": neuer_vortrag,     # was danach stehen bleibt
         "einsaetze_offen": len(offen),
         "minuten_offen": minuten,
         "dauer_schnitt": schnitt,
         "grenze": limit,
-        "rest": round(limit - summe, 2),
-        "ueber": summe > limit,
-        "auslastung": (summe / limit) if limit else 0.0,
+        "rest": round(limit - auszahlbar, 2),
+        "ueber": verfuegbar > limit,
+        "auslastung": (auszahlbar / limit) if limit else 0.0,
     }
 
 

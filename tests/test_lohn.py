@@ -130,21 +130,26 @@ def test_reinigungen_ausserhalb_des_monats_zaehlen_nicht():
     assert lohn.prognose("vale", [weit], defaults=SAETZE)["einsaetze_offen"] == 0
 
 
-def test_die_grenze_wird_als_ueberschritten_gemeldet():
+def test_ueber_der_grenze_wird_gedeckelt_und_nicht_verloren():
+    """Mehr zu arbeiten ist kein Fehler: ausgezahlt wird bis zur Grenze, der
+    Rest bleibt als Zeitkonto stehen. Ohne das müsste jemand Arbeit ablehnen,
+    die längst getan ist."""
     heute = date.today()
     _eintrag("vale", heute, 60 * 45)      # 45 Stunden à 15 € = 675 €
     p = lohn.prognose("vale", [], defaults=SAETZE)
     assert p["summe"] == 675.0
+    assert p["auszahlbar"] == float(p["grenze"])
+    assert p["zeitkonto"] == round(675.0 - p["grenze"], 2)
     assert p["ueber"] is True
-    assert p["rest"] < 0
-    assert p["auslastung"] > 1
+    assert p["auslastung"] == 1.0, "der Balken laeuft nicht ueber"
 
 
-def test_knapp_darunter_ist_nicht_ueber():
+def test_knapp_darunter_bleibt_ohne_zeitkonto():
     heute = date.today()
     _eintrag("vale", heute, 60 * 40)      # 600 € bei Grenze 603
     p = lohn.prognose("vale", [], defaults=SAETZE)
     assert not p["ueber"]
+    assert p["zeitkonto"] == 0
     assert 0 < p["rest"] <= 3
 
 
@@ -211,3 +216,47 @@ def test_die_prognose_deckt_jetzt_den_ganzen_monat():
     _von, bis = _billing_period(_billing_month(heute.isoformat()))
     assert (bis - heute).days <= vorschau_tage(), (
         "Das Vorschaufenster reicht nicht bis zum Ende des Abrechnungsmonats")
+
+
+# ------------------------------------------------------------- Zeitkonto
+def test_ohne_vorgeschichte_ist_das_konto_leer():
+    assert lohn.zeitkonto("vale", defaults=SAETZE) == 0.0
+
+
+def test_ein_voller_monat_schiebt_den_rest_in_den_naechsten(monkeypatch):
+    """Der eigentliche Zweck: die Stunden gehen nicht verloren, sie warten."""
+    heute = date.today()
+    vormonat = heute.replace(day=1) - timedelta(days=20)
+    _eintrag("vale", vormonat, 60 * 45)         # 675 € im Vormonat
+    voriger = _billing_month(vormonat.isoformat())
+    laufend = _billing_month(heute.isoformat())
+    assert voriger < laufend, "Testaufbau: der Eintrag muss im Vormonat liegen"
+
+    stand = lohn.zeitkonto("vale", defaults=SAETZE)
+    assert stand == round(675.0 - lohn.grenze(vormonat.year), 2)
+
+    # Und er taucht in der Vorschau des laufenden Monats wieder auf.
+    p = lohn.prognose("vale", [], defaults=SAETZE)
+    assert p["vortrag"] == stand
+    assert p["auszahlbar"] == stand      # der laufende Monat ist noch leer
+
+
+def test_das_konto_baut_sich_ueber_ruhige_monate_ab():
+    """Ein Monat mit Luft zahlt aus, was aufgelaufen ist."""
+    heute = date.today()
+    vormonat = heute.replace(day=1) - timedelta(days=20)
+    _eintrag("vale", vormonat, 60 * 45)         # 675 € -> 72 € aufs Konto
+    _eintrag("vale", heute, 60 * 10)            # 150 € im laufenden Monat
+    p = lohn.prognose("vale", [], defaults=SAETZE)
+    assert p["vortrag"] > 0
+    assert p["auszahlbar"] == round(150.0 + p["vortrag"], 2)
+    assert p["zeitkonto"] == 0, "das Konto muesste sich geleert haben"
+
+
+def test_der_balken_laeuft_nie_ueber():
+    """Ein Fortschritt über 100 % sieht aus wie ein Fehler und ist keiner."""
+    heute = date.today()
+    _eintrag("vale", heute, 60 * 80)            # weit über der Grenze
+    p = lohn.prognose("vale", [], defaults=SAETZE)
+    assert p["auslastung"] <= 1.0
+    assert p["auszahlbar"] == float(p["grenze"])

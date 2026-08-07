@@ -509,8 +509,10 @@ def lohn_vorschau(user, jobs):
 
     p = lohn.prognose(user, jobs, ucfg, defs)
     anteil = min(1.0, p["auslastung"])
-    if p["ueber"]:
-        farbe, ton_text = "negative", ton.STOERUNG
+    # Kein Alarm: mehr zu arbeiten ist erlaubt, der Ueberhang bleibt als
+    # Guthaben stehen. Farbe sagt nur, wie voll der Monat ist.
+    if p["zeitkonto"]:
+        farbe, ton_text = "primary", ton.TITEL
     elif anteil >= 0.85:
         farbe, ton_text = "warning", ton.DRINGEND
     else:
@@ -524,7 +526,7 @@ def lohn_vorschau(user, jobs):
             ui.label(f"{_month_label(p['monat'])}").classes(f"text-xs {ton.STILL}")
 
         with ui.row().classes("items-baseline gap-2 no-wrap"):
-            ui.label(_eur(p["summe"]) + " €").classes(
+            ui.label(_eur(p["auszahlbar"])).classes(
                 f"text-3xl font-bold leading-none {ton_text}").mark("lohn-summe")
             ui.label(t("von {grenze} € Grenze", grenze=p["grenze"])).classes(
                 f"text-sm {ton.LEISE}")
@@ -533,29 +535,28 @@ def lohn_vorschau(user, jobs):
             .props(f"color={farbe} rounded track-color=grey-3 size=8px").classes("w-full")
 
         with ui.row().classes("w-full items-center gap-3 flex-wrap"):
-            ui.label(t("erfasst {betrag} €", betrag=_eur(p["verdient"]))) \
+            ui.label(t("erfasst {betrag}", betrag=_eur(p["verdient"]))) \
                 .classes(f"text-xs {ton.LEISE}")
             if p["einsaetze_offen"]:
-                ui.label(t("+ {n} zugewiesene Reinigung(en) ≈ {betrag} €",
+                ui.label(t("+ {n} zugewiesene Reinigung(en) ≈ {betrag}",
                            n=p["einsaetze_offen"], betrag=_eur(p["erwartet"]))) \
                     .classes(f"text-xs {ton.LEISE}")
-
-        if p["ueber"]:
-            schon = lohn.ueberschreitungen_im_jahr(user, ucfg, defs)
-            rest = lohn.AUSNAHMEN_JE_JAHR - schon
-            with ui.column().classes(f"w-full gap-0 rounded-lg p-2 {ton.FLAECHE_STOERUNG}"):
-                ui.label(t("Über der Minijob-Grenze – {betrag} € zu viel.",
-                           betrag=_eur(abs(p["rest"])))) \
-                    .classes(f"text-sm font-medium {ton.AUF_STOERUNG}")
-                ui.label(
-                    t("Zweimal im Jahr ist das erlaubt; dieses Jahr war es {schon}×. "
-                      "Danach ist die Beschäftigung nicht mehr geringfügig.",
-                      schon=schon) if rest > 0
-                    else t("Die zwei erlaubten Male sind dieses Jahr aufgebraucht – "
-                           "bitte mit der Verwaltung klären.")) \
+            if p["vortrag"]:
+                ui.label(t("+ {betrag} aus dem Zeitkonto", betrag=_eur(p["vortrag"]))) \
                     .classes(f"text-xs {ton.LEISE}")
+
+        if p["zeitkonto"]:
+            with ui.row().classes(f"w-full items-center gap-2 no-wrap rounded-lg p-2 "
+                                  f"{ton.FLAECHE_RUHIG}").mark("zeitkonto"):
+                ui.icon("account_balance_wallet").classes(f"{ton.GEDECKT} text-base shrink-0")
+                with ui.column().classes("gap-0 min-w-0"):
+                    ui.label(t("{betrag} gehen aufs Zeitkonto",
+                               betrag=_eur(p["zeitkonto"]))) \
+                        .classes(f"text-sm font-medium {ton.TEXT}")
+                    ui.label(t("Die Stunden sind nicht weg – sie werden in einem Monat "
+                               "mit Luft ausgezahlt.")).classes(f"text-xs {ton.LEISE}")
         elif anteil >= 0.85:
-            ui.label(t("Noch {betrag} € bis zur Grenze.", betrag=_eur(p["rest"]))) \
+            ui.label(t("Noch {betrag} bis zur Grenze.", betrag=_eur(p["rest"]))) \
                 .classes(f"text-xs font-medium {ton.DRINGEND}")
 
         ui.label(t("Geschätzt mit {min} Min. je Reinigung – dein bisheriger Schnitt.",
