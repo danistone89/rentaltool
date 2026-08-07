@@ -484,7 +484,15 @@ Die Karte zeigt deshalb den **auszahlbaren** Betrag, nicht den erarbeiteten, und
 darunter, was aufs Konto geht. Der Balken läuft nie über 100 % – ein voller
 Balken mit Überlauf sähe aus wie ein Fehler und ist keiner.
 
-28 Tests in `tests/test_lohn.py`.
+**Für die Verwaltung** steht dieselbe Rechnung als Team-Ansicht in der
+Zeiterfassung: alle Mitarbeiter mit Auslastung, Zeitkonto und offenen
+Einsätzen, die Vollsten oben. Beim Zuweisen ist genau das die Frage – wer hat
+noch Luft? Ohne die Ansicht suchte man sie aus vier Bildschirmen zusammen, und
+im Zweifel bekam die Arbeit, wer zuletzt gefragt wurde. Sie hängt am Recht
+`ZEITEN_FREMDE`, also an Betreiber und Managerin; die Putzkraft sieht weiterhin
+nur die eigene Zahl.
+
+31 Tests in `tests/test_lohn.py`.
 
 *Größe:* S.
 

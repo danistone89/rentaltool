@@ -31,14 +31,14 @@ from starlette.requests import Request  # noqa: E402
 from starlette.responses import RedirectResponse  # noqa: E402
 
 from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  # noqa: E402,F401
-                 bookings, receipts, feiertage, i18n, ical, mode)
+                 bookings, receipts, feiertage, i18n, ical, mode, rechte)
 from app.ui import basis, belege, buchungen, dialog, einstellungen, ton  # noqa: E402,F401
 from app.ui import pwa  # noqa: E402,F401
 from app.ui import kalender, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
 from app.ui.basis import (AREAS, AUTH, BAR_PLAETZE, CFG, ROLE_AREAS, ROLES,  # noqa: E402,F401
                           STORAGE_SECRET, USERS, _APARTMENTS, _apts,
                           _checklisten_an, _cur_area, _cur_role, _cur_user,
-                          _is_admin, _lang_select, _load_apartments,
+                          _darf, _is_admin, _lang_select, _load_apartments,
                           _probe_hinweis, _role_areas, _role_label, _t, logo,
                           nav_plan, platz_von, t)
 from app.ui.belege import render_belege  # noqa: E402,F401
@@ -52,7 +52,8 @@ from app.ui.standort import (_geo_enabled, _match_geofence, _presence,  # noqa: 
 from app.ui.steuer import (open_archive, render_meldungen,  # noqa: E402,F401
                            render_result)
 from app.ui.zeiten import (_admin_zeiten, _meine_kennzahlen,  # noqa: E402,F401
-                           _time_edit_dialog, _zeit_list, lohn_vorschau)
+                           _time_edit_dialog, _zeit_list, lohn_vorschau,
+                           team_vorschau)
 from app.ui.zugang import (_RESET_THROTTLE, logout, open_account,  # noqa: E402,F401
                            open_users)
 from app.ui.belege import _SCAN_JS  # noqa: E402,F401
@@ -339,6 +340,10 @@ def main_page():
                 lohn_vorschau(user, buchungen._cleaning_jobs(quiet=True))
                 _meine_kennzahlen(user)
                 _zeit_list(timetrack.entries(user), apts, admin, staff, render, t("Meine Zeiten"), False)
+                if _darf(rechte.ZEITEN_FREMDE):
+                    ui.separator()
+                    # Zuerst die Frage, die beim Zuweisen gestellt wird.
+                    team_vorschau(buchungen._cleaning_jobs(quiet=True), staff)
                 if admin:
                     ui.separator()
                     ui.label("Auswertung (Admin)").classes("text-lg font-semibold")

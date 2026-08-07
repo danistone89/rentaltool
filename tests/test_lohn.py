@@ -260,3 +260,65 @@ def test_der_balken_laeuft_nie_ueber():
     p = lohn.prognose("vale", [], defaults=SAETZE)
     assert p["auslastung"] <= 1.0
     assert p["auszahlbar"] == float(p["grenze"])
+
+
+# --------------------------------------------------- Team-Vorschau (Verwaltung)
+from nicegui.testing import User            # noqa: E402
+from app import auth, data, mailer, web     # noqa: E402
+
+
+@pytest.fixture
+def team(monkeypatch):
+    monkeypatch.setattr(data, "get_apartments", lambda: [])
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: [])
+    monkeypatch.setattr(mailer, "send_notify", lambda *a, **k: None)
+    monkeypatch.setitem(web.CFG, "stundensatz_werktag", "15")
+    for name, rolle in [("chefin", "admin"), ("vale", "putzkraft"),
+                        ("gabriel", "putzkraft")]:
+        monkeypatch.setitem(web.USERS, name, {
+            "password_hash": auth.hash_password("geheim"), "role": rolle,
+            "totp_secret": "", "name": name})
+    web._APARTMENTS.clear()
+
+
+async def _anmelden(user, name):
+    await user.open("/login")
+    user.find(marker="login-user").type(name)
+    user.find(marker="login-pw").type("geheim")
+    user.find("Anmelden").click()
+    await user.open("/")
+    user.find(marker="nav-zeiterfassung").click()
+
+
+async def test_die_verwaltung_sieht_alle_mitarbeiter(user: User, team):
+    """Beim Zuweisen ist das die Frage: wer hat noch Luft?"""
+    heute = date.today()
+    _eintrag("vale", heute, 60 * 30)          # 450 €
+    _eintrag("gabriel", heute, 60 * 2)        # 30 €
+    await _anmelden(user, "chefin")
+    await user.should_see(marker="team-vorschau")
+    await user.should_see("Wer hat diesen Monat noch Luft?")
+    await user.should_see(marker="team-vale")
+    await user.should_see(marker="team-gabriel")
+
+
+async def test_die_vollsten_stehen_oben(user: User, team):
+    """Sie sind die Entscheidung – wer knapp ist, darf nicht untergehen."""
+    heute = date.today()
+    _eintrag("vale", heute, 60 * 30)
+    _eintrag("gabriel", heute, 60 * 2)
+    await _anmelden(user, "chefin")
+    with user.client:
+        namen = [m[5:] for e in user.client.elements.values()
+                 for m in (getattr(e, "_markers", None) or []) if m.startswith("team-")
+                 and m != "team-vorschau"]
+    assert namen[:2] == ["vale", "gabriel"], namen
+
+
+async def test_die_putzkraft_sieht_die_anderen_nicht(user: User, team):
+    """Was jemand verdient, geht die Kollegin nichts an."""
+    heute = date.today()
+    _eintrag("vale", heute, 60 * 30)
+    await _anmelden(user, "vale")
+    await user.should_see(marker="lohn-vorschau")      # die eigene schon
+    await user.should_not_see(marker="team-vorschau")

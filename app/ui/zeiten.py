@@ -561,3 +561,57 @@ def lohn_vorschau(user, jobs):
 
         ui.label(t("Geschätzt mit {min} Min. je Reinigung – dein bisheriger Schnitt.",
                    min=p["dauer_schnitt"])).classes(f"text-xs {ton.STILL}")
+
+
+def team_vorschau(jobs, staff):
+    """Für alle Mitarbeiter: wer diesen Monat wie voll ist.
+
+    Beim Zuweisen ist genau das die Frage – wer hat noch Luft? Ohne diese
+    Ansicht muss man sie sich aus vier Bildschirmen zusammensuchen, und im
+    Zweifel bekommt die Arbeit, wer zuletzt gefragt wurde.
+
+    Sortiert nach Auslastung, die Vollsten oben: die sind die Entscheidung.
+    """
+    defs = _rate_defaults()
+    zeilen = []
+    for name in sorted(staff or {}):
+        ucfg = USERS.get(name) or {}
+        if not timetrack.rate_for(feiertage.WERKTAG, ucfg, defs):
+            continue                       # ohne Stundensatz keine Aussage
+        zeilen.append((name, lohn.prognose(name, jobs, ucfg, defs)))
+    if not zeilen:
+        return
+    zeilen.sort(key=lambda x: -x[1]["auslastung"])
+
+    with ui.card().classes(ton.KARTE_ENG).mark("team-vorschau"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("groups").classes("text-primary text-xl shrink-0")
+            ui.label("Wer hat diesen Monat noch Luft?").classes("font-semibold")
+            ui.space()
+            ui.label(f"Grenze {zeilen[0][1]['grenze']} €").classes(f"text-xs {ton.STILL}")
+        for name, p in zeilen:
+            _team_zeile(staff.get(name) or name, p)
+        ui.label("Ausgezahlt wird höchstens bis zur Grenze; was darüber liegt, bleibt "
+                 "als Zeitkonto stehen.").classes(f"text-xs {ton.STILL}")
+
+
+def _team_zeile(anzeigename, p):
+    anteil = min(1.0, p["auslastung"])
+    farbe = "primary" if p["zeitkonto"] else ("warning" if anteil >= 0.85 else "primary")
+    with ui.column().classes("w-full gap-0 py-1 border-b border-slate-50") \
+            .mark(f"team-{anzeigename}"):
+        with ui.row().classes("w-full items-baseline gap-2 no-wrap"):
+            ui.label(anzeigename).classes("text-sm font-medium min-w-[110px]")
+            ui.label(_eur(p["auszahlbar"])).classes("text-sm font-semibold")
+            ui.space()
+            if p["zeitkonto"]:
+                ui.label(f"+ {_eur(p['zeitkonto'])} Zeitkonto") \
+                    .classes(f"text-xs {ton.GEDECKT}")
+            else:
+                ui.label(f"noch {_eur(p['rest'])}") \
+                    .classes(f"text-xs {ton.DRINGEND if anteil >= 0.85 else ton.LEISE}")
+        ui.linear_progress(value=anteil, show_value=False) \
+            .props(f"color={farbe} rounded track-color=grey-3 size=5px").classes("w-full")
+        if p["einsaetze_offen"]:
+            ui.label(f"{p['einsaetze_offen']} zugewiesene Reinigung(en) noch offen") \
+                .classes(f"text-xs {ton.STILL}")
