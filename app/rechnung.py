@@ -10,12 +10,17 @@ Buchungen des Jahres tragen 78 eine Reinigungsgebühr, 58 eine
 Übernachtungssteuer, 55 eine Mehrwertsteuer, drei gar nichts. Verlässlich ist
 allein `price`. Also:
 
-    Gesamtbetrag
-    − Beherbergungssteuer      (aus price-details, sonst herausgerechnet)
+    Gesamtbetrag               (von Smoobu – die einzige verlässliche Zahl)
+    − Beherbergungssteuer      (selbst gerechnet, price / 1,06)
     − Reinigung                (aus price-details, sonst Produktpreis)
     = Beherbergung             (der Rest)
 
-Die erste Zeile stammt aus `steuer.ohne_citytax` – **derselben Funktion, die
+**Die Steuer wird gerechnet, nicht übernommen.** Was die Portale als
+Übernachtungssteuer ausweisen, folgt drei verschiedenen Formeln – mal 6 % nur
+auf die Übernachtung, mal 6 % mit Reinigung, mal 7 %. Näheres in
+`steuer.ohne_citytax`, dort steht auch, was das Übernehmen angerichtet hat.
+
+Die zweite Zeile stammt aus `steuer.ohne_citytax` – **derselben Funktion, die
 die Steueranmeldung trägt**. Weicht die Rechnung von der Anmeldung ab, ist eine
 von beiden falsch, und das darf nicht möglich sein.
 

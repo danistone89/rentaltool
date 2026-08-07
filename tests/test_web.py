@@ -58,7 +58,7 @@ async def test_berechnen_zeigt_ergebnis(user: User, mock_backend):
     await _login(user)
     user.find(marker="nav-beherbergungssteuer").click()
     user.find("Berechnen").click()
-    await user.should_see("341,90")          # Steuer-KPI
+    await user.should_see("339,16")          # Steuer-KPI
     await user.should_see("Buchungen")        # Tabellen-Überschrift
     await user.should_see("Erzeugen & ablegen")   # Festschreiben-Button
     await user.should_see("per E-Mail senden")    # E-Mail-Button
@@ -72,11 +72,13 @@ async def test_summen_tabelle_zeigt_die_kette(user: User, mock_backend):
     user.find(marker="nav-beherbergungssteuer").click()
     user.find("Berechnen").click()
     await user.should_see(marker="summen")
-    # Dez 2025, gegen das eingereichte Formular validiert:
+    # Dez 2025. Die Steuer wird seit dem 7.8.2026 aus dem Gesamtbetrag
+    # gerechnet statt von Booking.com übernommen – eingereicht waren damals
+    # 5.698,28 € / 341,90 € (siehe tests/test_steuer.py).
     await user.should_see("5.991,89")   # Summe Rechnungsbeträge (was die Gäste zahlten)
-    await user.should_see("293,61")     # darin enthaltene Beherbergungssteuer
-    await user.should_see("5.698,28")   # = Bemessungsgrundlage / steuerpfl. Umsatz
-    await user.should_see("341,90")     # x 6 % = Steuer
+    await user.should_see("339,18")     # darin enthaltene Beherbergungssteuer
+    await user.should_see("5.652,71")   # = Bemessungsgrundlage / steuerpfl. Umsatz
+    await user.should_see("339,16")     # x 6 % = Steuer
     # Die Beschriftungen, die die Verwechslung verhindern:
     await user.should_see("Summe Rechnungsbeträge (was die Gäste insgesamt gezahlt haben)")
     await user.should_see("− darin enthaltene Beherbergungssteuer (Durchlaufposten)")

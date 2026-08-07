@@ -11,11 +11,12 @@ in einem Zug verschicken; was noch Entwurf ist oder keine Anschrift hat, lässt
 sich gar nicht erst anwählen – so kann der Stapelversand nichts Halbes
 hinausschicken.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from nicegui import ui
 
-from app import archive, data, mailer, protokoll, rechnung, rechnung_pdf
+from app import (archive, bookings, data, mailer, protokoll, rechnung,
+                 rechnung_pdf, smoobu)
 from app.ui.basis import (CFG, _cur_user, _d, _eur, bereichskopf, leer, spaeter,
                           stoerung, t)
 from app.ui import ton
@@ -185,27 +186,53 @@ def _aktionen(r):
 
 # ------------------------------------------------------------------ Aktionen
 def _entwuerfe_erzeugen(neu_laden):
-    from app.ui import buchungen as ui_buchungen
-    # Bewusst mit eigenem Fenster: die Reinigungsliste blickt einen Tag zurück,
-    # weil sie für den Alltag gebaut ist. Eine Rechnung entsteht nach dem
-    # Aufenthalt, oft mit Verzug – hier zählt die Vergangenheit.
+    # Die Buchungen kommen bewusst roh von Smoobu und NICHT über die
+    # Reinigungsliste. Die reicht sie durch `bookings.normalize()`, und das
+    # behält zwar Anreise, Abreise und Gast, wirft aber `price`,
+    # `price-details`, `created-at` und das verschachtelte `apartment` weg –
+    # also genau das, woraus eine Rechnung besteht. Über diesen Weg scheiterte
+    # jeder Entwurf lautlos an „Die Buchung hat keinen Betrag."
+    #
+    # Auch das Fenster ist ein anderes: die Reinigungsliste schaut nach vorn
+    # (was ist zu putzen), die Rechnung schaut zurück (wer ist abgereist).
     tage = rechnung.RUECKBLICK_TAGE
-    jobs = ui_buchungen._cleaning_jobs(days_ahead=0, days_back=tage, quiet=True)
-    faellig = rechnung.faellige_buchungen(jobs)
+    heute = date.today()
+    von = (heute - timedelta(days=tage)).isoformat()
+    try:
+        roh = data._reservations(von, heute.isoformat())
+    except smoobu.SmoobuError as ex:
+        ui.notify(t("Smoobu: {fehler}", fehler=ex), type="negative", timeout=9000)
+        return
+
+    faellig = rechnung.faellige_buchungen(
+        [b for b in roh if bookings.is_real(b)])
     if not faellig:
         ui.notify(f"In den letzten {tage} Tagen hat jede abgereiste Buchung "
                   f"schon eine Rechnung.", type="info", timeout=6000)
         return
+
     gaeste = data.gastdaten()
     neu, mit_befund = 0, 0
+    uebersprungen = {}
     for j in faellig:
         e, befunde = rechnung.entwurf_fuer(j, gaeste.get(j.get("id")), CFG, _cur_user())
         if e:
             neu += 1
             mit_befund += 1 if befunde else 0
-    ui.notify(f"{neu} Entwurf/Entwürfe aus den letzten {tage} Tagen angelegt"
-              + (f", davon {mit_befund} mit offenen Punkten." if mit_befund else "."),
-              type="positive", timeout=8000)
+        else:
+            # Kein Entwurf: der Grund darf nicht verschwinden. Genau dieses
+            # Schweigen ließ den Knopf aussehen, als täte er nichts.
+            grund = befunde[0] if befunde else "Grund unbekannt."
+            uebersprungen[grund] = uebersprungen.get(grund, 0) + 1
+
+    meldung = f"{neu} Entwurf/Entwürfe aus den letzten {tage} Tagen angelegt"
+    meldung += f", davon {mit_befund} mit offenen Punkten." if mit_befund else "."
+    if uebersprungen:
+        anzahl = sum(uebersprungen.values())
+        gruende = ", ".join(f"{n}× {g.rstrip('.')}" for g, n in
+                            sorted(uebersprungen.items(), key=lambda x: -x[1]))
+        meldung += f" {anzahl} übersprungen: {gruende}."
+    ui.notify(meldung, type="positive" if neu else "warning", timeout=10000)
     spaeter(neu_laden)
 
 

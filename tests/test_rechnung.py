@@ -395,3 +395,105 @@ def test_kuenftige_abreisen_bleiben_aussen_vor():
     heute = date.today()
     kuenftig = [{"id": 1, "departure": (heute + timedelta(days=2)).isoformat()}]
     assert rechnung.faellige_buchungen(kuenftig, heute) == []
+
+
+# ------------------------------------------------------------------ Die Naht
+# Die beiden Hälften waren einzeln immer richtig: `faellige_buchungen` wurde mit
+# Attrappen geprüft, `entwurf_fuer` mit echten Smoobu-Daten. Geprüft hat nie
+# jemand, ob das, was die erste durchreicht, der zweiten überhaupt genügt – und
+# genau dort lag der Fehler. Diese zwei Tests decken die Naht ab.
+
+def test_die_ganze_kette_von_der_smoobu_antwort_bis_zum_entwurf():
+    """Der Fehler vom 7.8.2026, zweiter Teil: „Entwürfe suchen" reichte die
+    aufbereiteten Reinigungs-Jobs weiter. Preis, Preisdetails, Buchungsdatum
+    und die Wohnung fallen dort heraus – jeder Entwurf scheiterte lautlos an
+    „Die Buchung hat keinen Betrag." Der Knopf schien nichts zu tun.
+
+    Gegangen wird hier derselbe Weg wie im Bildschirm: rohe Smoobu-Antwort →
+    aussortieren → fällige finden → Entwurf.
+    """
+    from datetime import date, timedelta
+    from app import bookings
+
+    p = stammdaten.produkt_anlegen("Endreinigung", stammdaten.FEST, 0.07)
+    stammdaten.preis_setzen(p["id"], 2748963, "2020-01-01", 65)
+
+    heute = date.today()
+    abreise = (heute - timedelta(days=30)).isoformat()
+    roh = [_buchung(id=901, departure=abreise,
+                    arrival=(heute - timedelta(days=33)).isoformat()),
+           # Eine Blockierung ist keine Buchung und darf keine Rechnung werden.
+           _buchung(id=902, departure=abreise, **{"is-blocked-booking": True})]
+
+    faellig = rechnung.faellige_buchungen(
+        [b for b in roh if bookings.is_real(b)], heute)
+    assert [b["id"] for b in faellig] == [901]
+
+    entwurf, befunde = rechnung.entwurf_fuer(faellig[0], _gast())
+    assert entwurf, f"Kein Entwurf entstanden. Befunde: {befunde}"
+    assert entwurf["summen"]["brutto"] == 400.07
+
+
+async def test_der_knopf_legt_wirklich_entwuerfe_an(user: User, app_bereit,
+                                                    monkeypatch):
+    """Der Test, der gefehlt hat. Beide Hälften waren einzeln geprüft und
+    einzeln richtig – geklickt hat den Knopf keiner. Vor der Korrektur legte er
+    null Entwürfe an und sagte nichts dazu.
+
+    Deshalb wird hier wirklich geklickt, mit einer Smoobu-Antwort in der Form,
+    die auch im Betrieb ankommt.
+    """
+    from datetime import date, timedelta
+
+    p = stammdaten.produkt_anlegen("Endreinigung", stammdaten.FEST, 0.07)
+    stammdaten.preis_setzen(p["id"], 2748963, "2020-01-01", 65)
+
+    heute = date.today()
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: [
+        _buchung(id=901, arrival=(heute - timedelta(days=33)).isoformat(),
+                 departure=(heute - timedelta(days=30)).isoformat())])
+
+    await _anmelden(user)
+    user.find(marker="entwuerfe-suchen").click()
+    await user.should_see("1 Entwurf")
+
+    # Die Meldung allein genügt nicht – der Entwurf muss auch dastehen, und mit
+    # dem richtigen Betrag. Genau daran scheiterte der alte Weg lautlos.
+    angelegt = rechnung.rechnungen()
+    assert len(angelegt) == 1, "Der Knopf meldet Erfolg, legt aber nichts an"
+    assert angelegt[0]["summen"]["brutto"] == 400.07
+    assert angelegt[0]["buchung"] == 901
+
+
+async def test_uebersprungene_buchungen_sagen_warum(user: User, app_bereit,
+                                                    monkeypatch):
+    """Schweigen war das eigentliche Ärgernis: der Knopf sah kaputt aus, obwohl
+    er lief. Was er nicht verarbeiten kann, muss er benennen."""
+    from datetime import date, timedelta
+
+    heute = date.today()
+    # Ohne hinterlegten Reinigungspreis und ohne Angabe von Smoobu bleibt die
+    # Aufteilung unbelastbar – das ist richtig so, darf aber nicht stumm sein.
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: [
+        _buchung(id=902, price=0,
+                 departure=(heute - timedelta(days=10)).isoformat())])
+
+    await _anmelden(user)
+    user.find(marker="entwuerfe-suchen").click()
+    await user.should_see("1 übersprungen")
+    await user.should_see("keinen Betrag")
+
+
+def test_aufbereitete_reinigungs_jobs_taugen_nicht_fuer_rechnungen():
+    """Die Falle festgenagelt: wer die Buchungen wieder über die
+    Reinigungsliste holt, bekommt genau dieses Ergebnis. Schlägt der Test um,
+    weil plötzlich doch ein Entwurf entsteht, ist `normalize()` gewachsen – dann
+    darf diese Warnung weg."""
+    from app import bookings
+
+    job = bookings.normalize(_buchung())
+    assert "price" not in job and "price-details" not in job, \
+        "normalize() reicht den Betrag jetzt durch – der Umweg wäre wieder gangbar"
+    entwurf, befunde = rechnung.entwurf_fuer(job, _gast())
+    assert entwurf is None
+    assert befunde == ["Die Buchung hat keinen Betrag."]

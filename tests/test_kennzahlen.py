@@ -63,13 +63,18 @@ def test_umsatz_ist_ohne_die_durchlaufende_beherbergungssteuer():
     assert kennzahlen.umsatz_je_monat(b) == {"2026-08": 377.42}
 
 
-def test_ausgewiesene_steuer_schlaegt_die_umrechnung():
-    """Die Wernerstraße rechnet bei Booking.com mit 7 % – nur der ausgewiesene
-    Betrag trifft dann die Wirklichkeit."""
+def test_die_ausgewiesene_steuer_wird_nicht_uebernommen():
+    """Was das Portal als Übernachtungssteuer ausweist, bleibt außen vor.
+
+    Diese Buchung ist ein echter Fall aus der Fixture: 13,28 € sind 6 % auf die
+    Übernachtung ALLEIN – die Reinigungsgebühr fehlt in der Basis, obwohl sie
+    nach § 4 Abs. 1 der Satzung (FAQ 5.2) dazugehört. Übernähme man den Betrag,
+    wäre der Umsatz 316,40 € statt 311,02 € und damit um 5,38 € zu hoch."""
     b = _buchung(1, 2960031, "Wernerstraße", "2026-08-01", "2026-08-03", 329.68,
                  kanal="Booking.com",
                  details="Reinigungsgebühr - EUR 95\nÜbernachtungssteuer - EUR 13.28")
-    assert kennzahlen.umsatz_je_monat(b) == {"2026-08": 316.40}
+    assert kennzahlen.umsatz_je_monat(b) == {"2026-08": 311.02}   # 329,68 / 1,06
+    assert kennzahlen.umsatz_je_monat(b) != {"2026-08": 316.40}
 
 
 def test_bei_airbnb_steckt_die_steuer_nicht_im_preis():
