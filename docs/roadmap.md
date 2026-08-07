@@ -371,6 +371,10 @@ Gemessen am Prüfbild: die Schrift beginnt 24 statt 16 Punkte vom Rand und endet
   Architektur grundlegend und ist ohne Phase 0–1 nicht sinnvoll.
 * **Checklisten wieder einschalten** – bewusst aus (`checklisten_aktiv`), bis
   der Alltag ohne sie rundläuft.
+* **Belege aus dem Postfach holen** – am 7.8.2026 verworfen. Technisch möglich
+  (`rechnung-automation` liest Postfächer über Microsoft Graph), aber es bringt
+  Postfachzugang, Filterregeln je Absender und Dublettenschutz mit. Hochladen
+  reicht.
 * **Automatisierte Gästekommunikation** – Nachrichten lesen/senden gibt es
   bereits; Vorlagen und Automatik sind ein eigenes Thema.
 
