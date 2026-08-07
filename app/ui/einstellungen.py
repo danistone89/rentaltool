@@ -4,9 +4,12 @@ Ein grosser Dialog mit Reitern. Gespeichert wird in `config.json`.
 """
 
 import os
+from datetime import date
 from nicegui import ui
-from app import data, mailer, rechte
-from app.ui.basis import (CFG, DEFAULT_APP_URL, _checklisten_an, _cur_user, _darf, t)
+from app import data, mailer, rechte, stammdaten
+from app.ui.basis import (CFG, DEFAULT_APP_URL, _apts, _checklisten_an,
+                          _cur_user, _darf, spaeter, t)
+from app.ui import ton
 from app.ui.buchungen import (_user_email)
 from app.ui.standort import (_geo_enabled, geocode)
 from app.ui.steuer import (DEFAULT_BETREFF, DEFAULT_TEXT)
@@ -71,6 +74,7 @@ def open_settings():
             t_smoobu = ui.tab("Smoobu", icon="sync")
             t_mail = ui.tab("E-Mail", icon="mail")
             t_stb = ui.tab("Steuerberater", icon="account_balance")
+            t_stamm = ui.tab("Produkte & Kreditoren", icon="inventory")
 
         with ui.tab_panels(tabs, value=t_betr).classes("w-full"):
             with ui.tab_panel(t_betr):
@@ -308,6 +312,9 @@ def open_settings():
                                       placeholder=DEFAULT_APP_URL) \
                     .props("outlined dense").classes("w-full max-w-[420px]")
 
+            with ui.tab_panel(t_stamm).mark("panel-stammdaten"):
+                _stammdaten_panel()
+
             with ui.tab_panel(t_stb):
                 ui.label("Empfänger für den monatlichen Arbeitszeiten-Versand "
                          "(Zeiterfassung → Auswertung → An Steuerberater senden). "
@@ -396,3 +403,184 @@ def open_settings():
             ui.button("Abbrechen", on_click=dialog.close).props("flat")
             ui.button("Speichern", on_click=save).props("unelevated")
     dialog.open()
+
+
+# ------------------------------------------------- Produkte & Kreditoren (AP13)
+def _stammdaten_panel():
+    """Die Grundlage der Rechnung – gepflegt, nicht geraten.
+
+    Bewusst zwei Listen und kein Assistent: Stammdaten ändert man selten und
+    dann genau. Was es hier zu verstehen gibt, steht als Satz daneben, nicht in
+    einer Hilfe, die niemand aufschlägt.
+    """
+    box = ui.column().classes("w-full gap-4")
+
+    def render():
+        box.clear()
+        with box:
+            _produkte_liste(render)
+            ui.separator()
+            _kreditoren_liste(render)
+    render()
+
+
+def _produkte_liste(neu_zeichnen):
+    produkte = stammdaten.produkte()
+    with ui.row().classes("w-full items-center gap-2"):
+        ui.label("Produkte").classes("font-semibold")
+        ui.space()
+        if not produkte:
+            ui.button("Vorgaben anlegen", icon="auto_awesome",
+                      on_click=lambda: (stammdaten.erstbefuellung(),
+                                        ui.notify("Produkte und bekannte Lieferanten angelegt.",
+                                                  type="positive"),
+                                        spaeter(neu_zeichnen))) \
+                .props("unelevated dense no-caps").mark("stammdaten-vorgaben")
+    if not produkte:
+        ui.label("Noch nichts angelegt. Die Vorgaben bringen Übernachtung, Endreinigung "
+                 "und Beherbergungssteuer mit – dazu die Lieferanten aus dem Kontenjournal.") \
+            .classes(f"text-sm {ton.LEISE}")
+        return
+
+    apts = _apts()
+    for p in produkte:
+        with ui.card().classes(ton.KARTE_ENG).mark(f"produkt-{p['id']}"):
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.label(p.get("name", "")).classes("font-medium")
+                ui.chip(f"{p.get('steuersatz', 0) * 100:.0f} % USt") \
+                    .props("color=grey-4 text-color=black dense square").classes("text-xs")
+                ui.space()
+                ui.label(_ART_TEXT.get(p.get("art"), p.get("art", ""))) \
+                    .classes(f"text-xs {ton.STILL}")
+            if p.get("art") != stammdaten.FEST:
+                continue
+            ui.label("Preis je Wohnung – gefragt wird mit dem Tag, an dem der Gast gebucht "
+                     "hat, nicht mit der Anreise.").classes(f"text-xs {ton.LEISE}")
+            for wid, wname in (apts or {}).items():
+                _preiszeile(p, wid, wname, neu_zeichnen)
+
+
+_ART_TEXT = {
+    stammdaten.BEHERBERGUNG: "Restbetrag der Buchung",
+    stammdaten.FEST: "fester Preis je Wohnung",
+    stammdaten.DURCHLAUFEND: "durchlaufend, keine USt",
+}
+
+
+def _preiszeile(produkt, wohnung_id, wohnung_name, neu_zeichnen):
+    verlauf = stammdaten.preisverlauf(produkt["id"], wohnung_id)
+    with ui.row().classes("w-full items-center gap-2 no-wrap flex-wrap"):
+        ui.icon("home").classes(f"{ton.STILL} text-sm shrink-0")
+        ui.label(wohnung_name).classes("text-sm font-medium min-w-[120px]")
+        for eintrag in verlauf:
+            ui.chip(f"{eintrag['betrag']:.2f} € ab {eintrag['ab'][8:10]}.{eintrag['ab'][5:7]}."
+                    f"{eintrag['ab'][:4]}",
+                    removable=True,
+                    on_value_change=lambda e, w=wohnung_id, ab=eintrag["ab"]: (
+                        None if e.value else
+                        (stammdaten.preis_entfernen(produkt["id"], w, ab),
+                         spaeter(neu_zeichnen)))) \
+                .props("color=deep-purple-1 text-color=deep-purple-10 dense square") \
+                .classes("text-xs")
+        if not verlauf:
+            ui.label("noch kein Preis").classes(f"text-xs {ton.HINWEIS}")
+        ui.space()
+        betrag = ui.number(label="€", value=None, step=1, format="%.2f") \
+            .props("outlined dense").classes("w-24")
+        ab = ui.input(value=date.today().isoformat()).props("type=date outlined dense") \
+            .classes("w-36")
+
+        def setzen(w=wohnung_id, b=betrag, a=ab):
+            if b.value in (None, ""):
+                ui.notify("Betrag fehlt.", type="warning"); return
+            stammdaten.preis_setzen(produkt["id"], w, a.value, b.value)
+            ui.notify(f"{wohnung_name}: {float(b.value):.2f} € ab {a.value}", type="positive")
+            spaeter(neu_zeichnen)
+        ui.button(icon="add", on_click=setzen).props("flat dense round color=primary") \
+            .tooltip("Preis ab diesem Buchungsdatum").mark(f"preis-setzen-{wohnung_id}")
+
+
+def _kreditoren_liste(neu_zeichnen):
+    with ui.row().classes("w-full items-center gap-2"):
+        ui.label("Kreditoren").classes("font-semibold")
+        ui.space()
+    ui.label("Woran ein Lieferant im Beleg erkannt wird, und was er mitbringt: Kategorie "
+             "fürs Kontenjournal, Wohnung als Kostenstelle. Ein Dauerbeleg sagt, dass die "
+             "monatliche Abbuchung keinen eigenen Beleg braucht.") \
+        .classes(f"text-xs {ton.LEISE}")
+
+    apts = _apts()
+    for k in stammdaten.kreditoren():
+        with ui.row().classes("w-full items-center gap-2 no-wrap flex-wrap py-1 "
+                              "border-b border-slate-50").mark(f"kreditor-{k['id']}"):
+            ui.label(k.get("name", "")).classes("text-sm font-medium min-w-[150px]")
+            ui.label(k.get("kategorie") or "— keine Kategorie —") \
+                .classes(f"text-xs {ton.LEISE} flex-grow min-w-0 truncate")
+            if k.get("wohnung"):
+                ui.chip((apts or {}).get(k["wohnung"], "Wohnung")) \
+                    .props("color=grey-4 text-color=black dense square").classes("text-xs")
+            if k.get("dauerbeleg"):
+                ui.chip("Dauerbeleg", icon="event_repeat") \
+                    .props("color=green-7 text-color=white dense square").classes("text-xs") \
+                    .tooltip(k["dauerbeleg"])
+            ui.button(icon="edit", on_click=lambda kk=k: _kreditor_dialog(kk, neu_zeichnen)) \
+                .props("flat dense round").tooltip("Bearbeiten")
+
+    ui.button("Kreditor hinzufügen", icon="add",
+              on_click=lambda: _kreditor_dialog(None, neu_zeichnen)) \
+        .props("outline no-caps dense").classes("mt-1").mark("kreditor-neu")
+
+
+def _kreditor_dialog(k, neu_zeichnen):
+    from app import buchhaltung
+    neu = k is None
+    apts = _apts()
+    with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+        ui.label("Kreditor anlegen" if neu else "Kreditor bearbeiten").classes("font-bold")
+        name = ui.input("Name", value=(k or {}).get("name", "")) \
+            .props("outlined dense").classes("w-full").mark("kreditor-name")
+        muster = ui.input("Erkennungsmuster (mit Komma getrennt)",
+                          value=", ".join((k or {}).get("muster", []))) \
+            .props("outlined dense").classes("w-full")
+        ui.label("Steht eines davon im Händlernamen eines Belegs, gehört er diesem "
+                 "Kreditor. Leer lassen heißt: der Name selbst zählt.") \
+            .classes(f"text-xs {ton.LEISE}")
+        kategorie = ui.select({"": "— keine —",
+                               **{x: x for x in buchhaltung.kategorien(CFG)}},
+                              value=(k or {}).get("kategorie", ""), label="Kategorie") \
+            .props("outlined dense options-dense").classes("w-full")
+        wohnung = ui.select({None: "— keine —", **(apts or {})},
+                            value=(k or {}).get("wohnung"), label="Kostenstelle (Wohnung)") \
+            .props("outlined dense").classes("w-full")
+        dauer = ui.input("Dauerbeleg – z. B. Mietvertrag vom 1.3.2024",
+                         value=(k or {}).get("dauerbeleg", "")) \
+            .props("outlined dense").classes("w-full")
+
+        def sichern():
+            if not (name.value or "").strip():
+                ui.notify("Name fehlt.", type="warning"); return
+            teile = [m.strip() for m in (muster.value or "").split(",") if m.strip()]
+            if neu:
+                stammdaten.kreditor_anlegen(name.value.strip(), kategorie.value or "",
+                                            teile, wohnung.value, dauer.value or "")
+            else:
+                stammdaten.kreditor_aendern(k["id"], name=name.value.strip(),
+                                            kategorie=kategorie.value or "", muster=teile,
+                                            wohnung=wohnung.value,
+                                            dauerbeleg=dauer.value or "")
+            dlg.close(); ui.notify("Gespeichert ✓", type="positive"); neu_zeichnen()
+
+        with ui.row().classes("w-full justify-between items-center"):
+            if not neu:
+                ui.button(icon="delete",
+                          on_click=lambda: (stammdaten.kreditor_loeschen(k["id"]), dlg.close(),
+                                            ui.notify("Kreditor entfernt.", type="warning"),
+                                            neu_zeichnen())) \
+                    .props("flat dense round color=negative").tooltip("Löschen")
+            else:
+                ui.element("div")
+            with ui.row().classes("gap-2"):
+                ui.button("Abbrechen", on_click=dlg.close).props("flat")
+                ui.button("Speichern", on_click=sichern).props("unelevated") \
+                    .mark("kreditor-speichern")
+    dlg.open()

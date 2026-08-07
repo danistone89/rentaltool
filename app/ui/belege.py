@@ -7,7 +7,7 @@ OpenCV.js traf Belege zu unzuverlaessig und lud 10 MB WebAssembly (siehe README)
 import os
 import base64
 from nicegui import ui
-from app import buchhaltung, housekeeping, mode, protokoll, receipts, rechte
+from app import buchhaltung, housekeeping, mode, protokoll, receipts, rechte, stammdaten
 from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _darf, _esc_attr,
                           _photo_thumb, _read_upload, bereichskopf,
                           leer, stoerung, t)
@@ -235,9 +235,17 @@ def render_belege():
         except Exception:
             text = ""
         aid = sc["apt"]
+        haendler = receipts.guess_merchant(text)
+        # Ein bekannter Lieferant bringt seine Kategorie mit (AP13). Die vom
+        # Benutzer gewaehlte Wohnung schlaegt die Vorgabe des Kreditors – wer
+        # sie ausdruecklich gesetzt hat, weiss es besser.
+        kategorie, kreditor_wohnung, _k = stammdaten.vorbelegung(haendler)
+        if aid is None and kreditor_wohnung:
+            aid = kreditor_wohnung
         receipts.add_receipt(user, doc["photo"], ocr_text=text,
                              amount=receipts.guess_amount(text),
-                             merchant=receipts.guess_merchant(text), pdf=doc.get("pdf"),
+                             merchant=haendler, pdf=doc.get("pdf"),
+                             kategorie=kategorie,
                              apartment_id=aid, apartment_name=apts.get(aid, ""))
         return doc
 

@@ -33,9 +33,9 @@ import threading
 from app import paths
 
 DATEI = paths.p("rentaltool.db")
-SCHEMA = 6      # 2: push_abos (AP7), 3: abwesenheiten (AP8),
+SCHEMA = 7      # 2: push_abos (AP7), 3: abwesenheiten (AP8),
                 # 4: abschluesse (AP10), 5: meldungen (AP11),
-                # 6: protokoll (AP12)
+                # 6: protokoll (AP12), 7: produkte+kreditoren (AP13)
 
 # Tabelle -> generierte Spalten {Spaltenname: JSON-Pfad}. Die Spalten sind
 # ableitbar und werden nie selbst geschrieben; sie existieren nur, damit man
@@ -57,6 +57,8 @@ TABELLEN = {
     "abschluesse": {"monat": "$.monat"},
     "meldungen": {"periode": "$.periode"},
     "protokoll": {"wann": "$.ts", "wer": "$.wer", "was": "$.was"},
+    "produkte": {"art": "$.art"},
+    "kreditoren": {"kreditor": "$.name"},
 }
 
 _lokal = threading.local()

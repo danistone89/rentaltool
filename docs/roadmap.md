@@ -373,3 +373,75 @@ Gemessen am Prüfbild: die Schrift beginnt 24 statt 16 Punkte vom Rand und endet
   der Alltag ohne sie rundläuft.
 * **Automatisierte Gästekommunikation** – Nachrichten lesen/senden gibt es
   bereits; Vorlagen und Automatik sind ein eigenes Thema.
+
+---
+
+## Phase 6 — Buchhaltung im Werkzeug (eingeschoben am 7.8.2026)
+
+Konzept mit Befunden und Entscheidungen:
+<https://claude.ai/code/artifact/386595d4-1535-49d7-9948-2f9ae26159a7>
+
+Ziel: Ausgangsrechnungen entstehen hier statt in Smoobu, Eingangsrechnungen
+werden wie in einer Buchhaltung verarbeitet, die Bank kommt als CSV dazu, und am
+Ende steht die EÜR. Grundlage sind drei Befunde aus den echten Smoobu-Daten
+(85 Buchungen 2026, abgefragt am 7.8.):
+
+* **Die Anschrift gibt es** – nicht an der Buchung, aber an
+  `GET /api/guests/<guestId>`. Booking.com liefert sie zu 81 %. Über 250 € *und*
+  ohne Anschrift sind nur 12 Buchungen im Jahr, rund zwei im Monat.
+* **Die Aufschlüsselung ist lückenhaft** – 78 von 85 tragen eine
+  Reinigungsgebühr, 58 eine Übernachtungssteuer, 55 eine Mehrwertsteuer.
+  Verlässlich ist allein der Gesamtbetrag.
+* **Der Reinigungspreis hängt am Buchungstag**, nicht am Aufenthalt (siehe AP13).
+
+**Entschieden am 7.8.2026:** Anschrift nachtragbar im Entwurf, ohne sie kein
+Versand · 7 % jetzt, 19 % vorgesehen · ein Nummernkreis je Jahr, vom Werkzeug
+geführt · Versand nur auf Wunsch, einzeln oder als Stapel.
+
+### AP13 · Stammdaten: Produkte, Preise, Kreditoren — ✅ erledigt (7.8.2026)
+
+`app/stammdaten.py`. Drei Produktarten: **Übernachtung** (der Restbetrag),
+**Endreinigung** (fester Preis je Wohnung) und **Beherbergungssteuer**
+(durchlaufend, keine USt). Steuersätze 7 % und 19 % – letzterer ist vorgesehen,
+damit ein künftiges Produkt eine Zahl braucht und keinen Umbau.
+
+**Der tragende Befund: Preise brauchen ein „gültig ab", und gefragt wird mit dem
+Buchungstag.** Die Cottaer Straße stieg von 65 € auf 75 €. Nach Anreisedatum
+sortiert springen die Beträge neunzehnmal hin und her und sehen aus wie Zufall –
+nach *Buchungsdatum* ist es eine saubere Kante: wer vor dem 4.1.2026 gebucht hat,
+zahlt 65 (72 Buchungen), wer danach buchte, 75 (27 Buchungen, ausnahmslos). Zwei
+Gäste, die im selben Monat anreisen, zahlen also verschieden. Wer die Frage
+falsch stellt, rechnet alte Rechnungen falsch nach und merkt es nie, weil beide
+Zahlen plausibel aussehen.
+
+Der hinterlegte Preis ist dabei **nicht** die Quelle für die Rechnung – Smoobu
+liefert die tatsächlich berechnete Gebühr, und die gilt. Er ist die Gegenprobe
+und der Rückfall für die sieben Buchungen ohne Angabe.
+
+**Kreditoren** bringen Kategorie (wörtlich ein SUMIF-Kriterium), Kostenstelle
+und Dauerbeleg mit; erkannt werden sie über Muster im Händlernamen, wobei das
+längste Muster gewinnt. Zehn bekannte Lieferanten aus dem Kontenjournal stehen
+als Vorgabe bereit. Sichtbarer Nutzen sofort: ein neuer Beleg von Rossmann trägt
+seine Kategorie schon beim Anlegen.
+
+Gepflegt wird beides in **Einstellungen → Produkte & Kreditoren**. Die
+Erstbefüllung läuft ausdrücklich nicht von selbst: was sich von allein anlegt,
+traut sich niemand zu ändern.
+
+*Nebenbei:* `basis.spaeter()` gibt es jetzt für den Fall, der im Projekt zum
+vierten Mal auftrat – ein Klick, der die Spalte neu aufbaut, in der er selbst
+steckt.
+
+34 Tests in `tests/test_stammdaten.py`.
+
+*Größe:* S–M.
+
+### AP14 · Ausgangsrechnung aus der Buchung — offen
+
+### AP15 · Eingangsrechnungen mit Kreditor und Kostenstelle — offen
+
+### AP16 · Kontoauszug einlesen und zuordnen — offen
+
+### AP17 · EÜR im Werkzeug — offen
+
+### AP18 · Ablage in der Nextcloud — offen

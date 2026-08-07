@@ -378,6 +378,22 @@ def laedt(text=""):
         ui.label(text or t("Wird geladen …")).classes(f"text-sm {ton.LEISE}")
 
 
+def spaeter(neu_zeichnen):
+    """Einen Bereich neu zeichnen, NACHDEM das auslösende Ereignis fertig ist.
+
+    Wer die Spalte neu aufbaut, in der gerade geklickt wurde, zieht NiceGUI die
+    Liste der Ereignis-Empfänger unter den Füßen weg: der Klick endet mit
+    „dictionary changed size during iteration" – im Betrieb genauso wie im Test.
+    Ein Zeitgeber der Länge null schiebt den Neuaufbau hinter das Ereignis.
+
+    Diese Stelle gab es im Projekt schon viermal (Monatsabschluss der Belege,
+    Steuermeldung, Stammdaten). Wo ein ganzer Seitenzustand wechselt, ist
+    `ui.navigate.reload()` die ehrlichere Antwort; wo nur eine Liste neu
+    entsteht, ist es diese hier.
+    """
+    ui.timer(0.01, neu_zeichnen, once=True)
+
+
 def _probe_hinweis():
     """Unuebersehbares Kennzeichen der Probe-Instanz.
 
