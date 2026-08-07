@@ -111,9 +111,103 @@ def kategorien(cfg=None):
     """Auswahlliste: die Vorgaben, dann eigene aus den Einstellungen, zuletzt
     der Auffangposten. Eigene sind nötig, weil jeder neue Lieferant eine neue
     Zeile im Kontenjournal bekommt – die Vorgabe kann das nicht vorwegnehmen."""
-    eigene = [k.strip() for k in ((cfg or {}).get("beleg_kategorien") or [])
-              if k and k.strip() and k.strip() not in VORGABE_KATEGORIEN]
-    return VORGABE_KATEGORIEN + eigene + [UNKLAR]
+    return VORGABE_KATEGORIEN + eigene_kategorien(cfg) + [UNKLAR]
+
+
+# ------------------------------------------------------- Eigene Kategorien
+# Die Vorgaben oben sind wörtlich die SUMIF-Kriterien des Workbooks und deshalb
+# unveränderlich. Alles, was der Betrieb darüber hinaus auswerten will –
+# „Putzmittel", „Gastgeschenke", was auch immer –, gehört hierher: angelegt in
+# den Einstellungen, nicht im Quelltext.
+
+def eigene_kategorien(cfg=None):
+    """Die selbst angelegten Kategorien, in der Reihenfolge des Anlegens."""
+    return [k.strip() for k in ((cfg or {}).get("beleg_kategorien") or [])
+            if k and k.strip() and k.strip() not in VORGABE_KATEGORIEN]
+
+
+def kategorie_anlegen(cfg, name):
+    """Eine eigene Kategorie hinzufügen. Gibt (ok, meldung) zurück.
+
+    Abgelehnt wird, was schon existiert – auch als Vorgabe. Zwei gleich
+    heißende Kategorien wären in der Auswahlliste nicht unterscheidbar, und in
+    der Auswertung liefe die Summe auf zwei Zeilen auseinander.
+    """
+    name = " ".join((name or "").split())
+    if not name:
+        return False, "Bitte einen Namen eingeben."
+    vorhanden = {k.lower() for k in kategorien(cfg)}
+    if name.lower() in vorhanden:
+        return False, f"„{name}“ gibt es schon."
+    cfg.setdefault("beleg_kategorien", []).append(name)
+    return True, f"„{name}“ angelegt."
+
+
+def kategorie_umbenennen(cfg, alt, neu):
+    """Eine eigene Kategorie umbenennen – **samt der schon zugeordneten Sätze**.
+
+    Ohne das Nachziehen verwaist die Auswertung still: die Belege und
+    Bewegungen trügen weiter den alten Text, die neue Kategorie stünde bei
+    null, und niemand sähe einen Fehler.
+
+    Vorgaben lassen sich nicht umbenennen – sie sind die wörtlichen
+    SUMIF-Kriterien des Workbooks. Gibt (ok, meldung) zurück.
+    """
+    alt = " ".join((alt or "").split())
+    neu = " ".join((neu or "").split())
+    if alt in VORGABE_KATEGORIEN:
+        return False, "Vorgaben lassen sich nicht umbenennen."
+    if alt not in eigene_kategorien(cfg):
+        return False, "Diese Kategorie gibt es nicht."
+    if not neu:
+        return False, "Bitte einen Namen eingeben."
+    if neu.lower() != alt.lower() and neu.lower() in {k.lower() for k in kategorien(cfg)}:
+        return False, f"„{neu}“ gibt es schon."
+    cfg["beleg_kategorien"] = [neu if k == alt else k
+                               for k in (cfg.get("beleg_kategorien") or [])]
+    return True, f"Umbenannt in „{neu}“ – {_nachziehen(alt, neu)} Sätze mitgenommen."
+
+
+def kategorie_loeschen(cfg, name):
+    """Eine eigene Kategorie entfernen.
+
+    Solange ihr noch Belege oder Bewegungen zugeordnet sind, wird nicht
+    gelöscht: die Sätze trügen sonst eine Kategorie, die es nicht mehr gibt.
+    """
+    name = " ".join((name or "").split())
+    if name in VORGABE_KATEGORIEN:
+        return False, "Vorgaben lassen sich nicht löschen."
+    benutzt = _zaehlen(name)
+    if benutzt:
+        return False, (f"„{name}“ ist noch {benutzt}× zugeordnet – erst "
+                       "umbuchen, dann löschen.")
+    cfg["beleg_kategorien"] = [k for k in (cfg.get("beleg_kategorien") or [])
+                               if k != name]
+    return True, f"„{name}“ entfernt."
+
+
+def _betroffen(name):
+    """Alle Sätze, die diese Kategorie tragen – Belege wie Kontobewegungen."""
+    for tabelle in ("belege", "bewegungen"):
+        try:
+            for satz in db.alle(tabelle):
+                if (satz.get("kategorie") or "") == name:
+                    yield tabelle, satz
+        except Exception:
+            continue        # Tabelle (noch) nicht vorhanden
+
+
+def _zaehlen(name):
+    return sum(1 for _t, _s in _betroffen(name))
+
+
+def _nachziehen(alt, neu):
+    anzahl = 0
+    with db.transaktion():
+        for tabelle, satz in list(_betroffen(alt)):
+            db.speichern(tabelle, satz["id"], dict(satz, kategorie=neu))
+            anzahl += 1
+    return anzahl
 
 
 def klasse_fuer(kategorie):

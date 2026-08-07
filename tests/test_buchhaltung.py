@@ -377,3 +377,74 @@ def test_sammelmappe_ist_eine_lesbare_pdf(tmp_path, monkeypatch):
     # Die Kopfzeile ordnet den Bon zu – ohne sie ist er in einem Stapel von
     # vierzig nicht mehr aufzulösen.
     assert "Rossmann" in doc[1].get_text()
+
+
+# --------------------------------------------------- Eigene Kategorien (AP27)
+# Die Vorgaben sind woertlich die SUMIF-Kriterien des Workbooks. Alles, was der
+# Betrieb darueber hinaus auswerten will, legt er selbst an – nicht der
+# Entwickler im Quelltext.
+def test_eine_eigene_kategorie_laesst_sich_anlegen():
+    cfg = {}
+    ok, _m = bh.kategorie_anlegen(cfg, "  Putzmittel ")
+    assert ok
+    assert bh.eigene_kategorien(cfg) == ["Putzmittel"]
+    assert "Putzmittel" in bh.kategorien(cfg)
+
+
+def test_doppelte_namen_werden_abgelehnt():
+    """Zwei gleich heissende Kategorien waeren in der Auswahl nicht
+    unterscheidbar, und die Auswertung liefe auf zwei Zeilen auseinander."""
+    cfg = {}
+    bh.kategorie_anlegen(cfg, "Putzmittel")
+    ok, meldung = bh.kategorie_anlegen(cfg, "putzmittel")
+    assert not ok and "gibt es schon" in meldung
+    ok, _m = bh.kategorie_anlegen(cfg, bh.VORGABE_KATEGORIEN[0])
+    assert not ok, "auch eine Vorgabe darf nicht doppelt entstehen"
+
+
+def test_ein_leerer_name_legt_nichts_an():
+    cfg = {}
+    assert bh.kategorie_anlegen(cfg, "   ")[0] is False
+    assert bh.eigene_kategorien(cfg) == []
+
+
+def test_umbenennen_nimmt_die_zugeordneten_saetze_mit():
+    """Der eigentliche Fund: ohne das Nachziehen truegen die Belege weiter den
+    alten Text, die neue Kategorie staende bei null – und niemand saehe einen
+    Fehler."""
+    from app import db
+    cfg = {}
+    bh.kategorie_anlegen(cfg, "Putzmittel")
+    db.anlegen("belege", {"id": "b1", "kategorie": "Putzmittel", "amount": "9,99"})
+    db.anlegen("bewegungen", {"id": "k1", "kategorie": "Putzmittel", "betrag": -9.99})
+    ok, meldung = bh.kategorie_umbenennen(cfg, "Putzmittel", "Reinigungsbedarf")
+    assert ok and "2 Sätze" in meldung
+    assert db.holen("belege", "b1")["kategorie"] == "Reinigungsbedarf"
+    assert db.holen("bewegungen", "k1")["kategorie"] == "Reinigungsbedarf"
+    assert bh.eigene_kategorien(cfg) == ["Reinigungsbedarf"]
+
+
+def test_vorgaben_lassen_sich_nicht_umbenennen():
+    """Sie muessen woertlich zum Workbook passen – ein Buchstabe daneben laesst
+    die SUMIF-Summe still auf null fallen."""
+    cfg = {}
+    ok, meldung = bh.kategorie_umbenennen(cfg, bh.VORGABE_KATEGORIEN[0], "Neuer Name")
+    assert not ok and "Vorgaben" in meldung
+
+
+def test_eine_benutzte_kategorie_wird_nicht_geloescht():
+    """Sonst truegen die Saetze eine Kategorie, die es nicht mehr gibt."""
+    from app import db
+    cfg = {}
+    bh.kategorie_anlegen(cfg, "Gastgeschenke")
+    db.anlegen("belege", {"id": "b2", "kategorie": "Gastgeschenke"})
+    ok, meldung = bh.kategorie_loeschen(cfg, "Gastgeschenke")
+    assert not ok and "1× zugeordnet" in meldung
+    assert bh.eigene_kategorien(cfg) == ["Gastgeschenke"]
+
+
+def test_eine_unbenutzte_kategorie_laesst_sich_loeschen():
+    cfg = {}
+    bh.kategorie_anlegen(cfg, "Versehen")
+    assert bh.kategorie_loeschen(cfg, "Versehen")[0]
+    assert bh.eigene_kategorien(cfg) == []

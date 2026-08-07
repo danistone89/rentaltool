@@ -482,7 +482,68 @@ def _stammdaten_panel():
             _produkte_liste(render)
             ui.separator()
             _kreditoren_liste(render)
+            ui.separator()
+            _kategorien_liste(render)
     render()
+
+
+def _kategorien_liste(neu_zeichnen):
+    """Eigene Kategorien anlegen, umbenennen, entfernen.
+
+    Die Vorgaben sind wörtlich die SUMIF-Kriterien des Workbooks und deshalb
+    hier nicht änderbar – sie stehen nur als Zahl daneben, damit klar ist, dass
+    es sie gibt. Alles, was der Betrieb darüber hinaus auswerten will, entsteht
+    hier: „wie viel ging für Putzmittel drauf" beantwortet man nicht mit einer
+    Vorgabeliste.
+    """
+    eigene = buchhaltung.eigene_kategorien(CFG)
+    with ui.row().classes("w-full items-center gap-2"):
+        ui.label("Eigene Kategorien").classes("font-semibold")
+        ui.space()
+        feld = ui.input(placeholder="z. B. Putzmittel") \
+            .props("outlined dense").classes("w-56").mark("kategorie-neu")
+
+        def anlegen():
+            ok, meldung = buchhaltung.kategorie_anlegen(CFG, feld.value)
+            ui.notify(meldung, type="positive" if ok else "warning")
+            if ok:
+                data.save_config()
+                neu_zeichnen()
+
+        feld.on("keydown.enter", anlegen)
+        ui.button(icon="add", on_click=anlegen).props("round dense unelevated") \
+            .tooltip("Kategorie hinzufügen").mark("kategorie-plus")
+
+    ui.label(f"{len(buchhaltung.VORGABE_KATEGORIEN)} Vorgaben sind fest "
+             "hinterlegt (sie müssen wörtlich zum Buchhaltungs-Workbook passen). "
+             "Hier kommt dazu, was du selbst auswerten willst.") \
+        .classes(f"text-xs {ton.LEISE}")
+
+    if not eigene:
+        ui.label("Noch keine eigene Kategorie.").classes("text-xs text-slate-400")
+        return
+    for name in eigene:
+        with ui.row().classes("w-full items-center gap-2 no-wrap").mark(f"kat-{name}"):
+            feld = ui.input(value=name).props("dense borderless").classes("flex-grow")
+
+            def umbenennen(_e=None, alt=name, f=None):
+                ok, meldung = buchhaltung.kategorie_umbenennen(CFG, alt, f.value)
+                ui.notify(meldung, type="positive" if ok else "warning")
+                if ok:
+                    data.save_config()
+                neu_zeichnen()
+
+            feld.on("blur", lambda e, alt=name, f=feld: umbenennen(e, alt, f))
+
+            def loeschen(n=name):
+                ok, meldung = buchhaltung.kategorie_loeschen(CFG, n)
+                ui.notify(meldung, type="positive" if ok else "warning")
+                if ok:
+                    data.save_config()
+                    neu_zeichnen()
+
+            ui.button(icon="delete", on_click=loeschen) \
+                .props("flat dense round color=negative").tooltip("Entfernen")
 
 
 def _produkte_liste(neu_zeichnen):
