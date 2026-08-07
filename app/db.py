@@ -62,6 +62,10 @@ TABELLEN = {
     "kreditoren": {"kreditor": "$.name"},
     "rechnungen": {"nummer": "$.nummer", "buchung": "$.buchung",
                    "rstatus": "$.status", "rdatum": "$.datum"},
+    # Kontobewegungen (AP16). Der Satzschlüssel ist der Fingerabdruck aus
+    # `kontoauszug.schluessel` – damit ist ein zweiter Import derselben Wochen
+    # ein Überschreiben desselben Satzes statt einer Dublette.
+    "bewegungen": {"bdatum": "$.datum", "bkonto": "$.konto"},
 }
 
 _lokal = threading.local()

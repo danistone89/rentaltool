@@ -34,7 +34,7 @@ from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  
                  bookings, receipts, feiertage, i18n, ical, mode, rechte)
 from app.ui import basis, belege, buchungen, dialog, einstellungen, ton  # noqa: E402,F401
 from app.ui import pwa  # noqa: E402,F401
-from app.ui import kalender, rechnungen, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
+from app.ui import kalender, kontoblatt, rechnungen, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
 from app.ui.basis import (AREAS, AUTH, BAR_PLAETZE, CFG, ROLE_AREAS, ROLES,  # noqa: E402,F401
                           STORAGE_SECRET, USERS, _APARTMENTS, _apts,
                           _checklisten_an, _cur_area, _cur_role, _cur_user,
@@ -365,12 +365,16 @@ def main_page():
     def build_rechnungen():
         rechnungen.render_rechnungen(activate)
 
+    def build_konto():
+        kontoblatt.render_konto()
+
     builders = {"buchungen": build_buchungen,
                 "uebersicht": build_uebersicht,
                 "beherbergungssteuer": build_beherbergungssteuer,
                 "reinigung": build_reinigung,   # kein Menüpunkt; Ziel von _open_checkliste
                 "belege": build_belege,
                 "rechnungen": build_rechnungen,
+                "konto": build_konto,
                 "zeiterfassung": build_zeiterfassung}
 
     # ------------------------------------------------------------ Navigation

@@ -86,6 +86,7 @@ AREAS = [
     {"key": "zeiterfassung", "label": "Zeiterfassung", "icon": "schedule"},
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
     {"key": "rechnungen", "label": "Rechnungen", "icon": "request_quote"},
+    {"key": "konto", "label": "Konto", "icon": "account_balance"},
 ]
 # "reinigung" ist KEIN Menüpunkt mehr – die Checkliste wird aus einer Buchung geöffnet
 # (activate('reinigung') via _open_checkliste). "uebersicht" ist die Admin-Auswertung.

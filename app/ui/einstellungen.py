@@ -6,9 +6,9 @@ Ein grosser Dialog mit Reitern. Gespeichert wird in `config.json`.
 import os
 from datetime import date
 from nicegui import ui
-from app import buchhaltung, data, mailer, rechte, stammdaten
+from app import buchhaltung, data, housekeeping, mailer, rechte, stammdaten
 from app.ui.basis import (CFG, DEFAULT_APP_URL, _apts, _checklisten_an,
-                          _cur_user, _darf, spaeter, t)
+                          _cur_user, _darf, _read_upload, spaeter, t)
 from app.ui import ton
 from app.ui.buchungen import (_user_email)
 from app.ui.standort import (_geo_enabled, geocode)
@@ -54,6 +54,57 @@ def open_folder_picker(start, on_pick):
     dlg.open()
 
 
+# ---------------------------------------------------------------- Logo
+def _logo_feld(betr):
+    """Logo für die Rechnung – hochladen, ansehen, entfernen.
+
+    Das Bild wird sofort gespeichert, nicht erst beim Schließen des Dialogs:
+    ein Upload, den man noch bestätigen muss, geht regelmäßig verloren. Der
+    Name steht in `betreiber["logo"]`, die Datei im Medienordner – damit zeigt
+    dieselbe Angabe das Logo hier unter `/media/…` und im PDF.
+    """
+    ui.separator().classes("my-2")
+    ui.label("Logo (erscheint oben links auf der Rechnung)").classes("text-sm text-slate-500")
+    with ui.row().classes("w-full items-center gap-3") as reihe:
+        vorschau = ui.column().classes("items-start")
+
+        def zeichnen():
+            vorschau.clear()
+            with vorschau:
+                rel = (betr.get("logo") or "").strip()
+                if rel:
+                    ui.image(f"/media/{rel}").classes("h-16").props("fit=contain")
+                else:
+                    ui.label("Noch kein Logo hinterlegt.").classes("text-xs text-slate-400")
+
+        async def hochladen(e):
+            try:
+                rohdaten, name = await _read_upload(e)
+                endung = (name.rsplit(".", 1)[-1] if "." in name else "png").lower()[:4]
+                if endung not in ("png", "jpg", "jpeg", "gif"):
+                    ui.notify("Bitte PNG, JPG oder GIF.", type="warning")
+                    return
+                betr["logo"] = housekeeping.save_photo("logo", rohdaten, ext=endung)
+                data.save_config()
+            except Exception as ex:
+                ui.notify(f"Logo konnte nicht gespeichert werden: {ex}", type="negative")
+                return
+            ui.notify("Logo gespeichert ✓", type="positive")
+            zeichnen()
+
+        def entfernen():
+            betr.pop("logo", None)
+            data.save_config()
+            ui.notify("Logo entfernt.")
+            zeichnen()
+
+        zeichnen()
+        ui.upload(auto_upload=True, on_upload=hochladen, label="Logo wählen") \
+            .props('accept="image/*"').classes("hk-upload w-[190px]")
+        ui.button("Entfernen", icon="delete", on_click=entfernen).props("flat no-caps")
+    return reihe
+
+
 # ---------------------------------------------------------------- Einstellungen
 def open_settings():
     if not _darf(rechte.EINSTELLUNGEN):
@@ -83,6 +134,7 @@ def open_settings():
                 with ui.grid(columns=2).classes("w-full gap-3"):
                     for key, lbl in data.BETREIBER_FIELDS:
                         inputs[key] = ui.input(lbl, value=betr.get(key, "")).props("outlined dense").classes("w-full")
+                _logo_feld(betr)
 
             with ui.tab_panel(t_pdf):
                 with ui.grid(columns=2).classes("w-full gap-3"):
@@ -592,6 +644,17 @@ def _kreditor_dialog(k, neu_zeichnen):
         dauer = ui.input("Dauerbeleg – z. B. Mietvertrag vom 1.3.2024",
                          value=(k or {}).get("dauerbeleg", "")) \
             .props("outlined dense").classes("w-full")
+        # Die Klasse entscheidet, ob eine Zahlung ins Ergebnis eingeht. Sie
+        # gehört hierher und nicht ins Programm: wer die eigene Privatentnahme
+        # bekommt oder welche Stadtkasse die Steuer einzieht, ist je Betrieb
+        # verschieden.
+        klasse = ui.select({"": "— aus der Kategorie ableiten —",
+                            **{x: x for x in buchhaltung.KLASSEN}},
+                           value=(k or {}).get("klasse", ""),
+                           label="Wie geht die Zahlung ins Ergebnis?") \
+            .props("outlined dense options-dense").classes("w-full") \
+            .tooltip("„Privat/prüfen“ für Entnahmen, „Durchlaufend“ für "
+                     "abgeführte Steuern – beides ist keine Betriebsausgabe.")
 
         def sichern():
             if not (name.value or "").strip():
@@ -599,12 +662,14 @@ def _kreditor_dialog(k, neu_zeichnen):
             teile = [m.strip() for m in (muster.value or "").split(",") if m.strip()]
             if neu:
                 stammdaten.kreditor_anlegen(name.value.strip(), kategorie.value or "",
-                                            teile, wohnung.value, dauer.value or "")
+                                            teile, wohnung.value, dauer.value or "",
+                                            klasse=klasse.value or "")
             else:
                 stammdaten.kreditor_aendern(k["id"], name=name.value.strip(),
                                             kategorie=kategorie.value or "", muster=teile,
                                             wohnung=wohnung.value,
-                                            dauerbeleg=dauer.value or "")
+                                            dauerbeleg=dauer.value or "",
+                                            klasse=klasse.value or "")
             dlg.close(); ui.notify("Gespeichert ✓", type="positive"); neu_zeichnen()
 
         with ui.row().classes("w-full justify-between items-center"):

@@ -46,6 +46,33 @@ VORGABE_KATEGORIEN = [
     "Software (Lexware Office)",
     "Strom (SachsenEnergie)",
     "Wasser/Nebenkosten (DREWAG)",
+    # Ab AP24 kommen die Kontobewegungen dazu – und mit ihnen die Posten, die
+    # es als *Beleg* nie gab: Miete, Löhne, Darlehen, Entnahmen. Die
+    # Schreibweise ist auch hier **wörtlich die des Workbooks**, denn sie
+    # entscheidet über den SUMIF (siehe Modulkopf). Erfundene Bezeichnungen
+    # ließen die Summe still auf null fallen.
+    "Miete/Raumkosten Wernerstr. 34c (Weitervermietung)",
+    "Hausgeld WEG Wohnpark",
+    "Löhne/Gehälter Minijob",
+    "Sozialabgaben Minijob (Knappschaft)",
+    "Knappschaft HAUSHALTSSCHECK (privater Haushalt? – prüfen)",
+    "Kontoführung/Bankgebühr DKB",
+    "Telekommunikation (Magenta TV)",
+    "Verwaltungsgebühr LH Dresden (Geodaten)",
+    # Erlösseite. „netto Auszahlung" ist keine Beschreibung, sondern eine
+    # Warnung: was ankommt, ist der Gastpreis MINUS Provision – siehe AP23.
+    "Beherbergungserlöse (Booking, netto Auszahlung)",
+    "Beherbergungserlöse (Airbnb, netto Auszahlung)",
+    "Beherbergungserlöse (Direktbuchung, brutto)",
+    # Und die vier, an denen sich das Ergebnis entscheidet: keiner davon ist
+    # eine Betriebsausgabe.
+    "Beherbergungssteuer an Stadt (durchlaufender Posten)",
+    "Darlehensrate Targobank (Zins/Tilgung – aufteilen)",
+    "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)",
+    "Eigenübertrag / Entnahme",
+    "Privateinlage / Eigenübertrag",
+    "Kartenausgleich (neutral)",
+    "Kreditkartenausgleich (neutral – Einzelausgaben s. VISA)",
 ]
 
 # Der Auffangposten. Er steht so im Workbook und landet in der EÜR unter
@@ -61,6 +88,22 @@ KLASSEN = ["Ausgabe", "Ausgabe/prüfen", "Privat/prüfen", "Durchlaufend",
 _KLASSE_JE_KATEGORIE = {
     "Lebensmittel (privat? – prüfen)": "Privat/prüfen",
     UNKLAR: "Ausgabe/prüfen",
+    # Was auf dem Konto steht, aber nicht ins betriebliche Ergebnis gehört.
+    "Eigenübertrag / Entnahme": "Privat/prüfen",
+    "Privateinlage / Eigenübertrag": "Privat/prüfen",
+    "Knappschaft HAUSHALTSSCHECK (privater Haushalt? – prüfen)": "Privat/prüfen",
+    "Beherbergungssteuer an Stadt (durchlaufender Posten)": "Durchlaufend",
+    "Kartenausgleich (neutral)": "Neutral",
+    "Kreditkartenausgleich (neutral – Einzelausgaben s. VISA)": "Neutral",
+    # Zins ist Ausgabe, Tilgung nicht – beides steckt in einer Rate. Bis AP22
+    # sie trennt, sind die Posten benannt, aber ausdrücklich unfertig.
+    "Darlehensrate Targobank (Zins/Tilgung – aufteilen)": "Ausgabe/prüfen",
+    "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)": "Ausgabe/prüfen",
+    # Erlöse. Die Provision fehlt in diesen Beträgen – bis AP23 sie
+    # heraustrennt, ist der Umsatz zu niedrig ausgewiesen.
+    "Beherbergungserlöse (Booking, netto Auszahlung)": "Einnahme",
+    "Beherbergungserlöse (Airbnb, netto Auszahlung)": "Einnahme",
+    "Beherbergungserlöse (Direktbuchung, brutto)": "Einnahme",
 }
 
 
