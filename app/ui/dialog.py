@@ -5,9 +5,10 @@ tauschen, Zeit nachtragen, Schaden melden, Gast anschreiben.
 """
 
 from nicegui import ui
-from app import bookings, housekeeping, mailer, planung, push, smoobu, timetrack
+from app import bookings, housekeeping, mailer, planung, push, rechte, smoobu, timetrack
 from app.ui.basis import (CFG, USERS, _app_url, _checklisten_an, _cur_area,
-                          _cur_role, _cur_user, _d, _photo_thumb, _t, laedt, t)
+                          _cur_role, _cur_user, _d, _darf, _photo_thumb, _t,
+                          laedt, t)
 from app.ui import buchungen, reinigung  # noqa: F401  (Ringschluss, siehe Kopf)
 
 def _dfmt_kurz(iso):
@@ -434,8 +435,8 @@ def open_booking_dialog(bk, user, admin, staff, activate):
                        lambda: (dlg.close(), buchungen._open_checkliste(bk, activate)))
             action(t("In meinen Kalender (.ics)"), "event_available",
                    lambda: buchungen._kalender_download(bk))
-            if admin:
-                action(t("Zurücksetzen (Admin)"), "restart_alt",
+            if _darf(rechte.AUFTRAG_ZURUECK):
+                action(t("Zurücksetzen"), "restart_alt",
                        lambda: (dlg.close(), _reset_dialog(bk, user, admin, staff, activate)), color="negative")
 
         if mgr:

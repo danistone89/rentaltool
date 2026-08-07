@@ -7,9 +7,9 @@ OpenCV.js traf Belege zu unzuverlaessig und lud 10 MB WebAssembly (siehe README)
 import os
 import base64
 from nicegui import ui
-from app import buchhaltung, housekeeping, mode, receipts
-from app.ui.basis import (CFG, _MONATE, _apts, _cur_role, _cur_user, _d, _esc_attr,
-                          _is_admin, _photo_thumb, _read_upload, bereichskopf,
+from app import buchhaltung, housekeeping, mode, protokoll, receipts, rechte
+from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _darf, _esc_attr,
+                          _photo_thumb, _read_upload, bereichskopf,
                           leer, stoerung, t)
 from app.ui import ton
 
@@ -217,7 +217,7 @@ _SCAN_JS = r"""
 
 def render_belege():
     user = _cur_user()
-    admin = _is_admin()
+    darf_loeschen = _darf(rechte.BELEGE_LOESCHEN)
     bereichskopf("receipt", t("Belege"),
                  t("Rechnungen scannen, ablegen & per OCR auslesen"))
 
@@ -334,7 +334,7 @@ def render_belege():
     # Kategorisieren ist ein Buchungsakt: eine falsche Kategorie laeuft still in
     # die EÜR. Die Putzkraft fotografiert und schreibt Haendler, Betrag und
     # wofuer – gebucht wird von der Verwaltung.
-    bucht = _cur_role() in ("admin", "manager")
+    bucht = _darf(rechte.BELEGE_BUCHEN)
 
     if bucht:
         with ui.tabs().props("dense no-caps align=left").classes("w-full") as reiter:
@@ -406,7 +406,7 @@ def render_belege():
                             ui.chip(t("abgeschlossen"), icon="lock") \
                                 .props("color=green-7 text-color=white dense square") \
                                 .classes("text-xs")
-                _beleg_card(r, apts, user, admin, bucht, render_alles)
+                _beleg_card(r, apts, user, darf_loeschen, bucht, render_alles)
 
     def render_abschluss():
         if abschluss_box is None:
@@ -422,7 +422,7 @@ def render_belege():
     render_alles()
 
 
-def _beleg_card(r, apts, user, admin, bucht, rerender):
+def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
     zu = buchhaltung.abschluss_von(buchhaltung.monat(r)) is not None
     with ui.card().classes(ton.KARTE_ENG):
         with ui.row().classes("w-full items-start gap-3 no-wrap"):
@@ -488,7 +488,7 @@ def _beleg_card(r, apts, user, admin, bucht, rerender):
                     ui.button(icon="picture_as_pdf",
                               on_click=lambda p=r["pdf"]: ui.navigate.to(f"/media/{p}", new_tab=True)) \
                         .props("flat round dense color=primary").tooltip(t("PDF öffnen"))
-                if admin:
+                if darf_loeschen:
                     ui.button(icon="delete", on_click=lambda i=r["id"]: _del_beleg(i, rerender)) \
                         .props("flat round dense color=negative").tooltip(t("Beleg löschen"))
         if r.get("ocr_text"):
@@ -501,7 +501,7 @@ def _del_beleg(receipt_id, rerender):
         ui.label(t("Beleg wirklich löschen?")).classes("font-medium")
         with ui.row().classes("w-full justify-end gap-2"):
             ui.button(t("Abbrechen"), on_click=dlg.close).props("flat")
-            ui.button(t("Löschen"), on_click=lambda: (receipts.delete_receipt(receipt_id),
+            ui.button(t("Löschen"), on_click=lambda: (_beleg_weg(receipt_id),
                                                    dlg.close(),
                                                    ui.notify(t("Beleg gelöscht."), type="warning"),
                                                    rerender())) \
@@ -569,6 +569,10 @@ def _monatskarte(m, belege, user, rerender):
             if abschluss:
                 ui.button(t("Wieder öffnen"), icon="lock_open",
                           on_click=lambda: (buchhaltung.oeffnen(m),
+                                            protokoll.notieren(
+                                                _cur_user(), protokoll.MONAT_GEOEFFNET, m,
+                                                f"{befund['anzahl']} Belege, "
+                                                f"{buchhaltung.betrag_text(befund['summe'])} €"),
                                             ui.navigate.reload())) \
                     .props("flat no-caps color=negative").mark(f"oeffnen-{m}")
             else:
@@ -629,3 +633,14 @@ def _abschliessen(m, belege, user, name, rerender):
         ui.notify(t("Es steht noch etwas offen – siehe oben."), type="warning")
         return
     ui.navigate.reload()
+
+
+def _beleg_weg(receipt_id):
+    """Löschen und festhalten, wer es war – ein Beleg ist ein Beweismittel."""
+    weg = receipts.list_receipts()
+    weg = next((r for r in weg if r["id"] == receipt_id), {})
+    receipts.delete_receipt(receipt_id)
+    protokoll.notieren(
+        _cur_user(), protokoll.BELEG_GELOESCHT, receipt_id,
+        f"{weg.get('merchant') or '?'} · {weg.get('amount') or '?'} € · "
+        f"{buchhaltung.belegdatum(weg) if weg else '?'}")

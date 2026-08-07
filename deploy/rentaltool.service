@@ -1,0 +1,43 @@
+[Unit]
+Description=Beherbergungssteuer (rentaltool)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rentaltool
+Environment=RENTALTOOL_DATA=/var/lib/rentaltool
+ExecStart=/opt/rentaltool/.venv/bin/python app/web.py
+Restart=always
+RestartSec=3
+
+# --- Wer den Dienst faehrt -------------------------------------------------
+# Bis AP12 lief er als root. Eine Weboberflaeche, die Dateien hochlaedt, PDFs
+# baut und fremde HTTP-Antworten verarbeitet, braucht dafuer keinen einzigen
+# Grund – und mit root wird aus jedem Fehler in dieser Kette sofort ein Fehler
+# im ganzen System. Anlegen des Benutzers und Umhaengen der Rechte: siehe
+# docs/UMSTELLUNG-DIENSTBENUTZER.md.
+User=rentaltool
+Group=rentaltool
+
+# --- Was er nicht anfassen kann -------------------------------------------
+# Schreiben darf er nur den Datenordner. Der Programmcode unter /opt liegt
+# bewusst NICHT dabei: ein Deploy ist ein bewusster Schritt von aussen
+# (git pull als root), kein Nebeneffekt der laufenden Anwendung.
+ReadWritePaths=/var/lib/rentaltool
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Nur IPv4/IPv6-Sockets – die App spricht HTTP nach aussen (Smoobu, Push,
+# SMTP) und lauscht auf 127.0.0.1 hinter nginx. Mehr braucht sie nicht.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

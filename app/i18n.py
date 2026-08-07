@@ -33,6 +33,8 @@ _EN = {
     "6-stelliger Code (falls 2FA aktiv)": "6-digit code (if 2FA is enabled)",
     "Benutzername oder Passwort falsch.": "Incorrect username or password.",
     "Code fehlt oder ist falsch.": "Code missing or incorrect.",
+    "Zu viele Versuche – bitte {n} Sekunden warten.":
+        "Too many attempts – please wait {n} seconds.",
     "Benutzername fehlt.": "Username is missing.",
     "Passwort mindestens 6 Zeichen.": "Password must be at least 6 characters.",
     "Passwörter stimmen nicht überein.": "Passwords do not match.",

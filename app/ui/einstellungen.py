@@ -5,8 +5,8 @@ Ein grosser Dialog mit Reitern. Gespeichert wird in `config.json`.
 
 import os
 from nicegui import ui
-from app import data, mailer
-from app.ui.basis import (CFG, DEFAULT_APP_URL, _checklisten_an, _cur_user, _is_admin, t)
+from app import data, mailer, rechte
+from app.ui.basis import (CFG, DEFAULT_APP_URL, _checklisten_an, _cur_user, _darf, t)
 from app.ui.buchungen import (_user_email)
 from app.ui.standort import (_geo_enabled, geocode)
 from app.ui.steuer import (DEFAULT_BETREFF, DEFAULT_TEXT)
@@ -53,8 +53,8 @@ def open_folder_picker(start, on_pick):
 
 # ---------------------------------------------------------------- Einstellungen
 def open_settings():
-    if not _is_admin():
-        ui.notify("Nur für Administratoren.", type="negative"); return
+    if not _darf(rechte.EINSTELLUNGEN):
+        ui.notify("Dafür fehlt dir die Berechtigung.", type="negative"); return
     betr = CFG.setdefault("betreiber", {})
     ec = CFG.setdefault("email", {})
     with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full"):

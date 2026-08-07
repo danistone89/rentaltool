@@ -18,7 +18,7 @@ kommen aus `app/feiertage.py` und gelten für Sachsen.
 """
 from datetime import date, timedelta
 
-from app import archive, data, db, feiertage
+from app import archive, data, db, feiertage, protokoll
 
 TABELLE = "meldungen"
 
@@ -117,12 +117,16 @@ def bezahlt(periode_iso, wer=""):
     return _merken(periode_iso, bezahlt=_jetzt(), bezahlt_von=wer)
 
 
-def zuruecknehmen(periode_iso, stufe):
+def zuruecknehmen(periode_iso, stufe, wer=""):
     """Eine Stufe zurücknehmen – versehentlich abgehakt kommt vor.
 
     Zurückgenommen wird immer mitsamt allem, was darauf aufbaut: „nicht
-    gesendet, aber bezahlt" wäre ein Zustand, den es nicht gibt.
+    gesendet, aber bezahlt" wäre ein Zustand, den es nicht gibt. Und es steht
+    im Protokoll: eine Meldung, die als erledigt galt und es plötzlich nicht
+    mehr ist, muss nachvollziehbar bleiben.
     """
+    protokoll.notieren(wer, protokoll.MELDUNG_ZURUECKGESETZT, periode_iso,
+                       f"zurück auf vor „{stufe}\u201c")
     felder = {}
     if stufe == BEZAHLT:
         felder = {"bezahlt": "", "bezahlt_von": ""}

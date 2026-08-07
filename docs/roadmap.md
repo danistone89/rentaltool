@@ -306,12 +306,50 @@ Beherbergungssteuer. Die Gäste zahlen dort zu viel (Rechnung 71: 47,56 € stat
 
 ## Phase 5 — Rollen & Härtung
 
-### AP12 · Feine Rechte & Login-Härtung — offen
+### AP12 · Feine Rechte & Login-Härtung — ✅ erledigt (7.8.2026)
 
-Was darf ein Manager konkret (zuweisen, fremde Zeiten korrigieren, Belege
-sehen)? Statt „ganze Bereiche an/aus" (`ROLE_AREAS`). Dazu: Rate-Limit am Login
-(das Passwort-Zurücksetzen hat eins, der Login nicht), 2FA für Admins, Dienst
-nicht mehr als `root`, Protokoll wer was geändert hat.
+**Benannte Rechte** in `app/rechte.py`. Vorher gab es zwei Grobraster:
+`ROLE_AREAS` schaltete ganze Bereiche, und im Code stand acht Mal
+`if _is_admin()`. Dazwischen nichts – wer Zeiten korrigieren sollte, brauchte
+Administratorrechte und damit auch Benutzerverwaltung, Einstellungen und
+Steuer. Jetzt steht dort, **was** jemand darf, nicht **wo** er hindarf; die
+Bereiche bleiben in `ROLE_AREAS`, weil „sieht er die Belege?" und „darf er
+einen löschen?" verschiedene Fragen sind.
+
+Die Linie: **der Manager führt den Tag, der Betreiber verantwortet Nachweis und
+Geld.** Manager ja – zuweisen, fremde Zeiten erfassen, Auftrag zurücksetzen,
+Belege buchen. Manager nein – Beleg löschen (Beweismittel), abgerechnete Zeiten
+ändern (liegt beim Steuerbüro), Benutzer, Einstellungen, Steuer.
+
+**Login-Bremse** in `app/auth.py`: fünf Versuche frei, danach 30 s mit
+Verdopplung bis 15 Minuten. Gezählt wird nach eingetipptem Namen, auch wenn es
+das Konto nicht gibt – sonst verrät das Ausbleiben der Sperre, welche Namen
+existieren. Der zweite Faktor wird mitgebremst: sechs Ziffern sind sonst schnell
+durchprobiert.
+
+**2FA für Administratoren:** ein dauerhafter Hinweis mit Direktlink, kein
+Aussperren. Eine harte Pflicht bräuchte einen Notausgang über die
+Kommandozeile – und wer sich selbst aussperrt, während die Putzkraft vor der
+Wohnung steht, ist schlechter dran als vorher.
+
+**Protokoll** (`app/protokoll.py`), sichtbar in der Benutzerverwaltung: Konten,
+Rollen, gelöschte Belege, wieder geöffnete Monatsabschlüsse, zurückgesetzte
+Steuermeldungen. Kein Vollprotokoll – notiert wird, was jemandem schadet, wenn
+es unbemerkt bleibt. Es gibt bewusst keine Funktion zum Löschen eines Eintrags.
+
+**Dienstbenutzer: vorbereitet, nicht ausgerollt.** `deploy/rentaltool.service`
+läuft als `rentaltool` statt `root` und ist gehärtet (`ProtectSystem=strict`,
+schreibbar nur der Datenordner). Der Weg dorthin samt Rückweg steht in
+`docs/UMSTELLUNG-DIENSTBENUTZER.md`; der wahrscheinlichste Stolperstein ist der
+rclone-Mount der Nextcloud, der ohne `--allow-other` für den neuen Benutzer
+unlesbar ist und die nächtliche Sicherung still scheitern ließe.
+
+*Nebenbefund:* Der PWA-Hinweis aus AP6 stand innerhalb von `content` – und
+`activate()` leert das bei jedem Bereichswechsel. Er war also seit AP6 nach dem
+ersten Klick weg; gemerkt hat es niemand, weil er ohnehin erst im Browser
+sichtbar wird. Hinweise stehen jetzt daneben, nicht darin.
+
+30 Tests in `tests/test_rechte.py`.
 
 *Größe:* M.
 

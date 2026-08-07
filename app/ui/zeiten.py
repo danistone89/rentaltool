@@ -6,8 +6,10 @@ Auswertung ueber alle und den Abrechnungsstand (siehe README).
 
 from nicegui import ui
 from datetime import date
-from app import feiertage, mailer, timetrack
-from app.ui.basis import (CFG, USERS, _MONATE, _billing_month, _billing_period, _cur_user, _d, _eur, _has_rates, _hours_num, _month_label, _rate_defaults, _t, _zeit_aggregat, t)
+from app import feiertage, mailer, rechte, timetrack
+from app.ui.basis import (CFG, USERS, _MONATE, _billing_month, _billing_period,
+                          _cur_user, _d, _darf, _eur, _has_rates, _hours_num,
+                          _month_label, _rate_defaults, _t, _zeit_aggregat, t)
 from app.ui.standort import (_presence)
 from app.ui import ton
 
@@ -100,7 +102,7 @@ def _time_edit_dialog(default_user, apts, admin, staff, entry=None, on_saved=Non
     with ui.dialog() as dlg, ui.card().classes("w-[420px] max-w-full gap-2"):
         ui.label(t("Zeit bearbeiten") if entry else t("Zeit manuell erfassen")).classes("text-lg font-bold")
         usel = None
-        if admin and not entry:
+        if _darf(rechte.ZEITEN_FREMDE) and not entry:
             usel = ui.select({u: (staff.get(u) or u) for u in staff}, value=default_user,
                              label=t("Mitarbeiter")).props("outlined dense").classes("w-full")
         d = ui.input(t("Datum"), value=d0).props("type=date outlined dense").classes("w-full")
@@ -172,7 +174,7 @@ def _zeit_list(rows, apts, admin, staff, on_change, title, show_user):
                     .classes("text-sm font-medium shrink-0")
                 # Gemeldete Zeiten darf nur der Admin noch anfassen – sonst weicht
                 # das, was beim Steuerbüro liegt, von dem hier ab.
-                if timetrack.is_billed(e) and not admin:
+                if timetrack.is_billed(e) and not _darf(rechte.ZEITEN_ABGERECHNET):
                     ui.icon("lock").classes("text-slate-300 shrink-0") \
                         .tooltip(t("Ans Steuerbüro gemeldet – nicht mehr änderbar."))
                 else:

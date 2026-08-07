@@ -187,9 +187,16 @@ def main_page():
     # Das Menue faehrt von unten aus und bleibt damit in Daumennaehe.
     menue_blatt = ui.dialog().props("position=bottom")
 
-    content = ui.column().classes("w-full max-w-6xl mx-auto p-3 sm:p-6 gap-4 sm:gap-5")
-    with content:
+    # Hinweise stehen NEBEN dem Bereichsinhalt, nicht darin: `activate()` leert
+    # `content` bei jedem Bereichswechsel. Der PWA-Hinweis stand seit AP6 darin
+    # und war deshalb nach dem ersten Klick weg – gemerkt hat das niemand, weil
+    # er ohnehin erst im Browser sichtbar wird.
+    hinweise = ui.column().classes("w-full max-w-6xl mx-auto px-3 sm:px-6 pt-3 gap-2")
+    with hinweise:
+        zugang.zwei_faktor_hinweis()
         pwa.einrichten_banner()
+
+    content = ui.column().classes("w-full max-w-6xl mx-auto p-3 sm:p-6 gap-4 sm:gap-5")
 
     # Die Kopfzeile steht seit AP-D2 in basis.bereichskopf – vier Bereiche
     # hatten sie vorher Zeile für Zeile nachgebaut.

@@ -125,3 +125,49 @@ def is_configured(auth_cfg):
 
 def totp_enabled(auth_cfg):
     return bool((auth_cfg or {}).get("totp_secret"))
+
+
+# ---------------------------------------------------- Bremse am Login (AP12)
+# Das Passwort-Zurücksetzen hatte längst eine Bremse, der Login nicht: man
+# konnte beliebig oft raten. Bei sechsstelligen Codes und kurzen Passwörtern
+# ist das der billigste Angriff überhaupt.
+#
+# Gezählt wird nach **eingetipptem Namen**, auch wenn es das Konto gar nicht
+# gibt – sonst verrät schon das Ausbleiben der Sperre, welche Namen existieren.
+# Der Zähler steht im Arbeitsspeicher: ein Neustart löscht ihn, aber einen
+# Neustart kann von außen niemand auslösen.
+_FEHLVERSUCHE = {}          # name -> (anzahl, letzter_versuch)
+SPERRE_AB = 5               # so viele Fehlversuche sind frei
+SPERRE_BASIS = 30           # Sekunden, danach Verdopplung
+SPERRE_MAX = 900            # Deckel: 15 Minuten
+
+
+def _wartezeit(anzahl):
+    if anzahl < SPERRE_AB:
+        return 0
+    return min(SPERRE_BASIS * 2 ** (anzahl - SPERRE_AB), SPERRE_MAX)
+
+
+def sperre_rest(benutzer, jetzt=None):
+    """Wie viele Sekunden dieser Name noch warten muss. 0 heißt: frei."""
+    anzahl, letzter = _FEHLVERSUCHE.get((benutzer or "").strip(), (0, 0.0))
+    rest = _wartezeit(anzahl) - ((jetzt or time.time()) - letzter)
+    return max(0, int(rest + 0.999))
+
+
+def fehlversuch(benutzer, jetzt=None):
+    """Einen Fehlversuch vermerken. Gibt die neue Wartezeit in Sekunden."""
+    name = (benutzer or "").strip()
+    anzahl, _ = _FEHLVERSUCHE.get(name, (0, 0.0))
+    _FEHLVERSUCHE[name] = (anzahl + 1, jetzt or time.time())
+    return _wartezeit(anzahl + 1)
+
+
+def anmeldung_geglueckt(benutzer):
+    """Nach einer richtigen Anmeldung ist die Bremse gelöst."""
+    _FEHLVERSUCHE.pop((benutzer or "").strip(), None)
+
+
+def bremse_zuruecksetzen():
+    """Nur für Tests und den Start."""
+    _FEHLVERSUCHE.clear()

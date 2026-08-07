@@ -7,9 +7,9 @@ belastbare englische Entsprechung, und diesen Bereich bedient nur der Betreiber.
 import os
 from nicegui import ui
 from datetime import date
-from app import archive, data, mailer, meldung
+from app import archive, data, mailer, meldung, rechte
 
-from app.ui.basis import (CFG, _cur_user, t)
+from app.ui.basis import (CFG, _cur_user, _darf, t)
 from app.ui import ton
 
 try:
@@ -399,6 +399,11 @@ def render_meldungen(neu_laden=None):
     Fällt sie auf ein Wochenende oder einen Feiertag, zeigt die App den
     nächsten Werktag (§ 108 Abs. 3 AO).
     """
+    # Der Bereich selbst haengt schon an ROLE_AREAS; die Frage hier ist eine
+    # andere und wird deshalb auch hier gestellt: melden und bezahlen ist
+    # Betreibersache, nicht nur „darf den Bildschirm sehen".
+    if not _darf(rechte.STEUER):
+        return
     offene = meldung.offene()
     with ui.card().classes(ton.KARTE_ENG).mark("meldungen"):
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
@@ -449,5 +454,7 @@ def _bezahlt_setzen(p, neu_laden):
     iteration") – im Betrieb wie im Test. Dieselbe Stelle gab es schon beim
     Monatsabschluss der Belege.
     """
+    if not _darf(rechte.STEUER):
+        ui.notify("Dafür fehlt dir die Berechtigung.", type="negative"); return
     meldung.bezahlt(p, _cur_user())
     ui.navigate.reload()

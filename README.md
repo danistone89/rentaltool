@@ -217,6 +217,17 @@ Rollen: `admin` (sieht alles, verwaltet Nutzer/Einstellungen), `manager`
 Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/ui/basis.py`.** Nutzer
 ohne freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 
+**Rechte (AP12):** Was jemand darf, steht benannt in `app/rechte.py` –
+getrennt davon, welche *Bereiche* er sieht (`ROLE_AREAS`). Die Linie: der
+Manager führt den Tag (zuweisen, fremde Zeiten erfassen, Auftrag zurücksetzen,
+Belege buchen), der Betreiber verantwortet Nachweis und Geld (Belege löschen,
+abgerechnete Zeiten ändern, Benutzer, Einstellungen, Steuer). Der Login bremst
+nach fünf Fehlversuchen (30 s, verdoppelnd bis 15 min) – auch bei Namen, die es
+gar nicht gibt, sonst verrät das Ausbleiben der Sperre die vorhandenen Konten.
+Administratoren ohne 2FA sehen einen dauerhaften Hinweis; ausgesperrt wird
+niemand. Wer Konten, Rollen, Belege oder Abschlüsse ändert, steht im
+**Protokoll** (unten in der Benutzerverwaltung) – löschen lässt sich dort nichts.
+
 **Navigation:** Am Handy stehen die Bereiche in einer Leiste unten, ab 1024 px
 in der Schublade links. Beides kommt aus `basis.nav_plan(rolle)` – **eine**
 Liste für beide Ansichten, sonst laufen sie auseinander. Unten ist Platz für

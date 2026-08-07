@@ -7,11 +7,12 @@ README unter "Login, Benutzer & Rollen".
 import time as _time
 
 from nicegui import app, ui
-from app import auth, data, i18n, mailer
-from app.ui import benachrichtigungen, pwa
+from app import auth, data, i18n, mailer, protokoll, rechte
+from app.ui import benachrichtigungen, pwa, ton
 from app import planung as _planung
 from app.ui import planung as ui_planung
-from app.ui.basis import (CFG, ROLES, USERS, _app_url, _cur_user, _is_admin, _lang, _lang_select, _probe_hinweis, _role_label, logo, t)
+from app.ui.basis import (CFG, ROLES, USERS, _app_url, _cur_user, _darf, _is_admin,
+                          _lang, _lang_select, _probe_hinweis, _role_label, logo, t)
 
 # ---------------------------------------------------------------- Login
 def _finish_login(username, role):
@@ -76,7 +77,15 @@ def login_page():
                     .classes("w-full").mark("login-code")
 
                 def do_login():
-                    u = USERS.get((un.value or "").strip())
+                    name = (un.value or "").strip()
+                    # Erst die Bremse, dann alles andere: sonst verrät schon die
+                    # Art der Abfuhr, ob es den Namen gibt.
+                    rest = auth.sperre_rest(name)
+                    if rest:
+                        ui.notify(t("Zu viele Versuche – bitte {n} Sekunden warten.", n=rest),
+                                  type="negative", timeout=8000)
+                        return
+                    u = USERS.get(name)
                     if u and not u.get("password_hash"):
                         # Eingeladen, aber noch kein Passwort gesetzt
                         ui.notify(t("Dein Zugang ist noch nicht aktiviert – bitte den Link "
@@ -86,10 +95,15 @@ def login_page():
                                          "Einladung an."),
                                   type="warning", timeout=9000); return
                     if not u or not auth.verify_password(pw.value or "", u.get("password_hash", "")):
+                        auth.fehlversuch(name)
                         ui.notify(t("Benutzername oder Passwort falsch."), type="negative"); return
                     if u.get("totp_secret") and not auth.verify_totp(u["totp_secret"], code.value or ""):
+                        # Auch der zweite Faktor wird gebremst – sechs Ziffern
+                        # sind sonst in überschaubarer Zeit durchprobiert.
+                        auth.fehlversuch(name)
                         ui.notify(t("Code fehlt oder ist falsch."), type="negative"); return
-                    finish2((un.value or "").strip(), u.get("role", "putzkraft"))
+                    auth.anmeldung_geglueckt(name)
+                    finish2(name, u.get("role", "putzkraft"))
                 for f in (un, pw, code):
                     f.on("keydown.enter", lambda: do_login())
                 ui.button(t("Anmelden"), on_click=do_login).props("unelevated").classes("w-full")
@@ -507,8 +521,8 @@ def _user_saetze(uname, u):
 
 
 def open_users():
-    if not _is_admin():
-        ui.notify("Nur für Administratoren.", type="negative"); return
+    if not _darf(rechte.BENUTZER):
+        ui.notify("Dafür fehlt dir die Berechtigung.", type="negative"); return
     with ui.dialog() as dlg, ui.card().classes("w-[640px] max-w-full gap-2"):
         ui.label("Benutzer verwalten").classes("text-xl font-bold")
         listing = ui.column().classes("w-full gap-2")
@@ -543,8 +557,12 @@ def open_users():
                                         ui.notify("Eigene Admin-Rolle nicht entfernbar.",
                                                   type="warning")
                                         USERS[un]["role"] = "admin"; render(); return
+                                    vorher = USERS[un].get("role", "")
                                     USERS[un]["role"] = e.value
                                     data.save_config()
+                                    protokoll.notieren(
+                                        _cur_user(), protokoll.ROLLE_GEAENDERT, un,
+                                        f"{ROLES.get(vorher, vorher)} → {ROLES.get(e.value)}")
                                     ui.notify(f"Rolle von {un}: {ROLES.get(e.value)}",
                                               type="positive")
                                 return h
@@ -587,7 +605,11 @@ def open_users():
                                 .tooltip("Passwort direkt setzen (Notfall, ohne E-Mail)")
                             if uname != _cur_user():
                                 def _del(un=uname):
-                                    USERS.pop(un, None); data.save_config()
+                                    weg = USERS.pop(un, None) or {}
+                                    data.save_config()
+                                    protokoll.notieren(
+                                        _cur_user(), protokoll.BENUTZER_GELOESCHT, un,
+                                        f"Rolle war {ROLES.get(weg.get('role'), '?')}")
                                     ui.notify(f"{un} gelöscht.", type="warning"); render()
                                 ui.button(icon="delete", on_click=_del) \
                                     .props("flat dense round color=negative").tooltip(t("Löschen"))
@@ -645,10 +667,14 @@ def open_users():
                                "totp_secret": "", "name": name, "email": mail,
                                "lang": nlang.value}
                 data.save_config()
+                protokoll.notieren(_cur_user(), protokoll.BENUTZER_ANGELEGT, name,
+                                   f"Rolle {ROLES.get(nrole.value)}, Einladung an {mail}")
                 _send_invite(name, "einladung")
                 nu.value = ""; nem.value = ""; render()
             ui.button("Einladen", icon="person_add", on_click=add) \
                 .props("unelevated no-caps").mark("new-user-invite")
+
+        protokoll_ansicht()
 
         with ui.row().classes("w-full justify-end"):
             ui.button("Schließen", on_click=dlg.close).props("flat")
@@ -665,3 +691,55 @@ def seiten_registrieren():
     """
     ui.page("/login")(login_page)
     ui.page("/invite")(invite_page)
+
+
+# ------------------------------------------------------- 2FA-Hinweis (AP12)
+def zwei_faktor_hinweis():
+    """Erinnert Administratoren ohne zweiten Faktor – ohne sie auszusperren.
+
+    Ein Administrator kann alles ändern und löschen; ein geratenes oder
+    abgeschautes Passwort reicht dafür heute aus. Eine harte Pflicht wäre
+    strenger, verlangt aber einen Notausgang über die Kommandozeile – und wer
+    sich selbst aussperrt, während die Putzkraft vor der Wohnung steht, ist
+    schlechter dran als vorher. Deshalb: sichtbar, dauerhaft, aber offen.
+    """
+    if not _is_admin():
+        return
+    u = USERS.get(_cur_user()) or {}
+    if u.get("totp_secret"):
+        return
+    with ui.row().classes("w-full items-center gap-2 no-wrap rounded-xl px-3 py-2 mb-1 "
+                          f"{ton.FLAECHE_HINWEIS}").mark("2fa-hinweis"):
+        ui.icon("shield").classes(f"{ton.AUF_HINWEIS} text-xl shrink-0")
+        with ui.column().classes("gap-0 min-w-0 flex-grow"):
+            ui.label("Dieses Konto hat keine Zwei-Faktor-Anmeldung.") \
+                .classes(f"text-sm font-medium {ton.AUF_HINWEIS}")
+            ui.label("Ein Administrator kann alles ändern und löschen – ein Passwort "
+                     "allein ist dafür wenig.").classes(f"text-xs {ton.LEISE}")
+        ui.button("Jetzt einrichten", on_click=open_account) \
+            .props("unelevated dense no-caps").classes("shrink-0").mark("2fa-einrichten")
+
+
+# --------------------------------------------------------- Protokoll (AP12)
+def protokoll_ansicht():
+    """Die letzten Vorgänge, die jemandem schaden könnten, wenn sie unbemerkt
+    blieben. Nur lesbar – ein Protokoll, das sich aufräumen lässt, beweist
+    nichts."""
+    eintraege = protokoll.eintraege(100)
+    with ui.expansion("Protokoll – wer hat was geändert", icon="history") \
+            .classes("w-full").mark("protokoll"):
+        if not eintraege:
+            ui.label("Noch nichts zu berichten.").classes(f"text-sm {ton.LEISE}")
+            return
+        for e in eintraege:
+            with ui.row().classes("w-full items-start gap-2 no-wrap py-1 "
+                                  "border-b border-slate-50"):
+                ui.label(e["ts"].replace("T", " ")[:16]) \
+                    .classes(f"text-xs {ton.STILL} shrink-0 font-mono")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    ui.label(f"{protokoll.text_von(e['was'])}"
+                             + (f": {e['ziel']}" if e.get("ziel") else "")) \
+                        .classes("text-sm font-medium text-slate-700")
+                    if e.get("details"):
+                        ui.label(e["details"]).classes(f"text-xs {ton.LEISE}")
+                ui.label(e.get("wer", "?")).classes(f"text-xs {ton.LEISE} shrink-0")

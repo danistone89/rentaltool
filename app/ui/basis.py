@@ -12,7 +12,7 @@ werden.
 import base64
 from nicegui import app, ui
 from datetime import date
-from app import auth, data, housekeeping, i18n, mode, smoobu, timetrack
+from app import auth, data, housekeeping, i18n, mode, rechte, smoobu, timetrack
 from app.ui import ton
 
 CFG = data.CONFIG
@@ -196,6 +196,16 @@ def _cur_role():
 
 def _is_admin():
     return _cur_role() == "admin"
+
+
+def _darf(recht):
+    """Darf der angemeldete Benutzer das? (siehe app/rechte.py)
+
+    `_is_admin()` bleibt für das, was wirklich nur der Betreiber ist – aber
+    überall dort, wo es um eine einzelne Fähigkeit geht, steht ab AP12 diese
+    Frage: „darf er das", nicht „ist er Administrator".
+    """
+    return rechte.darf(_cur_role(), recht)
 
 
 def _role_areas(role):
