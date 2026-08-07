@@ -217,6 +217,16 @@ Rollen: `admin` (sieht alles, verwaltet Nutzer/Einstellungen), `manager`
 Bereiche eine Rolle sieht, steuert `ROLE_AREAS` in `app/ui/basis.py`.** Nutzer
 ohne freigeschaltete Bereiche sehen eine Willkommens-/Hinweisseite.
 
+**Vor dem Ausrollen selbst ausprobieren:** `./tools/probelauf.sh` startet die App
+auf <http://127.0.0.1:3002> mit **echten Buchungen, aber gesperrtem Ausgang**.
+Zwei Vorkehrungen: `RENTALTOOL_STAGING=1` blockiert Mailversand,
+Gast-Nachrichten und den Nextcloud-Spiegel **im Code** (`app/mode.py`) – nicht
+über die Konfiguration, die ließe sich versehentlich wieder füllen –, und ein
+eigener Datenordner unter `/tmp/livaro-probe` hält alles Entstehende vom
+Echtbetrieb fern. Nicht `./run-local.sh` nehmen, wenn Rechnungen im Spiel sind:
+dort hängt die echte E-Mail-Konfiguration, und „Senden" ginge an einen echten
+Gast.
+
 **Rechte (AP12):** Was jemand darf, steht benannt in `app/rechte.py` –
 getrennt davon, welche *Bereiche* er sieht (`ROLE_AREAS`). Die Linie: der
 Manager führt den Tag (zuweisen, fremde Zeiten erfassen, Auftrag zurücksetzen,
