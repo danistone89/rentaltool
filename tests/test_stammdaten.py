@@ -239,3 +239,50 @@ def test_kreditor_ohne_treffer_laesst_die_kategorie_leer(app_bereit):
     st.erstbefuellung()
     kategorie, _w, _k = st.vorbelegung("Irgendein Laden GmbH")
     assert kategorie == ""
+
+
+async def test_preis_eintragen_speichert_ihn(user: User, app_bereit):
+    """Der Fehler vom 7.8.2026: das Feld war ein `ui.number`, und der getippte
+    Wert kam beim Klick auf „+" nicht am Server an – die Meldung blieb aus, der
+    Preis auch. Im echten Browser nachgestellt: mit `ui.number` kein Eintrag,
+    mit `ui.input` einer."""
+    from nicegui import ui as _ui
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see(marker=f"preis-betrag-{COTTAER}")
+
+    with user.client:
+        feld = next(iter(user.find(marker=f"preis-betrag-{COTTAER}").elements))
+        assert isinstance(feld, _ui.input), \
+            "Zahlenfelder schlucken die Eingabe – hier gehoert ein Textfeld hin"
+        feld.value = "65,00"          # deutsche Schreibweise
+    user.find(marker=f"preis-setzen-{COTTAER}").click()
+
+    p = st.produkt_der_art(st.FEST)
+    assert st.preisverlauf(p["id"], COTTAER), "Preis wurde nicht gespeichert"
+    assert st.preisverlauf(p["id"], COTTAER)[0]["betrag"] == 65.0
+
+
+async def test_deutsche_und_englische_schreibweise_gehen_beide(user: User, app_bereit):
+    from nicegui import ui as _ui
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see(marker=f"preis-betrag-{WERNER}")
+    with user.client:
+        next(iter(user.find(marker=f"preis-betrag-{WERNER}").elements)).value = "95.50"
+    user.find(marker=f"preis-setzen-{WERNER}").click()
+    p = st.produkt_der_art(st.FEST)
+    assert st.preisverlauf(p["id"], WERNER)[0]["betrag"] == 95.5
+
+
+async def test_ohne_betrag_sagt_es_die_oberflaeche(user: User, app_bereit):
+    st.erstbefuellung()
+    await _anmelden(user)
+    user.find(marker="nav-einstellungen").click()
+    await user.should_see(marker=f"preis-setzen-{COTTAER}")
+    user.find(marker=f"preis-setzen-{COTTAER}").click()
+    await user.should_see("Bitte einen Betrag eintragen")
+    p = st.produkt_der_art(st.FEST)
+    assert st.preisverlauf(p["id"], COTTAER) == []

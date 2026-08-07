@@ -6,7 +6,7 @@ Ein grosser Dialog mit Reitern. Gespeichert wird in `config.json`.
 import os
 from datetime import date
 from nicegui import ui
-from app import data, mailer, rechte, stammdaten
+from app import buchhaltung, data, mailer, rechte, stammdaten
 from app.ui.basis import (CFG, DEFAULT_APP_URL, _apts, _checklisten_an,
                           _cur_user, _darf, spaeter, t)
 from app.ui import ton
@@ -494,17 +494,31 @@ def _preiszeile(produkt, wohnung_id, wohnung_name, neu_zeichnen):
         if not verlauf:
             ui.label("noch kein Preis").classes(f"text-xs {ton.HINWEIS}")
         ui.space()
-        betrag = ui.number(label="€", value=None, step=1, format="%.2f") \
-            .props("outlined dense").classes("w-24")
-        ab = ui.input(value=date.today().isoformat()).props("type=date outlined dense") \
-            .classes("w-36")
+        # Bewusst ein Textfeld statt ui.number: das Zahlenfeld formatiert beim
+        # Tippen mit und schluckt dabei die Eingabe. Gelesen wird mit dem
+        # Geld-Parser aus der Buchhaltung, der ohnehin „65,50" und „1.234,56"
+        # versteht – eine deutsche Eingabe soll hier nicht scheitern.
+        betrag = ui.input(label="Betrag €", placeholder="65,00") \
+            .props("outlined dense inputmode=decimal").classes("w-28") \
+            .mark(f"preis-betrag-{wohnung_id}")
+        ab = ui.input(label="ab Buchung", value=date.today().isoformat()) \
+            .props("type=date outlined dense").classes("w-40") \
+            .mark(f"preis-ab-{wohnung_id}")
 
         def setzen(w=wohnung_id, b=betrag, a=ab):
-            if b.value in (None, ""):
-                ui.notify("Betrag fehlt.", type="warning"); return
-            stammdaten.preis_setzen(produkt["id"], w, a.value, b.value)
-            ui.notify(f"{wohnung_name}: {float(b.value):.2f} € ab {a.value}", type="positive")
+            wert = buchhaltung.betrag_zahl(b.value)
+            if not wert:
+                ui.notify("Bitte einen Betrag eintragen, z. B. 65,00.", type="warning")
+                return
+            if not (a.value or "").strip():
+                ui.notify("Bitte ein Datum wählen, ab dem der Preis gilt.",
+                          type="warning")
+                return
+            stammdaten.preis_setzen(produkt["id"], w, a.value, wert)
+            b.value = ""
+            ui.notify(f"{wohnung_name}: {wert:.2f} € ab {a.value}", type="positive")
             spaeter(neu_zeichnen)
+        betrag.on("keydown.enter", lambda: setzen())
         ui.button(icon="add", on_click=setzen).props("flat dense round color=primary") \
             .tooltip("Preis ab diesem Buchungsdatum").mark(f"preis-setzen-{wohnung_id}")
 
