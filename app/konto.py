@@ -144,7 +144,12 @@ def schnell_zuordnen(bewegung_id, kategorie):
         return None, []
     if b.get("betrag", 0.0) >= 0 or zuordnung.hat_posten(bewegung_id):
         return None, []
-    if not _setzen(b, kategorie):
+    # `ueberschreiben=True`: wer klickt, entscheidet – auch gegen eine
+    # Kategorie, die die Erkennung gesetzt hat. Am Bestand vom 8.8.2026 trugen
+    # 63 Bewegungen eine erkannte Kategorie ohne Posten; fuer sie war die
+    # Auswahl in der Zeile tot, weil `_setzen` sie schuetzte. Der Schutz gilt
+    # nur noch fuers Mitziehen.
+    if not _setzen(b, kategorie, ueberschreiben=True):
         return None, []
     # Der Kern der Bedienung: einmal zuordnen, danach von allein erkannt.
     stammdaten.kategorie_lernen(b.get("gegenpartei"), kategorie)
@@ -154,12 +159,20 @@ def schnell_zuordnen(bewegung_id, kategorie):
     return db.holen(TABELLE, bewegung_id), weitere
 
 
-def _setzen(b, kategorie):
-    """Kategorie + Posten an einer offenen Ausgabe. True, wenn es geklappt hat."""
+def _setzen(b, kategorie, ueberschreiben=False):
+    """Kategorie + Posten an einer offenen Ausgabe. True, wenn es geklappt hat.
+
+    `ueberschreiben` gilt fuer die **angeklickte** Bewegung: dort entscheidet
+    der Mensch, auch gegen eine erkannte Kategorie. Beim **Mitziehen** bleibt
+    es streng – was schon etwas traegt, wurde entweder erkannt oder von Hand
+    gesetzt, und beides wird nicht ueberschrieben.
+    """
     from app import buchhaltung
     if b.get("betrag", 0.0) >= 0 or b.get("umbuchung"):
         return False
-    if zuordnung.hat_posten(b["id"]) or (b.get("kategorie") or "").strip():
+    if zuordnung.hat_posten(b["id"]):
+        return False
+    if not ueberschreiben and (b.get("kategorie") or "").strip():
         return False
     satz, _meldung = zuordnung.hinzufuegen(b["id"], zuordnung.KATEGORIE,
                                            b.get("betrag", 0.0), kategorie)
@@ -625,3 +638,19 @@ def aus_posten_lernen():
         if stammdaten.kategorie_lernen(b.get("gegenpartei"), p[0]["kategorie"]):
             gelernt += 1
     return gelernt
+
+
+def ist_erledigt(bewegung):
+    """Ist an dieser Bewegung noch etwas zu tun?
+
+    **Drei Wege fuehren zu „fertig", und die Anzeige muss alle drei kennen.**
+    Vorher haengte der Haken in der Zeile allein an `zuordnung.ist_fertig`, das
+    Posten verlangt. Eine Bewegung, die nur eine erkannte Kategorie trug, sah
+    deshalb aus wie unbearbeitet – am Bestand vom 8.8.2026 betraf das 63 von
+    238 Bewegungen, obwohl sie in der Auswertung laengst mitzaehlten.
+    """
+    if bewegung.get("umbuchung"):
+        return True
+    if zuordnung.hat_posten(bewegung["id"]):
+        return zuordnung.ist_fertig(bewegung)
+    return bool((bewegung.get("kategorie") or "").strip())

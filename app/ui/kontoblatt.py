@@ -42,6 +42,8 @@ def _kategorie_wahl(bewegung, neu_zeichnen):
     def gesetzt(e):
         if not e.value:
             return
+        # Auch wenn dieselbe Kategorie gewaehlt wird: die Bewegung bekommt
+        # dadurch ihren Posten und der Empfaenger wird gemerkt.
         satz, weitere = konto.schnell_zuordnen(bewegung["id"], e.value)
         if not satz:
             return
@@ -56,11 +58,18 @@ def _kategorie_wahl(bewegung, neu_zeichnen):
                       type="positive", timeout=2500)
         neu_zeichnen()
 
-    ui.select({"": "— zuordnen —",
-               **{x: x for x in buchhaltung.kategorien(CFG)}},
-              value="", on_change=gesetzt) \
+    # Die gesetzte Kategorie steht als Wert drin, nicht „— zuordnen —". Sonst
+    # sieht eine erkannte Bewegung aus wie unbearbeitet, und ein Klick auf
+    # dieselbe Kategorie scheint wirkungslos (so gemeldet am 8.8.2026 an
+    # Smoobu).
+    jetzige = (bewegung.get("kategorie") or "").strip()
+    auswahl = {"": "— zuordnen —", **{x: x for x in buchhaltung.kategorien(CFG)}}
+    if jetzige and jetzige not in auswahl:
+        auswahl[jetzige] = f"{jetzige} (nicht mehr in der Liste)"
+    ui.select(auswahl, value=jetzige, on_change=gesetzt) \
         .props("dense borderless options-dense").classes(
-            f"text-xs shrink-0 w-[190px] {ton.STILL}") \
+            f"text-xs shrink-0 w-[190px] "
+            + (ton.STILL if not jetzige else "")) \
         .mark(f"kat-{bewegung['id']}")
 
 
@@ -956,7 +965,7 @@ def render_konto():
                 # darin. So bleibt die Liste lesbar und die Arbeit ist einen
                 # Klick entfernt – ohne Wechsel auf eine andere Seite.
                 for b in bewegungen[:200]:
-                    fertig = zuordnung.ist_fertig(b)
+                    fertig = konto.ist_erledigt(b)
                     zeile = ui.expansion().classes("w-full").props("dense") \
                         .mark(f"bew-{b['id']}")
                     with zeile.add_slot("header"):

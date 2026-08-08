@@ -336,6 +336,19 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Dazu `konto.aus_posten_lernen`: aus schon zugeordneten Bewegungen wird
   nachträglich gelernt — sonst müsste man sie lösen und neu zuordnen, nur damit
   das Lernen greift.
+* **Der tote Klick (8.8.2026 an Smoobu gemeldet, behoben).** „Setze ich einen
+  auf Software, ändert er es bei den anderen nicht." Nachgemessen: **63 von
+  238** Bewegungen trugen bereits eine Kategorie aus der automatischen
+  Erkennung (`herkunft='kreditor'`), aber **keinen Posten**. Für die war die
+  Auswahl in der Zeile tot — sie zeigte „— zuordnen —", und der Klick prallte
+  an einer Schutzregel ab, die nur fürs Mitziehen gedacht war. Es passierte
+  nichts, und es stand auch nichts da.
+  Drei Korrekturen: der **angeklickte** Satz wird gesetzt, auch gegen eine
+  erkannte Kategorie (beim Mitziehen bleibt die Regel streng); die Zeile zeigt
+  die **gesetzte Kategorie** statt „— zuordnen —"; und der Haken kennt jetzt
+  alle drei Wege zu „fertig" (`konto.ist_erledigt`) statt nur Posten — dadurch
+  gelten 110 statt 47 Bewegungen als erledigt, was sie in der Auswertung
+  ohnehin schon waren.
 * **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
@@ -346,6 +359,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1105 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1113 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

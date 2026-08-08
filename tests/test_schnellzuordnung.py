@@ -395,3 +395,78 @@ def test_die_zahl_nennt_die_zugeordneten_bewegungen():
     assert len(v) == 3
     assert konto.gelerntes_anwenden(v) == 3
     assert konto.ohne_zuordnung() == []
+
+
+# ---- Der tote Klick (8.8.2026 an Smoobu gemeldet)
+# Am Bestand: 63 Bewegungen trugen eine Kategorie aus der automatischen
+# Erkennung (`herkunft='kreditor'`), aber keinen Posten. Die Auswahl in der
+# Zeile erschien trotzdem – und der Klick prallte an der Schutzregel ab, die
+# nur fuers Mitziehen gedacht war. Es passierte NICHTS.
+def test_eine_erkannte_bewegung_laesst_sich_trotzdem_zuordnen():
+    _bewegung(-73.78, "Smoobu GmbH", "w1", kategorie="Software (Smoobu Channelmanager)")
+    satz, _weitere = konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)")
+    assert satz is not None
+    assert len(z.posten("w1")) == 1
+    assert z.ist_fertig(konto.holen("w1"))
+
+
+def test_und_laesst_sich_dabei_auch_umkategorisieren():
+    """Wer klickt, entscheidet – auch gegen die Erkennung."""
+    _bewegung(-73.78, "Smoobu GmbH", "w1", kategorie="Wäscherei (Rena)")
+    konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)")
+    assert konto.holen("w1")["kategorie"] == "Software (Smoobu Channelmanager)"
+    assert z.posten("w1")[0]["kategorie"] == "Software (Smoobu Channelmanager)"
+
+
+def test_mitgezogen_wird_weiterhin_nur_was_noch_nichts_traegt():
+    """Beim Mitziehen bleibt die Regel streng: was schon eine Kategorie hat,
+    wurde entweder erkannt oder von Hand gesetzt – beides nicht ueberschreiben."""
+    _bewegung(-73.78, "Smoobu GmbH", "w1")
+    _bewegung(-73.78, "Smoobu GmbH", "w2", datum="2026-03-02",
+              kategorie="Wäscherei (Rena)")
+    _bewegung(-73.78, "Smoobu GmbH", "w3", datum="2026-04-28")
+    _satz, weitere = konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)")
+    assert weitere == ["w3"]
+    assert konto.holen("w2")["kategorie"] == "Wäscherei (Rena)"
+
+
+def test_eine_erkannte_bewegung_gilt_als_erledigt():
+    """Sie zaehlt in der Auswertung mit – also gehoert der Haken an die Zeile.
+    Vorher hing er an `ist_fertig`, das Posten verlangt; die Zeile sah aus wie
+    unbearbeitet."""
+    _bewegung(-73.78, "Smoobu GmbH", "w1", kategorie="Software (Smoobu Channelmanager)")
+    assert konto.ist_erledigt(konto.holen("w1")) is True
+
+
+def test_ohne_kategorie_und_ohne_posten_ist_nichts_erledigt():
+    _bewegung(-73.78, "Smoobu GmbH", "w1")
+    assert konto.ist_erledigt(konto.holen("w1")) is False
+
+
+def test_eine_halbe_aufteilung_gilt_nicht_als_erledigt():
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    assert konto.ist_erledigt(konto.holen("w1")) is False
+
+
+def test_eine_umbuchung_ist_immer_erledigt():
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "u1", "datum": "2026-06-12", "betrag": -500.0,
+                               "gegenpartei": "Kreditkarte", "text": "",
+                               "konto": "giro", "umbuchung": True, "kategorie": ""})
+    assert konto.ist_erledigt(konto.holen("u1")) is True
+
+
+def test_die_zeile_zeigt_die_gesetzte_kategorie():
+    """Vorher stand dort immer „— zuordnen —" – auch an einer Bewegung, die
+    laengst eine erkannte Kategorie trug."""
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    b = _bewegung(-73.78, "Smoobu GmbH", "w1",
+                  kategorie="Software (Smoobu Channelmanager)")
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._kategorie_wahl(b, lambda: None)
+    feld = karte.default_slot.children[0]
+    assert feld.value == "Software (Smoobu Channelmanager)"
