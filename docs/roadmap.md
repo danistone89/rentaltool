@@ -1043,6 +1043,33 @@ Feste Monatswerte, von Hand gepflegt, wie heute im Workbook. *Größe:* S
 
 ---
 
+## Phase 8 — Bankbuchhaltung (Konzept vom 8.8.2026)
+
+**Das Konzept steht in `docs/konzept-bankbuchhaltung.md`** – Zielbild,
+Datenmodell, die Befunde aus den echten Daten und die Pakete B1–B9. Hier steht
+nur der Stand.
+
+Der Anlass: Das heutige Modell hat an der Bewegung **je ein Feld** (`beleg_id`,
+`rechnung_id`) und kann damit keine Sammelauszahlung abbilden. Nachgeprüft
+wurde außerdem, dass **beide Portale gesammelt auszahlen** – 51 von 65
+Zahlungseingängen sind n:m, nicht die Ausnahme.
+
+| | Paket | Größe | Stand |
+|---|---|---|---|
+| **B1** | Die Zuordnung als eigener Satz | M | ✅ erledigt (8.8.2026) |
+| **B2** | Die Zuordnungsmaske mit Restbetrag | L | offen |
+| **B3** | Ausgangsrechnungen zuordnen | L | offen |
+| **B4** | Portalprovision gegenbuchen | M | offen |
+| **B5** | Eingangsbelege – beide Wege zusammenführen | L | offen |
+| **B6** | Kategorien an der Zuordnung | S | offen |
+| **B7** | Der Überblick | L | offen |
+| **B8** | Vollständigkeit | M | offen |
+| **B9** | Übergabe ans Steuerbüro | L | offen |
+
+Sie lösen AP20, AP23, AP25 und AP18 ab.
+
+---
+
 ## Der zweite Zweck: die Übergabe ans Steuerbüro (festgelegt 7.8.2026)
 
 Das Werkzeug hat **zwei** Aufgaben, nicht eine:

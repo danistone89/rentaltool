@@ -62,7 +62,7 @@ def _beleg_knopf(bewegung, neu_zeichnen):
     from app import housekeeping, receipts
     from app.ui.basis import _read_upload
 
-    beleg_id = (bewegung.get("beleg_id") or "").strip()
+    beleg_id = (konto.belege_von(bewegung) or [""])[0]
     if beleg_id:
         ui.button(icon="description",
                   on_click=lambda: konto.beleg_setzen(bewegung["id"], "") or neu_zeichnen()) \

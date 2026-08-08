@@ -17,7 +17,7 @@ Kategorie) aber nicht angerührt. Sonst wäre jede Wiederholung ein Rückschritt
 """
 from datetime import datetime
 
-from app import buchhaltung, db, kontoauszug, stammdaten
+from app import buchhaltung, db, kontoauszug, stammdaten, zuordnung
 
 TABELLE = "bewegungen"
 
@@ -147,12 +147,29 @@ def beleg_erwartet(bewegung):
 
 
 def beleg_setzen(bewegung_id, beleg_id):
-    """Einen Beleg an eine Bewegung haengen (oder mit '' wieder loesen)."""
+    """Einen Beleg an eine Bewegung haengen (oder mit '' alle wieder loesen).
+
+    Seit B1 entsteht dabei ein **Posten** (`app/zuordnung.py`), kein Feld mehr.
+    Diese Funktion bleibt als bequemer Weg fuer den einfachen Fall – eine
+    Ausgabe, ein Beleg, voller Betrag. Alles Weitere geht ueber die Posten.
+    """
     b = db.holen(TABELLE, bewegung_id)
     if b is None:
         return None
-    db.speichern(TABELLE, bewegung_id, dict(b, beleg_id=beleg_id or ""))
+    zuordnung.entfernen_zu(bewegung_id)
+    if beleg_id:
+        zuordnung.hinzufuegen(bewegung_id, zuordnung.BELEG, b.get("betrag", 0.0),
+                              kategorie=b.get("kategorie", ""), ziel_id=beleg_id)
     return db.holen(TABELLE, bewegung_id)
+
+
+def belege_von(bewegung):
+    """Die Belege, die an dieser Bewegung haengen (kann mehr als einer sein)."""
+    return zuordnung.ziele(bewegung["id"], zuordnung.BELEG)
+
+
+def hat_beleg(bewegung):
+    return bool(belege_von(bewegung))
 
 
 def beleg_nicht_noetig(bewegung_id, noetig=False):
@@ -175,7 +192,7 @@ def ohne_beleg(von="", bis=""):
     das Mass dafuer, ob die Uebergabe ans Steuerbuero vollstaendig ist (AP25).
     """
     return [b for b in alle(von, bis)
-            if beleg_erwartet(b) and not (b.get("beleg_id") or "").strip()]
+            if beleg_erwartet(b) and not hat_beleg(b)]
 
 
 def importieren(rohdaten, heute=None):

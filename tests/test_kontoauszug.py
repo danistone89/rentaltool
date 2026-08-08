@@ -420,5 +420,5 @@ def test_hochladen_geht_auch_ohne_kategorie():
     assert not b.get("kategorie")
     assert not konto.beleg_erwartet(b), "steht (noch) nicht in der Liste"
     # ... laesst sich aber sehr wohl zuordnen:
-    nachher = konto.beleg_setzen(b["id"], "beleg-42")
-    assert nachher["beleg_id"] == "beleg-42"
+    konto.beleg_setzen(b["id"], "beleg-42")
+    assert konto.belege_von(b) == ["beleg-42"]

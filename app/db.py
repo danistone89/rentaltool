@@ -66,6 +66,10 @@ TABELLEN = {
     # `kontoauszug.schluessel` – damit ist ein zweiter Import derselben Wochen
     # ein Überschreiben desselben Satzes statt einer Dublette.
     "bewegungen": {"bdatum": "$.datum", "bkonto": "$.konto"},
+    # Zuordnungen (B1). Eine Bewegung kann viele haben – eine Portal-Auszahlung
+    # deckt mehrere Rechnungen ab und trägt den Provisionsbeleg dagegen.
+    "zuordnungen": {"bewegung": "$.bewegung_id", "zart": "$.art",
+                    "ziel": "$.ziel_id"},
 }
 
 _lokal = threading.local()
