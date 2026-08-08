@@ -199,6 +199,7 @@ def offene_arbeiten():
     unter `rest`, eine unberuehrte unter `ohne_kategorie`.
     """
     return {"rest": len(bewegungen_mit_rest()),
+            "automatisch": len(konto.automatisch()),
             "ohne_kategorie": len(unberuehrt()),
             "ohne_beleg": len(konto.ohne_beleg()),
             "posten_ohne_kategorie": len(posten_ohne_kategorie())}

@@ -71,6 +71,15 @@ def _kategorie_wahl(bewegung, neu_zeichnen):
             f"text-xs shrink-0 w-[190px] "
             + (ton.STILL if not jetzige else "")) \
         .mark(f"kat-{bewegung['id']}")
+    if bewegung.get("herkunft") == "kreditor" and jetzige:
+        # Was die Maschine entschieden hat, muss man sehen. Die Erkennung ueber
+        # den Empfaenger hat am 8.8.2026 68 Kategorien gesetzt, ohne zu fragen –
+        # und nichts wies darauf hin. Ein Klick auf dieselbe Kategorie ist die
+        # Bestaetigung, danach verschwindet die Markierung.
+        ui.icon("auto_awesome").classes(f"text-xs shrink-0 {ton.AUF_HINWEIS}") \
+            .tooltip("Automatisch über den Empfänger erkannt – noch nicht "
+                     "bestätigt. Kategorie auswählen bestätigt sie.") \
+            .mark(f"auto-{bewegung['id']}")
 
 
 def _mitgezogen_zeigen(name, kategorie, ids, neu_zeichnen):
@@ -938,6 +947,7 @@ def render_konto():
             # zeigen, verwirren mehr als sie helfen (so gemeldet am 8.8.2026).
             fehlen_ids = {x["id"] for x in konto.ohne_beleg()}
             offen_ids = {x["id"] for x in offen}
+            auto_ids = {x["id"] for x in konto.automatisch()}
             with ui.card().classes("w-full").mark("konto-liste"):
                 _gelerntes_knopf(zeichnen)
                 with ui.row().classes("w-full items-center gap-2"):
@@ -945,6 +955,7 @@ def render_konto():
                     ui.space()
                     ui.toggle({"alle": f"Alle ({len(bewegungen)})",
                                "offen": f"Nicht zugeordnet ({len(offen_ids)})",
+                               "auto": f"Automatisch erkannt ({len(auto_ids)})",
                                "beleg": f"Beleg fehlt ({len(fehlen_ids)})"},
                               value=zustand["sicht"],
                               on_change=lambda e: (zustand.update(sicht=e.value),
@@ -955,6 +966,13 @@ def render_konto():
                     ui.label("Ausgänge ohne Kategorie. Erst zuordnen – vorher "
                              "steht nicht fest, ob es dazu überhaupt einen Beleg "
                              "gibt.").classes(f"text-xs {ton.STILL}")
+                elif zustand["sicht"] == "auto":
+                    bewegungen = [b for b in bewegungen if b["id"] in auto_ids]
+                    ui.label("Diese Kategorien hat das Werkzeug selbst gesetzt – "
+                             "über den Empfänger, ohne zu fragen. Meistens "
+                             "stimmen sie; durchsehen sollte man sie trotzdem "
+                             "einmal. Eine Kategorie auswählen bestätigt sie, "
+                             "auch dieselbe.").classes(f"text-xs {ton.STILL}")
                 elif zustand["sicht"] == "beleg":
                     bewegungen = [b for b in bewegungen if b["id"] in fehlen_ids]
                     ui.label("Zugeordnet, aber der Beleg fehlt. Privatentnahmen, "

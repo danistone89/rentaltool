@@ -570,3 +570,15 @@ def test_pruefpunkte_ohne_stichtag_werden_nicht_verglichen():
                                "konto": "DE62", "umbuchung": False, "kategorie": ""})
     assert vs.saldospruenge() == []
     assert vs.befund()["saldo_pruefbar"] is False
+
+
+def test_der_befund_nennt_die_automatisch_erkannten():
+    """Sie sind keine Arbeit im engeren Sinn, aber ungeprueft – und das gehoert
+    dorthin, wo steht, worauf die Zahlen stehen."""
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "w1", "datum": "2026-06-12", "betrag": -73.78,
+                               "gegenpartei": "Smoobu GmbH", "text": "",
+                               "konto": "giro", "umbuchung": False,
+                               "kategorie": "Software (Smoobu Channelmanager)",
+                               "herkunft": "kreditor"})
+    assert vs.offene_arbeiten()["automatisch"] == 1

@@ -349,6 +349,14 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   alle drei Wege zu „fertig" (`konto.ist_erledigt`) statt nur Posten — dadurch
   gelten 110 statt 47 Bewegungen als erledigt, was sie in der Auswertung
   ohnehin schon waren.
+* **Sichtbar, was die Maschine entschieden hat (8.8.2026).** Die Erkennung
+  über den Empfänger hatte 68 Kategorien gesetzt, ohne zu fragen — und nichts
+  wies darauf hin. Jetzt: ein Zeichen in der Zeile („automatisch erkannt, noch
+  nicht bestätigt"), eine eigene Sicht **Automatisch erkannt (n)** neben
+  „Nicht zugeordnet" und „Beleg fehlt", und eine Zeile im Überblick. Eine
+  Kategorie auszuwählen — auch dieselbe — bestätigt sie, dann verschwindet das
+  Zeichen. Eine Buchhaltung, in der man nicht sieht, was der Mensch entschieden
+  hat und was das Werkzeug, kann man nicht verantworten.
 * **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
@@ -359,6 +367,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1113 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1119 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

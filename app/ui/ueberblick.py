@@ -130,7 +130,9 @@ def _vollstaendigkeit():
                 .classes(f"text-xs {ton.AUF_HINWEIS}").mark("ub-kartenprobe")
 
         o = b["offene_arbeiten"]
-        posten = [("Bewegungen mit offenem Rest", o["rest"]),
+        posten = [("Kategorien automatisch erkannt, noch nicht bestätigt",
+                   o["automatisch"]),
+                  ("Bewegungen mit offenem Rest", o["rest"]),
                   ("Ausgaben ohne Kategorie", o["ohne_kategorie"]),
                   ("Buchungen ohne Beleg", o["ohne_beleg"]),
                   ("Posten ohne Kategorie", o["posten_ohne_kategorie"])]

@@ -165,7 +165,8 @@ def test_die_auswahl_erscheint_an_einer_offenen_ausgabe():
         with ui.card() as karte:
             kontoblatt._kategorie_wahl(b, lambda: None)
     # Nicht bloss „ist durchgelaufen": es muss wirklich ein Feld dastehen.
-    assert len(karte.default_slot.children) == 1
+    from nicegui import ui as _ui
+    assert not any(isinstance(c, _ui.icon) for c in karte.default_slot.children)
 
 
 def test_die_auswahl_fehlt_wo_schon_posten_haengen():
@@ -470,3 +471,68 @@ def test_die_zeile_zeigt_die_gesetzte_kategorie():
             kontoblatt._kategorie_wahl(b, lambda: None)
     feld = karte.default_slot.children[0]
     assert feld.value == "Software (Smoobu Channelmanager)"
+
+
+# ------------------- Sichtbar machen, was das Werkzeug selbst entschieden hat
+# Gemeldet am 8.8.2026: „mach noch besser erkennbar was automatisch erkannt
+# wurde. das sieht man aktuell nicht." Am Bestand hatte die Erkennung 68
+# Kategorien gesetzt, ohne gefragt zu haben – und nichts wies darauf hin.
+def test_automatisch_erkannte_bewegungen_sind_auffindbar():
+    _bewegung(-73.78, "Smoobu GmbH", "w1", kategorie="Software (Smoobu Channelmanager)")
+    from app import db
+    db.speichern(konto.TABELLE, "w1",
+                 dict(konto.holen("w1"), herkunft="kreditor"))
+    _bewegung(-100.0, "Baumarkt", "w2", kategorie="Wäscherei (Rena)")
+    db.speichern(konto.TABELLE, "w2", dict(konto.holen("w2"), herkunft="hand"))
+    assert [b["id"] for b in konto.automatisch()] == ["w1"]
+
+
+def test_eine_bestaetigung_nimmt_die_markierung_weg():
+    """Ein Klick auf dieselbe Kategorie ist die Bestaetigung – danach steht die
+    Entscheidung beim Menschen."""
+    from app import db
+    _bewegung(-73.78, "Smoobu GmbH", "w1", kategorie="Software (Smoobu Channelmanager)")
+    db.speichern(konto.TABELLE, "w1", dict(konto.holen("w1"), herkunft="kreditor"))
+    konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)")
+    assert konto.holen("w1")["herkunft"] == "hand"
+    assert konto.automatisch() == []
+
+
+def test_umbuchungen_zaehlen_nicht_als_automatisch_erkannt():
+    """Sie sind keine Entscheidung ueber eine Kategorie, sondern eine Tatsache."""
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "u1", "datum": "2026-06-12", "betrag": -500.0,
+                               "gegenpartei": "Kreditkarte", "text": "",
+                               "konto": "giro", "umbuchung": True, "kategorie": "",
+                               "herkunft": "umbuchung"})
+    assert konto.automatisch() == []
+
+
+def test_die_zeile_markiert_die_automatische_erkennung():
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    from app import db
+    b = _bewegung(-73.78, "Smoobu GmbH", "w1",
+                  kategorie="Software (Smoobu Channelmanager)")
+    db.speichern(konto.TABELLE, "w1", dict(konto.holen("w1"), herkunft="kreditor"))
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._kategorie_wahl(konto.holen("w1"), lambda: None)
+    # Nicht die Zahl der Elemente zaehlen (ein Tooltip ist auch eins), sondern
+    # nach der Markierung selbst suchen.
+    from nicegui import ui as _ui
+    assert any(isinstance(c, _ui.icon) and c._props.get("name") == "auto_awesome"
+               for c in karte.default_slot.children)
+
+
+def test_ohne_automatik_steht_nur_das_feld_da():
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    b = _bewegung(-73.78, "Smoobu GmbH", "w1")
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._kategorie_wahl(b, lambda: None)
+    from nicegui import ui as _ui
+    assert not any(isinstance(c, _ui.icon) for c in karte.default_slot.children)

@@ -640,6 +640,23 @@ def aus_posten_lernen():
     return gelernt
 
 
+def automatisch(von="", bis=""):
+    """Bewegungen, deren Kategorie das Werkzeug selbst gesetzt hat.
+
+    **Warum sie auffindbar sein muessen.** Die Erkennung ueber den Empfaenger
+    ist bequem und meistens richtig – aber sie hat am Bestand vom 8.8.2026 68
+    Kategorien gesetzt, ohne zu fragen, und nichts wies darauf hin. Eine
+    Buchhaltung, in der man nicht sieht, was der Mensch entschieden hat und was
+    die Maschine, kann man nicht verantworten.
+
+    Ein Klick auf dieselbe Kategorie ist die Bestaetigung: danach steht
+    `herkunft` auf „hand" und die Markierung verschwindet.
+    """
+    return [b for b in alle(von, bis)
+            if not b.get("umbuchung") and b.get("herkunft") == "kreditor"
+            and (b.get("kategorie") or "").strip()]
+
+
 def ist_erledigt(bewegung):
     """Ist an dieser Bewegung noch etwas zu tun?
 
