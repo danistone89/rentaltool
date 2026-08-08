@@ -384,10 +384,15 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   **Durchgeführt (8.8.2026):** 48 Testrechnungen gelöscht, 78 übernommen,
   Startnummer 79. Die Zahlungszuordnung greift — die Zahlung über 379,48 €
   findet Nr. 74 Katarina Gockel mit „Name im Verwendungszweck".
-* **⚠ Offener Punkt vor dem Ausrollen:** bei 2 von 34 vergleichbaren Buchungen
-  ist Smoobus `price` nicht der gezahlte Betrag (Gockel 370,00 statt 379,48 –
-  die Bank bestätigt 379,48; Anja Ernst 442,00 statt 400,07). Ab Nr. 79 erzeugt
-  das Werkzeug die Rechnungen aus diesem Feld.
+* **Geklärt (8.8.2026):** die beiden gemeldeten Preisabweichungen waren keine
+  Fehler des Werkzeugs. Anja Ernst war **mein** Fehler – der Vergleich hatte
+  Stornos nicht ausgefiltert (das Werkzeug tut es; 49 von 155 Buchungen sind
+  Stornos). Katarina Gockel war eine **von Hand erstellte** Rechnung. Sauber
+  gerechnet stimmen 46 von 47.
+* **⚠ Offener Punkt:** Beträge eines Entwurfs lassen sich in der Oberfläche
+  **nicht** ändern – nur die Anschrift. `rechnung.aendern(positionen=…)` kann
+  es, die Maske bietet es nicht an. Wer wie bei Gockel von Hand korrigieren
+  muss, kann es im Werkzeug nicht.
 * **Alle Pakete B1–B9 sind erledigt.** Offen bleiben: der Echtbetrieb (35+
   Commits auf dem Zweig, live läuft der Stand von gestern) und die offene Frage
   zur E-Rechnung im Fahrplan. — Übergabe ans Steuerbüro: Ablage in der Nextcloud

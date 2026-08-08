@@ -1123,12 +1123,26 @@ davon auf den Cent derselbe Bruttobetrag**. Das ist zugleich der beste
 verfügbare Nachweis, dass die Beherbergungssteuer-Rechnung dieses Werkzeugs
 dasselbe ergibt wie das alte System.
 
-> **Offener Punkt vor dem Ausrollen.** Bei **2 von 34** vergleichbaren
-> Buchungen ist Smoobus `price` **nicht** der Betrag, den der Gast gezahlt hat:
-> Katarina Gockel `price` 370,00 gegen Rechnung 379,48 (die Bank bestätigt
-> 379,48), Anja Ernst 442,00 gegen 400,07. Ab Nr. 79 erzeugt das Werkzeug die
-> Rechnungen aus genau diesem Feld — in diesen Fällen läge es daneben. Vor dem
-> Ausrollen klären.
+**Geklärt: Smoobus Preis trägt.** Ein erster Vergleich meldete zwei Fälle, in
+denen `price` nicht dem Rechnungsbetrag entspricht. Beide waren keine Fehler
+des Werkzeugs:
+
+* **Anja Ernst** – mein Vergleich hatte **Stornos nicht ausgefiltert**. Sie hat
+  drei Sätze (532,74 storniert, 442,00 storniert, 400,07 gültig); die 400,07
+  sind Rechnung und Zahlung. Das Werkzeug filtert korrekt
+  (`bookings.is_real`) – bei **49 Stornos unter 155 Buchungen** ist dieser
+  Filter wesentlich.
+* **Katarina Gockel** – die Rechnung wurde **von Hand erstellt** (Ansage vom
+  8.8.2026); es zählt, was auf der Rechnung steht.
+
+Sauber gerechnet – nur gültige Buchungen, nur Rechnungen mit
+Beherbergungssteuer: **46 von 47** stimmen mit Smoobus Preis überein, der
+47. ist die handgemachte.
+
+> **Was dabei auffiel:** `rechnung.aendern` kann die **Positionen** eines
+> Entwurfs ändern, die Oberfläche bietet es aber nicht an – dort lässt sich nur
+> die Anschrift pflegen. Wer einen Betrag von Hand korrigieren will (wie bei
+> Gockel geschehen), kann das im Werkzeug **nicht**. Offener Punkt.
 
 Sie lösen AP20, AP23, AP25 und AP18 ab.
 
