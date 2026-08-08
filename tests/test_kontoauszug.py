@@ -422,3 +422,56 @@ def test_hochladen_geht_auch_ohne_kategorie():
     # ... laesst sich aber sehr wohl zuordnen:
     konto.beleg_setzen(b["id"], "beleg-42")
     assert konto.belege_von(b) == ["beleg-42"]
+
+
+# ------------- Zwei gleiche Zeilen bleiben zwei (B11a, 8.8.2026)
+# Gefragt: "wie verhindern wir generell, dass Ueberschneidungen hochgeladen
+# werden?" Fuer Ueberlappungen ist es geloest - derselbe Umsatz ergibt denselben
+# Abdruck und wird aufgefrischt. Die Restluecke war die Gegenrichtung: zwei in
+# JEDEM Feld gleiche Zeilen verschmolzen zu einer, und das faellt niemandem auf,
+# weil nichts fehlt, wonach man sucht. Am Bestand gab es einen Beinahe-Fall:
+# 2 x -14,57 EUR am selben Tag an denselben Empfaenger, nur der Zweck trennte sie.
+ZWEIMAL = '''\
+"DKB-Business";"DE62120300001310062102"
+"Zeitraum:";"01.07.2026 - 31.07.2026"
+"Kontostand vom 31.07.2026:";"1.000,00 €"
+""
+"Buchungsdatum";"Wertstellung";"Status";"Zahlungspflichtige*r";"Zahlungsempfänger*in";"Verwendungszweck";"Umsatztyp";"IBAN";"Betrag (€)";"Gläubiger-ID";"Mandatsreferenz";"Kundenreferenz"
+"31.07.26";"31.07.26";"Gebucht";"Daniel";"Netto Marken-Discount";"Einkauf";"Ausgang";"DE75100500001584049444";"-14,57";"";"";""
+"31.07.26";"31.07.26";"Gebucht";"Daniel";"Netto Marken-Discount";"Einkauf";"Ausgang";"DE75100500001584049444";"-14,57";"";"";""
+'''
+
+
+def test_zwei_voellig_gleiche_zeilen_bleiben_zwei():
+    _konto, _art, bew = ka.lesen(ZWEIMAL, heute=HEUTE)
+    assert len(bew) == 2
+    assert len({b["id"] for b in bew}) == 2, "sonst verschluckt der Import eine"
+
+
+def test_derselbe_auszug_zweimal_gibt_trotzdem_nur_zwei():
+    """Die Ueberlappung muss weiter greifen – sonst waere die Haerte erkauft
+    mit Dubletten bei jedem zweiten Export."""
+    erste = {b["id"] for b in ka.lesen(ZWEIMAL, heute=HEUTE)[2]}
+    zweite = {b["id"] for b in ka.lesen(ZWEIMAL, heute=HEUTE)[2]}
+    assert erste == zweite
+
+
+def test_die_reihenfolge_innerhalb_des_tages_zaehlt_nicht_gegen_die_ueberlappung():
+    """Ein spaeterer Export enthaelt denselben Tag mit denselben Zeilen – die
+    Nummerierung muss dieselbe sein, sonst entstehen Dubletten."""
+    lang = ZWEIMAL + ('"30.07.26";"30.07.26";"Gebucht";"Daniel";"Rossmann";'
+                      '"Einkauf";"Ausgang";"DE75100500001584049444";"-3,41";"";"";""\n')
+    a = {b["id"] for b in ka.lesen(ZWEIMAL, heute=HEUTE)[2]}
+    b = {x["id"] for x in ka.lesen(lang, heute=HEUTE)[2]}
+    assert a <= b, "die gemeinsamen Zeilen muessen dieselben Schluessel haben"
+
+
+def test_das_erste_vorkommen_behaelt_seinen_alten_schluessel():
+    """Sonst bekaeme JEDE bereits eingelesene Bewegung einen neuen Schluessel –
+    am Bestand vom 8.8.2026 waeren das 238 von 238 gewesen, und der naechste
+    Import haette alles ein zweites Mal angelegt."""
+    b = {"konto": "giro", "datum": "2026-07-31", "betrag": -14.57,
+         "text": "Einkauf", "gegenpartei": "Netto"}
+    ohne_nummer = ka.schluessel(b)
+    assert ka.schluessel(b, 1) == ohne_nummer
+    assert ka.schluessel(b, 2) != ohne_nummer

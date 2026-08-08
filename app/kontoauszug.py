@@ -101,17 +101,32 @@ def ist_umbuchung(text):
     return any(marke in t for marke in _UMBUCHUNG)
 
 
-def schluessel(bewegung):
+def schluessel(bewegung, lfd=1):
     """Fingerabdruck einer Bewegung – für die Dublettenerkennung.
 
     Auszüge überschneiden sich: wer im Juli und im August exportiert, hat den
     Juli zweimal. Der Schlüssel nimmt das, was die Bank nicht mehr ändert –
     Konto, Datum, Betrag und den Text. Die laufende Nummer der Datei taugt
     nicht, sie beginnt in jedem Export neu.
+
+    **`lfd` ist das wievielte Vorkommen dieser Zeile an diesem Tag.** Ohne das
+    verschmolzen zwei in *jedem* Feld gleiche Zeilen zu einer – und das fällt
+    niemandem auf, weil nichts fehlt, wonach man sucht; erst der Kontostand
+    ginge irgendwann nicht auf. Am Bestand vom 8.8.2026 gab es einen
+    Beinahe-Fall: zweimal −14,57 € am selben Tag an denselben Empfänger, nur
+    der Verwendungszweck trennte sie.
+
+    Weil die DKB **ganze Tage** exportiert, ist die Zählung über sich
+    überlappende Exporte hinweg stabil: derselbe Tag enthält dieselben Zeilen
+    in derselben Reihenfolge.
     """
     teile = [bewegung.get("konto", ""), bewegung.get("datum", ""),
              f"{bewegung.get('betrag', 0):.2f}", _text(bewegung.get("text")),
              _text(bewegung.get("gegenpartei"))]
+    if lfd > 1:
+        # Erst ab dem zweiten Vorkommen anhaengen – sonst aendern sich alle
+        # bereits vergebenen Schluessel, und der ganze Bestand waere doppelt.
+        teile.append(f"#{lfd}")
     return hashlib.sha256("|".join(teile).encode("utf-8")).hexdigest()[:16]
 
 
@@ -212,6 +227,7 @@ def lesen(rohdaten, heute=None):
     spalten = [_text(z).lower() for z in zeilen[kopf]]
     konto = kontoname(zeilen, art)
     bewegungen = []
+    gesehen = {}
     for zeile in zeilen[kopf + 1:]:
         if not any(_text(z) for z in zeile):
             continue
@@ -221,7 +237,10 @@ def lesen(rohdaten, heute=None):
             continue
         b["konto"] = konto
         b["art"] = art
-        b["id"] = schluessel(b)
+        # Wie oft kam diese Zeile an diesem Tag schon vor? Siehe `schluessel`.
+        roh = schluessel(b)
+        gesehen[roh] = gesehen.get(roh, 0) + 1
+        b["id"] = schluessel(b, gesehen[roh])
         bewegungen.append(b)
     return konto, art, bewegungen
 

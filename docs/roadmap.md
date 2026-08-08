@@ -1100,7 +1100,11 @@ ausdrücklich als unzuverlässig bezeichnet hat).
   genau einen Beinahe-Fall — 2 × −14,57 € am 31.07. an denselben Empfänger, nur
   der Zweck trennt sie. Deshalb kommt die laufende Nummer innerhalb des Tages
   dazu; weil die DKB ganze Tage exportiert, bleibt sie über Überlappungen
-  stabil.
+  stabil. **Rückwärtsverträglich:** die Nummer wird erst ab dem *zweiten*
+  Vorkommen angehängt — sonst bekäme jede der 238 bereits eingelesenen
+  Bewegungen einen neuen Schlüssel, und der nächste Import legte alles ein
+  zweites Mal an (gegengeprobt: 0 von 238 Schlüsseln blieben gleich).
+  ✅ erledigt (8.8.2026)
 * **B11b · Booking-Bericht einlesen.** XLSX (`openpyxl` als neue Abhängigkeit —
   auf dem Server noch nicht vorhanden). Schlüssel ist die Auszahlungsnummer:
   ein zweiter Import derselben Auszahlung ändert nichts, egal welcher Zeitraum
