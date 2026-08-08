@@ -272,8 +272,19 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Empfängers sofort mit** (bei Remez 5 weitere), mit Rückmeldung und Rückweg
   („Nur diese eine"). Der Knopf „Gelerntes anwenden" bleibt für alles, was
   vor dem Lernen schon dalag.
-* **Nächstes Paket: B7** — der Überblick: Einnahmen, Ausgaben, Ergebnis je
-  Monat, Wohnung und Kategorie.
+* **B7 ist fertig (8.8.2026):** neuer Bereich **Überblick** – je Monat
+  (Eingang, Ausgang, Geldfluss, Ergebnis, davon offen), je Kategorie nach
+  Klasse gruppiert, je Wohnung. Gerechnet wird über die **Posten**, nicht über
+  die Bewegung: eine Privatentnahme in einer Sammelzahlung belastet das
+  Ergebnis nicht mehr.
+  **Der Befund, der die Anzeige bestimmt hat:** beim ersten Lauf stand für
+  jeden Monat ein Verlust (Juni −1.489 €) – weil 11.932,88 € noch nicht
+  zugeordnet sind, überwiegend Einnahmen. Nicht belastbare Ergebnisse stehen
+  deshalb blass, mit der offenen Summe daneben.
+  **„Je Wohnung" trägt heute fast nichts:** 1 von 27 Posten, kein einziger
+  Beleg hat eine Wohnung. Die Abdeckung steht über der Tabelle.
+* **Nächstes Paket: B8** — Vollständigkeit: Saldo gegen den Kontoauszug,
+  lückenlose Zeiträume, Restbeträge ≠ 0.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
@@ -281,6 +292,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1007 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1036 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

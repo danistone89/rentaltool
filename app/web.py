@@ -34,6 +34,7 @@ from app import (data, smoobu, archive, mailer, auth, timetrack, housekeeping,  
                  bookings, receipts, feiertage, i18n, ical, mode, rechte)
 from app.ui import basis, belege, buchungen, dialog, einstellungen, ton  # noqa: E402,F401
 from app.ui import pwa  # noqa: E402,F401
+from app.ui import ueberblick as ui_ueberblick  # noqa: E402,F401
 from app.ui import kalender, kontoblatt, rechnungen, reinigung, standort, steuer, zeiten, zugang  # noqa: E402,F401
 from app.ui.basis import (AREAS, AUTH, BAR_PLAETZE, CFG, ROLE_AREAS, ROLES,  # noqa: E402,F401
                           STORAGE_SECRET, USERS, _APARTMENTS, _apts,
@@ -368,6 +369,9 @@ def main_page():
     def build_konto():
         kontoblatt.render_konto()
 
+    def build_ueberblick():
+        ui_ueberblick.render_ueberblick()
+
     def build_einstellungen():
         einstellungen.render_einstellungen()
 
@@ -378,6 +382,7 @@ def main_page():
                 "belege": build_belege,
                 "rechnungen": build_rechnungen,
                 "konto": build_konto,
+                "ueberblick": build_ueberblick,
                 "einstellungen": build_einstellungen,
                 "zeiterfassung": build_zeiterfassung}
 

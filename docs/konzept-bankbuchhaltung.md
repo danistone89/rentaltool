@@ -395,11 +395,54 @@ Pflicht zur Kategorie in `zuordnung.hinzufuegen`, `konto.je_kategorie`,
 Auswahl je Posten und „+ Neue Kategorie" in `app/ui/kontoblatt.py`,
 `tests/test_postenkategorie.py` (21 Prüfungen)
 
-### B7 · Der Überblick
+### B7 · Der Überblick — ✅ erledigt (8.8.2026)
 
 Einnahmen, Ausgaben, Ergebnis je Monat und Wohnung, dazu **je Kategorie** —
 „wie viel ging für Putzmittel drauf". Ersetzt das, was heute das Workbook von
 Hand liefert. *(war AP17 + zweite Hälfte AP27)* · *Größe:* L
+
+**Am Bestand nachgemessen (8.8.2026), bevor gebaut wird:**
+
+| Frage | Befund |
+|---|---|
+| Posten mit ableitbarer **Wohnung** | **1 von 27** |
+| Belege mit Wohnung | **0 von 30** |
+| Rechnungen mit Wohnung | 48 von 48 — aber nur 1 hängt an einer Zahlung |
+| `monatssummen` rechnet nach | `bewegung.klasse` und `bewegung.kategorie` |
+
+Daraus folgt der Zuschnitt:
+
+* **B7a · Ergebnis je Monat, aus den Posten.** `monatssummen` rechnet heute
+  über die Bewegung. Nach B6 kann eine Zahlung auf mehrere Kategorien mit
+  verschiedenen Klassen aufgeteilt sein — eine Privatentnahme in einer
+  Sammelzahlung würde das Ergebnis belasten. Dieselbe Naht wie in
+  `ohne_zuordnung`: auch `unklar` zählt bisher nur das Feld und übersieht, was
+  über die Maske zugeordnet wurde.
+* **B7b · Je Kategorie, gruppiert nach Klasse.** Die eigentliche Frage aus dem
+  Alltag. `konto.je_kategorie` steht seit B6; es fehlt die Gruppierung
+  (Einnahme / Ausgabe / Privat / Durchlaufend) und die Anzeige mit Zeitraum.
+* **B7c · Je Wohnung — so weit die Daten es hergeben.** Auf der Ausgabenseite
+  ist das heute **nichts**: kein einziger Beleg trägt eine Wohnung. Gebaut wird
+  die Rechnung trotzdem, aber die Anzeige **nennt ihre Abdeckung** statt eine
+  leere Tabelle als Ergebnis auszugeben. Eine Auswertung, die verschweigt,
+  worauf sie sich stützt, ist schlimmer als keine.
+
+**Was der Überblick NICHT ist:** keine EÜR fürs Finanzamt. Der Zweck ist der
+Blick auf die eigenen Zahlen, weil das Steuerbüro 8–10 Monate hinterherhinkt
+(Ansage vom 8.8.2026). Deshalb steht überall dabei, wie belastbar die Zahl
+gerade ist.
+
+**Der Befund, der die Anzeige bestimmt hat.** Beim ersten Lauf über die echten
+Zahlen stand für **jeden** Monat ein Verlust – Juni −1.489 €. Nicht weil der
+Betrieb Verlust macht, sondern weil **11.932,88 €** noch keiner Kategorie
+zugeordnet sind, überwiegend Einnahmen. Eine Ergebnisspalte, die das nicht
+sagt, wäre die gefährlichste Zahl im ganzen Werkzeug. Deshalb liefert `monate()`
+je Monat `offen_betrag` und `belastbar` mit; nicht belastbare Ergebnisse stehen
+blass, und unter der Tabelle steht, wie viel fehlt.
+
+*Umgesetzt:* `app/ueberblick.py` (monate / kategorien / wohnungen / abdeckung),
+`app/ui/ueberblick.py` als eigener Bereich, `tests/test_ueberblick.py`
+(23 Prüfungen)
 
 ### B8 · Vollständigkeit
 

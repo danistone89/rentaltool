@@ -87,6 +87,9 @@ AREAS = [
     {"key": "beherbergungssteuer", "label": "Beherbergungssteuer", "icon": "receipt_long"},
     {"key": "rechnungen", "label": "Rechnungen", "icon": "request_quote"},
     {"key": "konto", "label": "Konto", "icon": "account_balance"},
+    # Der Ueberblick steht NACH dem Konto: er lebt von dem, was dort zugeordnet
+    # wurde, und ohne Zuordnungen zeigt er nur, wie viel noch offen ist.
+    {"key": "ueberblick", "label": "Überblick", "icon": "query_stats"},
     # Einstellungen sind ein Bereich wie jeder andere – vorher waren sie ein
     # Fenster davor, das nicht scrollen konnte. ROLE_BAR führt sie nicht, sie
     # landen also im Menü, wo sie hingehören.

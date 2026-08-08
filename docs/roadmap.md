@@ -1063,7 +1063,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B4b** | Verrechnungskonto je Plattform | M | ✅ erledigt (8.8.2026) – ohne „offene Forderung", siehe Konzept |
 | **B5** | Eingangsbelege – beide Wege zusammenführen | L | ✅ erledigt (8.8.2026) |
 | **B6** | Kategorien an der Zuordnung | S | ✅ erledigt (8.8.2026) |
-| **B7** | Der Überblick | L | offen |
+| **B7** | Der Überblick | L | ✅ erledigt (8.8.2026) |
 | **B8** | Vollständigkeit | M | offen |
 | **B9** | Übergabe ans Steuerbüro | L | offen |
 
