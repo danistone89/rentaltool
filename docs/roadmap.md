@@ -943,7 +943,36 @@ der umgekehrte: man sieht eine Abbuchung, zu der der Beleg fehlt, und lädt ihn
 Genau das unterscheidet ein Werkzeug von einem Ordner voller Belege.
 
 Also: aus einer Bewegung heraus einen Beleg hochladen oder einen vorhandenen
-auswählen, und aus einem Beleg heraus die passende Bewegung. *Größe:* XL.
+auswählen, und aus einem Beleg heraus die passende Bewegung.
+
+**✅ Schritt 1 erledigt (7.8.2026):** Beleg an der Buchung – hochladen, lösen,
+oder abhaken, dass es keinen gibt. Dazu die Belegpflicht (wann wird überhaupt
+einer erwartet) und die Liste „fehlt noch".
+
+> **Schritt 2 – die beiden Wege treffen sich noch nicht.** Nachgefragt am
+> 8.8.2026: *„Im Menü gibt es Belege, dort laden Mitarbeiter hoch – werden die
+> automatisch den Bankbewegungen zugeordnet?"* **Nein.** Heute laufen zwei
+> getrennte Wege nebeneinander:
+>
+> | Weg | was passiert |
+> |---|---|
+> | **Belege** (Mitarbeiter, Handy) | Foto/PDF, OCR, Kategorie – **ohne Bezug zum Konto** |
+> | **Konto → Beleg hochladen** | landet auch in den Belegen, aber **verknüpft** |
+>
+> Zwei Folgen, beide unschön:
+>
+> * Ein Beleg, den die Putzkraft fotografiert, bleibt für das Konto unsichtbar –
+>   die Buchung steht weiter in „fehlt noch", obwohl der Beleg längst da ist.
+> * **Derselbe Beleg kann zweimal im System landen** (einmal aus der App, einmal
+>   an der Buchung). Die Dublettenprüfung von `buchhaltung.dubletten` greift
+>   innerhalb der Belege, aber niemand vergleicht die beiden Wege.
+>
+> Nötig ist deshalb die **automatische Zuordnung**: Betrag, Datum und Händler
+> stehen auf beiden Seiten. Ein Vorschlag statt einer stillen Verknüpfung – was
+> nicht eindeutig ist, bleibt ein Klärfall. Dazu am Beleg der umgekehrte Weg:
+> „passt zu dieser Buchung".
+
+*Größe:* XL *(Schritt 1 davon erledigt).*
 
 ### AP25 · Vollständigkeit und Abstimmung — offen *(Pflicht, nicht Kür)*
 

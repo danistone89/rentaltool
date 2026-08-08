@@ -69,7 +69,13 @@ def _beleg_knopf(bewegung, neu_zeichnen):
             .props("flat dense round color=positive") \
             .tooltip("Beleg hängt dran – klicken löst ihn wieder").classes("shrink-0")
         return
-    if not konto.beleg_erwartet(bewegung):
+    # Hochladen geht IMMER, solange es eine Ausgabe ist. `beleg_erwartet`
+    # beantwortet eine andere Frage – ob die Buchung in der Liste „fehlt noch"
+    # steht –, und die setzt eine Kategorie voraus. Hier wäre das falsch: wer
+    # den Kassenbon in der Hand hat, soll ihn anhängen können, ohne vorher zu
+    # kategorisieren. (Erst gemeldet an einer Netto-Buchung ohne Kategorie:
+    # dort fehlte der Knopf ganz.)
+    if bewegung.get("umbuchung") or bewegung.get("betrag", 0) >= 0:
         return
 
     async def hochladen(e):

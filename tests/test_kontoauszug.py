@@ -406,3 +406,19 @@ def test_die_liste_meldet_nicht_alles():
     assert "Rena Textilpflege GmbH" in fehlen, "ein Lieferant braucht einen Beleg"
     assert "Muster Privatkonto" not in fehlen
     assert "Stadtkasse Musterstadt" not in fehlen
+
+
+def test_hochladen_geht_auch_ohne_kategorie():
+    """Zwei verschiedene Fragen, die ich zuerst mit EINER Funktion beantwortet
+    hatte: „gehoert das in die Liste?" braucht die Kategorie, „darf ich hier
+    einen Beleg anhaengen?" nicht.
+
+    Gemeldet an einer Netto-Buchung ohne Kategorie – dort fehlte der
+    Upload-Knopf ganz. Wer den Kassenbon in der Hand hat, soll ihn anhaengen
+    koennen, ohne vorher zu kategorisieren."""
+    b = _bewegungen()["Irgendwer Neu GmbH"]
+    assert not b.get("kategorie")
+    assert not konto.beleg_erwartet(b), "steht (noch) nicht in der Liste"
+    # ... laesst sich aber sehr wohl zuordnen:
+    nachher = konto.beleg_setzen(b["id"], "beleg-42")
+    assert nachher["beleg_id"] == "beleg-42"
