@@ -1139,6 +1139,17 @@ Sauber gerechnet – nur gültige Buchungen, nur Rechnungen mit
 Beherbergungssteuer: **46 von 47** stimmen mit Smoobus Preis überein, der
 47. ist die handgemachte.
 
+**Ohne Verbindung zur Buchung bietet das Werkzeug Dubletten an.**
+`faellige_buchungen` überspringt eine Buchung nur, wenn `zu_buchung` eine
+Rechnung dazu findet – und die sucht über das Feld `buchung`, das eine aus
+einer PDF gelesene Rechnung nicht hat. An den echten Daten hätte das Werkzeug
+nach der Übernahme **122 Entwürfe** vorgeschlagen, darunter 78 zu gerade
+eingelesenen Rechnungen. `buchungen_verknuepfen` verbindet über Gastname und
+Anreisetag: **78 von 78 verbunden, keiner offen**, Entwürfe 122 → 44. Von
+diesen 44 liegen 39 vor Rechnung Nr. 1 (Oktober–Dezember 2025), 4 nach Josan
+(die gehören dem neuen Weg) und **einer dazwischen** – Silvia Erdmann,
+29.12.2025–01.01.2026, dort fehlt eine Rechnung.
+
 > **Was dabei auffiel:** `rechnung.aendern` kann die **Positionen** eines
 > Entwurfs ändern, die Oberfläche bietet es aber nicht an – dort lässt sich nur
 > die Anschrift pflegen. Wer einen Betrag von Hand korrigieren will (wie bei

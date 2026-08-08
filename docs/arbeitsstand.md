@@ -389,6 +389,11 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Stornos nicht ausgefiltert (das Werkzeug tut es; 49 von 155 Buchungen sind
   Stornos). Katarina Gockel war eine **von Hand erstellte** Rechnung. Sauber
   gerechnet stimmen 46 von 47.
+* **Beim Ausrollen wichtig:** die übernommenen Rechnungen sind jetzt mit ihrer
+  Smoobu-Buchung verbunden (78 von 78). Ohne das hätte das Werkzeug 122
+  Entwürfe vorgeschlagen, darunter 78 Dubletten. Es bleiben 44: 39 aus der Zeit
+  vor Rechnung Nr. 1, 4 nach Josan (neuer Weg) und **einer dazwischen** –
+  Silvia Erdmann 29.12.2025–01.01.2026, dort fehlt eine Rechnung.
 * **⚠ Offener Punkt:** Beträge eines Entwurfs lassen sich in der Oberfläche
   **nicht** ändern – nur die Anschrift. `rechnung.aendern(positionen=…)` kann
   es, die Maske bietet es nicht an. Wer wie bei Gockel von Hand korrigieren
@@ -405,6 +410,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1182 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1187 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

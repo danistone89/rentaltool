@@ -271,3 +271,47 @@ def test_umlaute_aus_dem_dateinamen_werden_zusammengesetzt(tmp_path, monkeypatch
     s = _lesen(_pdf(tmp_path, 35, zerlegt), TEXT, monkeypatch)
     assert s["gast"] == "Jürgen Ollmann"
     assert s["gast"] == unicodedata.normalize("NFC", s["gast"])
+
+
+# ------------------------------------- Die Verbindung zur Smoobu-Buchung
+def test_ohne_verbindung_bietet_das_werkzeug_dubletten_an(tmp_path):
+    """Der Befund vor dem Ausrollen: nach der Uebernahme haette das Werkzeug
+    122 Entwuerfe vorgeschlagen, darunter 78 zu gerade eingelesenen
+    Rechnungen."""
+    alt.uebernehmen([_satz(pfad=_pdf(tmp_path))])
+    buchung = {"id": 999, "guest-name": "Alexander Josan", "arrival": "2026-07-28",
+               "departure": "2026-07-31"}
+    assert rechnung.faellige_buchungen([buchung], heute=__import__("datetime").date(2026, 8, 8)) == [buchung]
+
+
+def test_mit_verbindung_verschwindet_die_dublette(tmp_path):
+    alt.uebernehmen([_satz(pfad=_pdf(tmp_path))])
+    buchung = {"id": 999, "guest-name": "Alexander Josan", "arrival": "2026-07-28",
+               "departure": "2026-07-31"}
+    v, ohne = alt.buchungen_verknuepfen([buchung])
+    assert (v, ohne) == (1, 0)
+    assert rechnung.faellige_buchungen([buchung], heute=__import__("datetime").date(2026, 8, 8)) == []
+
+
+def test_umlaute_stoeren_die_verbindung_nicht(tmp_path):
+    import unicodedata
+    alt.uebernehmen([_satz(gast="Jürgen Ollmann", pfad=_pdf(tmp_path, 35, "x"))])
+    buchung = {"id": 5, "guest-name": unicodedata.normalize("NFD", "Jürgen Ollmann"),
+               "arrival": "2026-07-28", "departure": "2026-07-31"}
+    assert alt.buchungen_verknuepfen([buchung])[0] == 1
+
+
+def test_ohne_treffer_bleibt_die_rechnung_unverbunden(tmp_path):
+    """Ein geratener Treffer waere schlimmer – er verdeckte eine fehlende
+    Rechnung."""
+    alt.uebernehmen([_satz(pfad=_pdf(tmp_path))])
+    v, ohne = alt.buchungen_verknuepfen([{"id": 1, "guest-name": "Wer Anders",
+                                          "arrival": "2026-01-01"}])
+    assert (v, ohne) == (0, 1)
+
+
+def test_ein_zweiter_lauf_verbindet_nicht_neu(tmp_path):
+    alt.uebernehmen([_satz(pfad=_pdf(tmp_path))])
+    buchung = {"id": 999, "guest-name": "Alexander Josan", "arrival": "2026-07-28"}
+    alt.buchungen_verknuepfen([buchung])
+    assert alt.buchungen_verknuepfen([buchung]) == (0, 0)

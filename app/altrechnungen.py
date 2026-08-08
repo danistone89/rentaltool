@@ -222,3 +222,42 @@ def original_pfad(r):
         return ""
     pfad = os.path.join(housekeeping.MEDIA_DIR, rel)
     return pfad if os.path.exists(pfad) else ""
+
+
+def _schluessel(gast, anreise):
+    return (re.sub(r"\W+", "", unicodedata.normalize("NFC", gast or "").lower()),
+            (anreise or "")[:10])
+
+
+def buchungen_verknuepfen(buchungen):
+    """Übernommene Rechnungen mit ihrer Smoobu-Buchung verbinden.
+
+    **Ohne diese Verbindung bietet das Werkzeug für jeden dieser Aufenthalte
+    einen neuen Entwurf an.** `rechnung.faellige_buchungen` überspringt eine
+    Buchung nur, wenn `zu_buchung` eine Rechnung dazu findet – und die sucht
+    über das Feld `buchung`. Die übernommenen Sätze tragen es nicht, sie kommen
+    ja aus einer PDF. An den echten Daten hätte das Werkzeug nach der Übernahme
+    **122 Entwürfe** vorgeschlagen, darunter 78 Dubletten zu dem, was gerade
+    eingelesen wurde.
+
+    Verbunden wird über **Gastname und Anreisetag** – die Nummer steht in
+    Smoobu nicht. Was sich nicht zuordnen lässt, bleibt ohne Verbindung; ein
+    geratener Treffer wäre schlimmer, er verdeckte eine fehlende Rechnung.
+
+    Gibt (verknuepft, ohne_treffer) zurück.
+    """
+    nach_schluessel = {}
+    for b in buchungen or []:
+        nach_schluessel.setdefault(
+            _schluessel(b.get("guest-name"), b.get("arrival")), b)
+    verknuepft = ohne = 0
+    for r in db.alle(rechnung.TABELLE):
+        if not ist_uebernommen(r) or (r.get("buchung") or ""):
+            continue
+        b = nach_schluessel.get(_schluessel(r.get("gast"), r.get("anreise")))
+        if not b:
+            ohne += 1
+            continue
+        db.speichern(rechnung.TABELLE, r["id"], dict(r, buchung=b.get("id")))
+        verknuepft += 1
+    return verknuepft, ohne

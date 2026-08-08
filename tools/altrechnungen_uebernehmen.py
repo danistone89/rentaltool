@@ -83,6 +83,22 @@ def main():
         print(f"(Wohnungen nicht erreichbar: {fehler} – Feld bleibt leer)")
     neu, uebersprungen = alt.uebernehmen(saetze, wohnungen)
     print(f"\n{neu} angelegt, {uebersprungen} übersprungen (schon vorhanden).")
+
+    # Ohne die Verbindung zur Smoobu-Buchung bietet das Werkzeug fuer jeden
+    # dieser Aufenthalte einen NEUEN Entwurf an – Dubletten zu dem, was gerade
+    # eingelesen wurde.
+    try:
+        from app import bookings
+        roh = data._reservations(saetze[0]["anreise"] or "2025-01-01",
+                                 saetze[-1]["abreise"] or "2030-12-31")
+        v, ohne = alt.buchungen_verknuepfen([b for b in roh if bookings.is_real(b)])
+        print(f"{v} mit ihrer Smoobu-Buchung verbunden"
+              + (f", {ohne} ohne Treffer (dort schlaegt das Werkzeug einen "
+                 "Entwurf vor – bitte ansehen)" if ohne else "."))
+    except Exception as fehler:
+        print(f"⚠ Verbindung zu den Buchungen nicht moeglich ({fehler}). "
+              "Ohne sie schlaegt das Werkzeug Entwuerfe zu bereits "
+              "uebernommenen Rechnungen vor.")
     hoechste = max(int(s["nummer"]) for s in saetze)
     print(f"\nNoch zu tun: in den Einstellungen `rechnung_startjahr` auf das "
           f"laufende Jahr und `rechnung_startnummer` auf {hoechste + 1} setzen –"
