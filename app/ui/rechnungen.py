@@ -258,6 +258,17 @@ def _festschreiben(r):
 
 
 def _pdf_laden(r):
+    # Eine uebernommene Rechnung (B10) behaelt ihr Original: der Gast hat ein
+    # bestimmtes Dokument bekommen, und ein neu gebautes mit anderem Layout
+    # unter derselben Nummer waere ein zweiter Beleg zum selben Vorgang.
+    from app import altrechnungen
+    pfad = altrechnungen.original_pfad(r)
+    if pfad:
+        with open(pfad, "rb") as f:
+            ui.download.content(f.read(), f"Rechnung_{r.get('nummer')}.pdf",
+                                media_type="application/pdf")
+        return
+
     try:
         pdf = rechnung_pdf.bauen(r, CFG.get("betreiber", {}))
     except Exception as ex:

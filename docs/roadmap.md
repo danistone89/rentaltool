@@ -1066,6 +1066,55 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B7** | Der Überblick | L | ✅ erledigt (8.8.2026) |
 | **B8** | Vollständigkeit | M | ✅ erledigt (8.8.2026) |
 | **B9** | Übergabe ans Steuerbüro | L | ✅ erledigt (8.8.2026) |
+| **B10** | Altrechnungen übernehmen (vor dem Ausrollen) | M | ✅ gebaut, Probelauf grün – Schreiben steht aus |
+
+### B10 · Die Rechnungen aus dem alten Weg übernehmen
+
+**Der Anlass (8.8.2026):** bis einschließlich der Buchung **Alexander Josan**
+sind die Rechnungen über Smoobu erzeugt und verschickt; ab der nächsten soll
+das Werkzeug übernehmen. Ohne Übernahme fehlten dem Werkzeug 78 Rechnungen —
+und damit die halbe Einnahmenseite, an der die Zahlungseingänge hängen (B3).
+
+**Am Bestand nachgesehen:**
+
+| | |
+|---|---|
+| PDFs in `Ausgangsrechnungen/` | **78**, lückenlos Nr. 1–78 |
+| davon im Rechnungsausgangsbuch | nur 1–59 |
+| Alexander Josan | **Nr. 78** – die letzte |
+| Text der PDFs maschinenlesbar | **ja**, vollständig |
+
+Die PDFs sind deshalb die Quelle, nicht das Workbook: sie decken alle 78 ab und
+tragen Nummer, Datum, Gast, Objekt, Aufenthalt, Netto, USt, Brutto und
+Übernachtungssteuer.
+
+* **B10a · Einlesen.** Ein Werkzeug liest die 78 PDFs, legt je Rechnung einen
+  Satz an (Status *gesendet*, Merkmal `quelle="smoobu"`) und **kopiert die
+  Original-PDF** mit. Probelauf zuerst, Schreiben nur auf ausdrückliche Ansage.
+* **B10b · Das Original bleibt das Original.** Für eine übernommene Rechnung
+  wird **kein PDF neu gebaut** – der Gast hat ein bestimmtes Dokument bekommen,
+  und ein zweites mit anderem Layout unter derselben Nummer wäre ein zweiter
+  Beleg zum selben Vorgang. Angezeigt und weitergegeben wird die Datei von
+  damals.
+* **B10c · Der Nummernkreis.** Die übernommenen behalten ihre Nummer (1–78, so
+  wie sie beim Gast liegt). Das Werkzeug beginnt bei **79**; dafür gibt es
+  `rechnung_startjahr` / `rechnung_startnummer` bereits.
+
+**Nicht verändert wird, was schon existiert:** keine Neuberechnung der
+Beherbergungssteuer, keine Korrektur der Beträge, kein Festschreiben-Lauf. Was
+hinausgegangen ist, ist hinausgegangen.
+
+**Probelauf am echten Bestand (8.8.2026):** 78 Rechnungen gelesen, Nr. 1–78,
+zusammen **36.847,29 € brutto**, keine unvollständig. Gegen die 59 Zeilen des
+Rechnungsausgangsbuchs geprüft — die 30 „Abweichungen" waren keine Lesefehler,
+sondern **zwei Begriffe von „Brutto"**: das Workbook führt ihn *ohne*
+Übernachtungssteuer, die PDF *mit* (Nr. 36 Peter Queißer: 806,19 gegen 765,93,
+Differenz genau die 40,26 € Steuer). Unter dieser Annahme stimmen 58 von 59;
+die Reste sind Cent-Differenzen zwischen Dokument und Workbook — dort gilt das
+Dokument, das hat der Gast.
+
+Das Werkzeug ist `tools/altrechnungen_uebernehmen.py`, Probelauf ist die
+Vorgabe. **Geschrieben wurde noch nichts.**
 
 Sie lösen AP20, AP23, AP25 und AP18 ab.
 

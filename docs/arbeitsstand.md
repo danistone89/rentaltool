@@ -375,6 +375,13 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   den Nextcloud-Sync, ist sie dort. Ein Download in den Browser-Ordner war
   keine Ablage; das eigentliche Ziel („sammeln im Werkzeug, speichern in
   Nextcloud") hatte ich beim ersten Bauen weggelassen.
+* **B10 (Altrechnungen) ist gebaut, aber noch nicht geschrieben.** Bis Nr. 78
+  (Alexander Josan) kamen die Rechnungen aus Smoobu; ab 79 übernimmt das
+  Werkzeug. `tools/altrechnungen_uebernehmen.py` liest die 78 PDFs (Probelauf
+  grün: 36.847,29 € brutto, keine unvollständig), legt sie als *gesendet* mit
+  `quelle="smoobu"` an und nimmt die Original-PDF mit — für sie wird nie ein
+  neues Dokument gebaut. **Offen:** der Lauf mit `--schreiben` und danach
+  `rechnung_startnummer` = 79.
 * **Alle Pakete B1–B9 sind erledigt.** Offen bleiben: der Echtbetrieb (35+
   Commits auf dem Zweig, live läuft der Stand von gestern) und die offene Frage
   zur E-Rechnung im Fahrplan. — Übergabe ans Steuerbüro: Ablage in der Nextcloud
@@ -387,6 +394,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1158 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1181 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```
