@@ -259,3 +259,15 @@ def test_fuer_eine_uebernommene_rechnung_wird_kein_pdf_gebaut(tmp_path, monkeypa
     r = [x for x in rechnung.rechnungen() if x["nummer"] == "78"][0]
     ui_r._pdf_laden(r)
     assert gebaut == [] and geladen == ["Rechnung_78.pdf"]
+
+
+def test_umlaute_aus_dem_dateinamen_werden_zusammengesetzt(tmp_path, monkeypatch):
+    """macOS legt Dateinamen in ZERLEGTER Unicode-Form ab („Ju"+"¨"). So
+    gelesen sieht der Name richtig aus, vergleicht sich aber mit keinem
+    anderen – beim Abgleich gegen die vorhandenen Rechnungen fielen dadurch
+    ALLE Umlaut-Namen durch."""
+    import unicodedata
+    zerlegt = unicodedata.normalize("NFD", "Jürgen_Ollmann")
+    s = _lesen(_pdf(tmp_path, 35, zerlegt), TEXT, monkeypatch)
+    assert s["gast"] == "Jürgen Ollmann"
+    assert s["gast"] == unicodedata.normalize("NFC", s["gast"])

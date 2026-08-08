@@ -27,6 +27,7 @@ derselben Nummer wäre ein zweiter Beleg zum selben Vorgang.
 import os
 import re
 import shutil
+import unicodedata
 
 from app import db, housekeeping, rechnung, receipts
 
@@ -89,7 +90,13 @@ def lesen(pfad):
             break
 
     return {"nummer": m.group(1),
-            "gast": m.group(2).replace("_", " ").strip(),
+            # macOS legt Dateinamen in ZERLEGTER Unicode-Form ab („Ju"+"¨"
+            # statt „ü"). Ungewandelt sieht der Name im Werkzeug zwar richtig
+            # aus, vergleicht sich aber mit keinem anderen – beim Abgleich
+            # gegen die vorhandenen Rechnungen fielen dadurch alle Umlaut-Namen
+            # durch (Jürgen Ollmann, Thomas Künne, Helga Schäk …).
+            "gast": unicodedata.normalize(
+                "NFC", m.group(2).replace("_", " ")).strip(),
             "datum": datum,
             "wohnung_name": wohnung,
             "anreise": anreise, "abreise": abreise,

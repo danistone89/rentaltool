@@ -1066,7 +1066,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B7** | Der Überblick | L | ✅ erledigt (8.8.2026) |
 | **B8** | Vollständigkeit | M | ✅ erledigt (8.8.2026) |
 | **B9** | Übergabe ans Steuerbüro | L | ✅ erledigt (8.8.2026) |
-| **B10** | Altrechnungen übernehmen (vor dem Ausrollen) | M | ✅ gebaut, Probelauf grün – Schreiben steht aus |
+| **B10** | Altrechnungen übernehmen (vor dem Ausrollen) | M | ✅ erledigt (8.8.2026) – 78 übernommen, Kreis ab 2026-0079 |
 
 ### B10 · Die Rechnungen aus dem alten Weg übernehmen
 
@@ -1114,7 +1114,21 @@ die Reste sind Cent-Differenzen zwischen Dokument und Workbook — dort gilt das
 Dokument, das hat der Gast.
 
 Das Werkzeug ist `tools/altrechnungen_uebernehmen.py`, Probelauf ist die
-Vorgabe. **Geschrieben wurde noch nichts.**
+Vorgabe.
+
+**Durchgeführt am 8.8.2026** (Probe-Instanz, auf Ansage): die 48 Testrechnungen
+gelöscht, 78 übernommen, `rechnung_startnummer` auf 79. Vorher zeigte der
+Abgleich, dass **44 der 48** dieselben Vorgänge waren wie die alten — bei **40
+davon auf den Cent derselbe Bruttobetrag**. Das ist zugleich der beste
+verfügbare Nachweis, dass die Beherbergungssteuer-Rechnung dieses Werkzeugs
+dasselbe ergibt wie das alte System.
+
+> **Offener Punkt vor dem Ausrollen.** Bei **2 von 34** vergleichbaren
+> Buchungen ist Smoobus `price` **nicht** der Betrag, den der Gast gezahlt hat:
+> Katarina Gockel `price` 370,00 gegen Rechnung 379,48 (die Bank bestätigt
+> 379,48), Anja Ernst 442,00 gegen 400,07. Ab Nr. 79 erzeugt das Werkzeug die
+> Rechnungen aus genau diesem Feld — in diesen Fällen läge es daneben. Vor dem
+> Ausrollen klären.
 
 Sie lösen AP20, AP23, AP25 und AP18 ab.
 

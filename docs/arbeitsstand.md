@@ -380,8 +380,14 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Werkzeug. `tools/altrechnungen_uebernehmen.py` liest die 78 PDFs (Probelauf
   grün: 36.847,29 € brutto, keine unvollständig), legt sie als *gesendet* mit
   `quelle="smoobu"` an und nimmt die Original-PDF mit — für sie wird nie ein
-  neues Dokument gebaut. **Offen:** der Lauf mit `--schreiben` und danach
-  `rechnung_startnummer` = 79.
+  neues Dokument gebaut.
+  **Durchgeführt (8.8.2026):** 48 Testrechnungen gelöscht, 78 übernommen,
+  Startnummer 79. Die Zahlungszuordnung greift — die Zahlung über 379,48 €
+  findet Nr. 74 Katarina Gockel mit „Name im Verwendungszweck".
+* **⚠ Offener Punkt vor dem Ausrollen:** bei 2 von 34 vergleichbaren Buchungen
+  ist Smoobus `price` nicht der gezahlte Betrag (Gockel 370,00 statt 379,48 –
+  die Bank bestätigt 379,48; Anja Ernst 442,00 statt 400,07). Ab Nr. 79 erzeugt
+  das Werkzeug die Rechnungen aus diesem Feld.
 * **Alle Pakete B1–B9 sind erledigt.** Offen bleiben: der Echtbetrieb (35+
   Commits auf dem Zweig, live läuft der Stand von gestern) und die offene Frage
   zur E-Rechnung im Fahrplan. — Übergabe ans Steuerbüro: Ablage in der Nextcloud
@@ -394,6 +400,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1181 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1182 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

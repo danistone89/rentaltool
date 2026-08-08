@@ -73,12 +73,14 @@ def main():
         print("\nProbelauf – es wurde nichts geschrieben. Mit --schreiben anlegen.")
         return 0
 
+    # Die Wohnungen kommen von Smoobu, nicht aus der Konfiguration – dort
+    # standen sie nie, und die Zuordnung blieb deshalb im ersten Lauf leer.
     wohnungen = {}
     try:
-        wohnungen = {str(k): (v.get("name") if isinstance(v, dict) else str(v))
-                     for k, v in (data.CONFIG.get("apartments") or {}).items()}
-    except Exception:
-        pass
+        from app.ui.basis import _apts
+        wohnungen = {k: v for k, v in _apts().items()}
+    except Exception as fehler:
+        print(f"(Wohnungen nicht erreichbar: {fehler} – Feld bleibt leer)")
     neu, uebersprungen = alt.uebernehmen(saetze, wohnungen)
     print(f"\n{neu} angelegt, {uebersprungen} übersprungen (schon vorhanden).")
     hoechste = max(int(s["nummer"]) for s in saetze)
