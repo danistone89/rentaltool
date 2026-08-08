@@ -15,9 +15,14 @@ Was stattdessen trägt:
 * **Die Wohnung** aus der Portal-Kennung (`ID.14005823`). Sie sagt nicht,
   welche Buchung gemeint ist, aber sie halbiert die Liste. Welche Kennung zu
   welcher Wohnung gehört, **lernt** das Werkzeug bei der ersten Zuordnung.
-* **Der erwartete Auszahlungsbetrag** je Rechnung: Smoobu liefert die Provision
-  je Buchung (`commission-included`). Damit steht neben jeder Rechnung, was von
-  ihr ankommen müsste – und das Abhaken wird selbstprüfend.
+**Zugeordnet wird der Rechnungsbetrag, nicht die Auszahlung.** Sonst wäre der
+Umsatz um die Provision zu niedrig und die Provision tauchte als Ausgabe nie
+auf. Was übrig bleibt, ist die einbehaltene Provision.
+
+⚠ **Die Provision aus Smoobu (`commission-included`) ist nicht verlässlich** –
+so der Betreiber am 8.8.2026. Maßgeblich sind die **monatlichen Belege von
+Booking und Airbnb**, die das Steuerbüro gegen die Auszahlungen bucht. Die
+Smoobu-Zahl wird deshalb weder angezeigt noch zur Prüfung herangezogen.
 
 Der Mensch entscheidet, das Werkzeug sortiert nur vor.
 """
@@ -78,11 +83,12 @@ def offene(jahr=None):
 
 
 def erwartet(r, buchungen=None):
-    """Was von dieser Rechnung ankommen müsste.
+    """Rechnungsbetrag minus geschätzter Provision – **ein Anhalt, kein Wert**.
 
-    Bei einer Portalbuchung ist das der Rechnungsbetrag **minus Provision** –
-    Smoobu liefert sie je Buchung. Ohne Provisionsangabe bleibt es der
-    Rechnungsbetrag; das ist der Direktzahler-Fall.
+    ⚠ Die Provision aus Smoobu (`commission-included`) ist nicht verlässlich
+    (siehe `provisionsprobe`). Zugeordnet und angezeigt wird deshalb der
+    **Rechnungsbetrag**; diese Funktion dient nur noch der Sortierung und
+    späteren Plausibilitätsprüfungen.
     """
     brutto = round((r.get("summen") or {}).get("brutto", 0.0), 2)
     b = (buchungen or {}).get(r.get("buchung"))
@@ -128,17 +134,19 @@ def kandidaten(bewegung, cfg=None, buchungen=None, jahr=None):
 
 
 def provisionsprobe(bewegung, buchungen=None):
-    """Passt der offene Rest zu den Provisionen der zugeordneten Rechnungen?
+    """Der offene Rest gegen die Provisionen aus Smoobu – **nur als Anhalt**.
 
-    Der Rest einer Portal-Auszahlung **ist** die einbehaltene Provision – wenn
-    alle zugehörigen Rechnungen zugeordnet sind. Smoobu kennt sie je Buchung
-    (`commission-included`), also lässt sich das nachrechnen, statt es zu
-    glauben.
+    ⚠ **Nicht als Wahrheit verwenden.** Der Betreiber hat am 8.8.2026
+    widersprochen: `commission-included` aus Smoobu stimmt nicht verlässlich.
+    Maßgeblich sind die **monatlichen Belege von Booking und Airbnb**, die das
+    Steuerbüro gegen die Auszahlungen bucht.
 
-    Gibt (rest, erwartete_provision, stimmt) zurück. Weichen die beiden ab, ist
-    das ein **Befund**: entweder fehlt noch eine Rechnung, oder das Portal hat
-    anders abgerechnet als angekündigt. Beides will man wissen, bevor man den
-    Rest blind wegbucht.
+    Die Funktion bleibt für spätere Plausibilitätsprüfungen erhalten, wird aber
+    in der Oberfläche **nicht** mehr als Befund gezeigt – eine Nachrechnung
+    gegen eine unzuverlässige Zahl erzeugt Fehlalarme („es fehlt eine
+    Rechnung", wo nur die Schätzung daneben lag).
+
+    Gibt (rest, geschaetzte_provision, stimmt) zurück.
     """
     from app import db
     rest = zuordnung.rest(bewegung)

@@ -165,42 +165,25 @@ def _provisionszeile(bewegung, rest, neu_zeichnen):
     **Der Rest IST die Provision** – sobald alle zugehörigen Rechnungen
     zugeordnet sind. Statt ihn von Hand einzutippen, steht hier ein Knopf.
 
-    Er kommt mit einer **Gegenprobe**: Smoobu kennt die Provision je Buchung,
-    also lässt sich nachrechnen, ob der Rest dazu passt. Weicht er ab, fehlt
-    entweder noch eine Rechnung, oder das Portal hat anders abgerechnet – beides
-    will man wissen, bevor man den Rest wegbucht. Ein Knopf, der stillschweigend
-    alles glattzieht, versteckt genau die Fälle, die man prüfen müsste.
+    **Maßgeblich ist der Beleg des Portals, nicht Smoobu.** Eine frühere Fassung
+    rechnete den Rest gegen `commission-included` aus den Smoobu-Buchungen und
+    meldete Abweichungen als Befund. Der Betreiber hat am 8.8.2026
+    widersprochen: die Smoobu-Zahl stimmt nicht verlässlich, und das Steuerbüro
+    bucht die **monatlichen Booking- und Airbnb-Belege** gegen die
+    Auszahlungen. Eine Nachrechnung gegen eine unzuverlässige Zahl hätte
+    Fehlalarme erzeugt – „es fehlt eine Rechnung", wo nur die Schätzung daneben
+    lag. Geprüft wird deshalb gegen den Monatsbeleg (B5), nicht hier.
     """
-    from app import buchhaltung, data, zahlungsvorschlag as vs
-    from app.ui.basis import CFG
-
-    # Nur sinnvoll, wenn schon Rechnungen zugeordnet sind und weniger ankam,
-    # als sie zusammen ausmachen.
     if not zuordnung.ziele(bewegung["id"], zuordnung.RECHNUNG) or rest >= 0:
         return
-    tag = (bewegung.get("datum") or "")[:10]
-    buchungen = {}
-    if tag:
-        try:
-            for b in data._reservations(f"{int(tag[:4]) - 1}-07-01",
-                                        f"{int(tag[:4]) + 1}-06-30"):
-                buchungen[b.get("id")] = b
-        except Exception:
-            pass
-    _rest, erwartete, stimmt = vs.provisionsprobe(bewegung, buchungen)
-
+    from app import buchhaltung
+    from app.ui.basis import CFG
     kategorien = [k for k in buchhaltung.kategorien(CFG) if "provision" in k.lower()]
+
     with ui.row().classes("w-full items-center gap-2 no-wrap mt-1"):
-        if erwartete and not stimmt:
-            ui.icon("info").classes(f"text-base {ton.AUF_HINWEIS} shrink-0")
-            ui.label(f"Laut Smoobu wären es {_eur(erwartete)} Provision – "
-                     f"es fehlt vermutlich noch eine Rechnung.") \
-                .classes(f"text-xs {ton.AUF_HINWEIS} flex-grow min-w-0") \
-                .mark(f"prov-hinweis-{bewegung['id']}")
-        else:
-            ui.label("Der Rest ist die einbehaltene Provision." if erwartete
-                     else "Rest als Provision des Portals buchen.") \
-                .classes(f"text-xs {ton.STILL} flex-grow min-w-0")
+        ui.label("Was nicht ausgezahlt wurde, ist die Provision des Portals. "
+                 "Der Monatsbeleg von Booking bzw. Airbnb wird später dagegen "
+                 "gebucht.").classes(f"text-xs {ton.STILL} flex-grow min-w-0")
 
         def buchen():
             kategorie = kategorien[0] if kategorien else ""
@@ -274,9 +257,6 @@ def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
                 # das Konzept benennt. Der Auszahlungsbetrag steht daneben,
                 # damit man sieht, was davon ankommt.
                 brutto = round((k["rechnung"].get("summen") or {}).get("brutto", 0), 2)
-                if k["provision"]:
-                    ui.label(f"davon {_eur(k['erwartet'])} ausgezahlt") \
-                        .classes(f"text-xs {ton.STILL} shrink-0")
                 ui.label(_eur(brutto)).classes("text-sm w-24 text-right shrink-0")
 
                 def zuordnen(kk=k):

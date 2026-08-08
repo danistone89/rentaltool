@@ -143,11 +143,17 @@ Und die Beträge helfen auch nicht:
 
 ### Was stattdessen trägt
 
-**Smoobu liefert die Provision je Buchung.** Das Feld `commission-included`
-steht an jeder Booking-Buchung (z. B. 31,13 € bei 277,59 € Preis). Damit kennt
-das Werkzeug zu jeder Rechnung den **erwarteten Auszahlungsbetrag** — und das
-macht das Abhaken schnell und selbstprüfend: man wählt Rechnungen aus, der
-Restbetrag zählt herunter, und was übrig bleibt, ist die Provision.
+**Der Restbetrag trägt die Arbeit.** Man wählt Rechnungen aus – zugeordnet wird
+der **Rechnungsbetrag**, nicht die Auszahlung –, der Rest zählt herunter, und
+was übrig bleibt, ist die einbehaltene Provision.
+
+> **Korrektur vom 8.8.2026:** Eine frühere Fassung wollte den Rest gegen
+> `commission-included` aus Smoobu prüfen. Der Betreiber hat widersprochen: die
+> Zahl stimmt nicht verlässlich. **Maßgeblich sind die monatlichen Belege von
+> Booking und Airbnb**, die das Steuerbüro gegen die Auszahlungen bucht. Eine
+> Nachrechnung gegen eine unzuverlässige Zahl hätte Fehlalarme erzeugt – „es
+> fehlt eine Rechnung", wo nur die Schätzung daneben lag. Geprüft wird gegen
+> den Monatsbeleg (B5).
 
 Dazu kommen die **monatlichen Provisionsbelege** von Booking und Airbnb
 (bestätigt am 8.8.2026) sowie die monatliche Airbnb-Auszahlungsübersicht. Sie
