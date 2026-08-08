@@ -158,3 +158,69 @@ def test_konto_beleg_setzen_erzeugt_einen_posten():
     assert z.ist_fertig(b), "der volle Betrag ist zugeordnet"
     konto.beleg_setzen("bk", "")
     assert konto.belege_von(b) == [] and not z.ist_fertig(b)
+
+
+# ---------------------------------------------------- Die Maske (B2)
+from nicegui.testing import User        # noqa: E402
+from app import auth, data, mailer, web  # noqa: E402
+
+
+@pytest.fixture
+def app_bereit(monkeypatch):
+    monkeypatch.setattr(data, "get_apartments", lambda: [])
+    monkeypatch.setattr(data, "_reservations", lambda *a, **k: [])
+    monkeypatch.setattr(mailer, "send_notify", lambda *a, **k: None)
+    monkeypatch.setitem(web.USERS, "nutzer", {
+        "password_hash": auth.hash_password("geheim"), "role": "admin",
+        "totp_secret": "", "name": "nutzer"})
+    web._APARTMENTS.clear()
+
+
+async def _anmelden(user):
+    await user.open("/login")
+    user.find(marker="login-user").type("nutzer")
+    user.find(marker="login-pw").type("geheim")
+    user.find("Anmelden").click()
+    await user.open("/")
+
+
+async def test_die_maske_zeigt_posten_und_restbetrag(user: User, app_bereit):
+    """Der Restbetrag ist die Anleitung: er sagt, ob noch etwas fehlt – ohne
+    dass man wissen muss, wie viele Posten „richtig" sind."""
+    b = _bewegung(1794.13, bid="airbnb1")
+    z.hinzufuegen(b["id"], z.RECHNUNG, 620.00, "Einnahmen Airbnb", ziel_id="41")
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    await user.should_see(marker=f"bew-{b['id']}")
+    await user.should_see("Rest")          # zugeklappt schon sichtbar
+    await user.should_see("1.174,13 €")    # 1794,13 − 620,00
+
+
+async def test_eine_fertige_bewegung_zeigt_keinen_rest(user: User, app_bereit):
+    b = _bewegung(-95.0, bid="fertig1", gegenpartei="Rena")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -95.0, "Wäscherei (Rena)")
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    await user.should_see(marker=f"bew-{b['id']}")
+    await user.should_not_see("Rest −")
+
+
+async def test_die_maske_hat_kategorie_betrag_und_plus(user: User, app_bereit):
+    """Ein Posten entsteht mit drei Griffen; der Betrag ist mit dem Rest
+    vorbelegt, im häufigen Fall ist es ein Klick."""
+    b = _bewegung(-42.0, bid="maske1", gegenpartei="Netto")
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    user.find(marker=f"bew-{b['id']}").click()
+    await user.should_see(marker=f"zu-kat-{b['id']}")
+    await user.should_see(marker=f"zu-betrag-{b['id']}")
+    await user.should_see(marker=f"zu-plus-{b['id']}")
+
+
+async def test_eine_umbuchung_hat_nichts_zuzuordnen(user: User, app_bereit):
+    b = _bewegung(-3.41, bid="umb1", gegenpartei="Kreditkartenabrechnung",
+                  umbuchung=True)
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    user.find(marker=f"bew-{b['id']}").click()
+    await user.should_see("nichts zuzuordnen")

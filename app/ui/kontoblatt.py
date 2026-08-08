@@ -10,7 +10,7 @@ werden. Ohne die Zahl daneben sieht das nach einem Fehler aus.
 """
 from nicegui import ui
 
-from app import konto, kontoauszug
+from app import konto, kontoauszug, zuordnung
 from app.ui.basis import _read_upload, _d
 from app.ui import ton
 
@@ -109,6 +109,85 @@ def _beleg_knopf(bewegung, neu_zeichnen):
                                     neu_zeichnen())) \
             .props("flat dense round").classes("text-slate-300") \
             .tooltip("Zu dieser Buchung gibt es keinen Beleg")
+
+
+_ARTNAME = {zuordnung.RECHNUNG: "Ausgangsrechnung", zuordnung.BELEG: "Beleg",
+            zuordnung.KATEGORIE: "nur Kategorie"}
+
+
+def _zuordnungsmaske(bewegung, neu_zeichnen):
+    """Eine Bewegung aufteilen – der Bildschirm, an dem die Arbeit stattfindet.
+
+    **Der Restbetrag ist die Anleitung.** Er steht groß daneben und zählt mit
+    jedem Posten herunter. Ist er null, ist die Bewegung fertig; bleibt etwas
+    übrig, fehlt noch ein Posten – bei einer Portal-Auszahlung genau die
+    Provision. Niemand muss wissen, wie viele Posten „richtig" sind: die Zahl
+    sagt es.
+
+    Der Betrag eines neuen Postens ist mit dem **Rest** vorbelegt. Im häufigen
+    Fall – eine Zahlung, eine Kategorie – ist die Maske damit ein Klick.
+    """
+    from app import buchhaltung
+    from app.ui.basis import CFG
+
+    p = zuordnung.posten(bewegung["id"])
+    rest = zuordnung.rest(bewegung)
+
+    with ui.column().classes("w-full gap-1 pl-2 border-l-2 border-slate-100"):
+        for satz in p:
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.label(_ARTNAME.get(satz["art"], satz["art"])) \
+                    .classes("text-xs text-slate-400 w-32 shrink-0")
+                ui.label(satz.get("kategorie") or satz.get("ziel_id") or "—") \
+                    .classes("text-sm truncate flex-grow min-w-0")
+                ui.label(_eur(satz["betrag"])).classes("text-sm w-28 text-right shrink-0")
+                ui.button(icon="close",
+                          on_click=lambda s=satz: (zuordnung.entfernen(s["id"]),
+                                                   neu_zeichnen())) \
+                    .props("flat dense round").classes(f"{ton.ZART} shrink-0") \
+                    .tooltip("Posten lösen")
+
+        # ---- Neuer Posten: Kategorie und Betrag ------------------------------
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            kat = ui.select({"": "— Kategorie —",
+                             **{x: x for x in buchhaltung.kategorien(CFG)}},
+                            value=bewegung.get("kategorie") or "") \
+                .props("dense borderless options-dense").classes("flex-grow min-w-0") \
+                .mark(f"zu-kat-{bewegung['id']}")
+            betrag = ui.number(value=abs(rest) if abs(rest) > 0.005 else None,
+                               format="%.2f", step=0.01) \
+                .props("dense borderless").classes("w-24 shrink-0") \
+                .mark(f"zu-betrag-{bewegung['id']}")
+
+            def anlegen():
+                try:
+                    wert = float(betrag.value or 0)
+                except (TypeError, ValueError):
+                    wert = 0.0
+                # Das Vorzeichen kommt von der Bewegung, nicht vom Tippen: bei
+                # einer Ausgabe ist der Posten negativ. Wer es umdrehen will –
+                # die Provision einer Auszahlung –, gibt eine negative Zahl ein.
+                if wert > 0 and bewegung.get("betrag", 0) < 0:
+                    wert = -wert
+                satz, meldung = zuordnung.hinzufuegen(
+                    bewegung["id"], zuordnung.KATEGORIE, wert, kat.value or "")
+                ui.notify(meldung, type="positive" if satz else "warning")
+                if satz:
+                    neu_zeichnen()
+
+            ui.button(icon="add", on_click=anlegen).props("round dense unelevated") \
+                .tooltip("Posten hinzufügen").mark(f"zu-plus-{bewegung['id']}")
+
+        # ---- Der Restbetrag --------------------------------------------------
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            fertig = zuordnung.ist_fertig(bewegung)
+            ui.label("Rest").classes("text-xs text-slate-400 flex-grow")
+            ui.label(_eur(0 if fertig else rest)).classes(
+                "text-sm font-medium w-28 text-right "
+                + (ton.STILL if fertig else ton.AUF_HINWEIS)) \
+                .mark(f"zu-rest-{bewegung['id']}")
+            if bewegung.get("betrag", 0) < 0:
+                _beleg_knopf(bewegung, neu_zeichnen)
 
 
 def render_konto():
@@ -230,23 +309,44 @@ def render_konto():
             # ---- Die Bewegungen selbst --------------------------------------
             with ui.card().classes("w-full").mark("konto-liste"):
                 ui.label("Bewegungen").classes("font-medium")
+                # Jede Zeile lässt sich aufklappen. Zugeklappt sagt sie, ob die
+                # Bewegung fertig ist; aufgeklappt steht die Zuordnungsmaske
+                # darin. So bleibt die Liste lesbar und die Arbeit ist einen
+                # Klick entfernt – ohne Wechsel auf eine andere Seite.
                 for b in bewegungen[:200]:
-                    with ui.row().classes("w-full items-start gap-2 no-wrap py-1 "
-                                          "border-b border-slate-100"):
-                        ui.label(_d(b["datum"])).classes("text-xs text-slate-400 w-20 shrink-0")
-                        with ui.column().classes("gap-0 min-w-0 flex-grow"):
-                            ui.label(b.get("gegenpartei") or "—") \
-                                .classes("text-sm truncate")
-                            if b.get("text") and b["text"] != b.get("gegenpartei"):
-                                ui.label(b["text"]).classes("text-xs text-slate-400 truncate")
+                    fertig = zuordnung.ist_fertig(b)
+                    zeile = ui.expansion().classes("w-full").props("dense") \
+                        .mark(f"bew-{b['id']}")
+                    with zeile.add_slot("header"):
+                        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            ui.label(_d(b["datum"])) \
+                                .classes("text-xs text-slate-400 w-20 shrink-0")
+                            with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                                ui.label(b.get("gegenpartei") or "—") \
+                                    .classes("text-sm truncate")
+                                if b.get("text") and b["text"] != b.get("gegenpartei"):
+                                    ui.label(b["text"]) \
+                                        .classes("text-xs text-slate-400 truncate")
+                            if b.get("umbuchung"):
+                                ui.label("Umbuchung") \
+                                    .classes("text-xs text-slate-400 shrink-0")
+                            elif fertig:
+                                ui.icon("check_circle") \
+                                    .classes(f"text-base {ton.ERFOLG} shrink-0") \
+                                    .tooltip("vollständig zugeordnet")
+                            elif zuordnung.hat_posten(b["id"]):
+                                ui.label(f"Rest {_eur(zuordnung.rest(b))}") \
+                                    .classes("text-xs shrink-0 " + ton.AUF_HINWEIS)
+                            ui.label(_eur(b["betrag"])).classes(
+                                "text-sm text-right w-28 shrink-0 "
+                                + ("" if b["betrag"] > 0 else "text-slate-600"))
+                    with zeile:
                         if b.get("umbuchung"):
-                            ui.label("Umbuchung").classes("text-xs text-slate-400 shrink-0")
-                        elif b["betrag"] < 0:
-                            _kategorie_wahl(b)
-                            _beleg_knopf(b, zeichnen)
-                        ui.label(_eur(b["betrag"])).classes(
-                            "text-sm text-right w-28 shrink-0 "
-                            + ("" if b["betrag"] > 0 else "text-slate-600"))
+                            ui.label("Umbuchung zwischen eigenen Konten – hier "
+                                     "gibt es nichts zuzuordnen.") \
+                                .classes("text-xs text-slate-400")
+                        else:
+                            _zuordnungsmaske(b, zeichnen)
                 if len(bewegungen) > 200:
                     ui.label(f"… und {len(bewegungen) - 200} weitere") \
                         .classes("text-xs text-slate-400 mt-1")
