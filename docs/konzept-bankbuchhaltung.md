@@ -523,10 +523,61 @@ Zwei Proben dagegen:
 `auszuege`, Karte im Bereich Überblick, `tests/test_vollstaendigkeit.py`
 (32 Prüfungen)
 
-### B9 · Übergabe ans Steuerbüro
+### B9 · Übergabe ans Steuerbüro — ✅ erledigt (8.8.2026)
 
 Ablage in der Nextcloud nach Jahr und Monat, sprechende Dateinamen,
 Belegnummer auf Dokument **und** Buchung. *(war AP18)* · *Größe:* L
+
+**Am Bestand nachgesehen (8.8.2026):**
+
+| | |
+|---|---|
+| Belege | 30, alle als PDF |
+| davon mit **Belegnummer** | **0** — die gibt es noch gar nicht |
+| davon mit gepflegtem Belegdatum | 0 (alle über den Upload-Tag) |
+| Bewegungen / Posten | 238 / 53 |
+| `belege_ordner` (Nextcloud) | leer |
+
+**Der entscheidende Befund: das Kontenjournal kommt heute aus den Belegen**
+(`buchhaltung.journal_zeile`). Das war richtig, solange Belege die einzige
+Quelle waren. Seit B1 ist die Buchhaltung aber die **Bewegung mit ihren
+Posten** — ein Journal aus Belegen kennt die 45 Ausgaben ohne Beleg nicht, und
+es kennt keine Aufteilung. Es würde dem Steuerbüro ein unvollständiges Bild
+geben, das vollständig aussieht.
+
+* **B9a · Die Belegnummer.** Laufend je Jahr, auf dem Beleg gespeichert. Sie
+  steht dann im Dateinamen **und** in der Journalzeile — das ist die Klammer,
+  über die das Steuerbüro von der Buchung zum Papier findet. Einmal vergeben
+  ändert sie sich nie wieder.
+* **B9b · Das Journal aus den Bewegungen.** Eine Zeile je Posten (nicht je
+  Beleg), mit Datum, Konto, Gegenpartei, Verwendungszweck, Betrag, Klasse,
+  Kategorie, Belegnummer. Bewegungen ohne Posten kommen mit ihrer Kategorie,
+  Umbuchungen mit dem Vermerk „neutral". Was fehlt, steht als Fehlt-Vermerk
+  drin, statt zu fehlen.
+* **B9c · Das Übergabepaket.** Ordner je Jahr und Monat, sprechende
+  Dateinamen (`0007_2026-03-14_Rossmann_27,81.pdf`), das Journal als CSV, und
+  ein **Deckblatt mit dem Befund aus B8** — wie viele Bewegungen ohne
+  Kategorie, ohne Beleg, welcher Zeitraum, welche Konten. Ohne dieses Blatt
+  liest das Steuerbüro einen Zwischenstand als Abschluss.
+
+**Kein automatisches Hochladen in die Nextcloud.** Der Ordner wird gespiegelt
+(`belege_ordner`), das genügt; ein zweiter Weg dorthin wäre ein zweiter
+Mechanismus für dieselbe Frage. Das Paket entsteht als Datei, die der Betrieb
+ablegt oder weitergibt.
+
+**Beim ersten Paket aus den echten Daten fiel auf:** alle 30 Belege lagen im
+Ordner `2026/08` — dem Monat des Uploads —, weil **keiner** ein Belegdatum
+trug. Die Ablage nach Jahr und Monat wäre damit wertlos gewesen. Zwei
+Konsequenzen: `receipts.guess_datum` liest das Datum aus dem Belegtext
+(Rechnungsdatum vor erstem Fund, nichts aus der Zukunft — „buchen wir am
+07.05. ab" ist kein Belegdatum), und was danach noch keins hat, kommt in einen
+eigenen Ordner `_ohne Belegdatum` statt in den Upload-Monat. An den echten
+Belegen: 24 von 30 bekamen ein Datum, die Ablage reicht jetzt von 2025/11 bis
+2026/05.
+
+*Umgesetzt:* `app/uebergabe.py` (nummer_vergeben / journal / journal_csv /
+deckblatt / paket), `receipts.guess_datum`, Karte im Bereich Überblick,
+`tests/test_uebergabe.py` (24 Prüfungen)
 
 ### Reihenfolge
 

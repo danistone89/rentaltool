@@ -1065,7 +1065,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B6** | Kategorien an der Zuordnung | S | ✅ erledigt (8.8.2026) |
 | **B7** | Der Überblick | L | ✅ erledigt (8.8.2026) |
 | **B8** | Vollständigkeit | M | ✅ erledigt (8.8.2026) |
-| **B9** | Übergabe ans Steuerbüro | L | offen |
+| **B9** | Übergabe ans Steuerbüro | L | ✅ erledigt (8.8.2026) |
 
 Sie lösen AP20, AP23, AP25 und AP18 ab.
 

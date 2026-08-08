@@ -17,7 +17,7 @@ als eine, die man aus einem Balken schätzt.
 """
 from nicegui import ui
 
-from app import konto, ueberblick, vollstaendigkeit
+from app import konto, uebergabe, ueberblick, vollstaendigkeit
 from app.ui.basis import _d
 from app.ui import ton
 
@@ -57,6 +57,7 @@ def render_ueberblick():
                          "Auszug einlesen.").classes("text-sm text-slate-400")
                 return
             _vollstaendigkeit()
+            _uebergabe(zustand)
             _monatstabelle(monate)
             _kategorietabelle(zustand)
             _wohnungstabelle(zustand)
@@ -148,6 +149,47 @@ def _vollstaendigkeit():
         else:
             ui.label("Alle Bewegungen sind zugeordnet.") \
                 .classes(f"text-xs {ton.ERFOLG}")
+
+
+def _uebergabe(zustand):
+    """Alles fürs Steuerbüro in einer Datei (B9).
+
+    **Mit Deckblatt, das das Fehlende nennt.** Ein Stapel Belege plus Journal
+    sieht nach Abschluss aus; ohne den Hinweis, dass 45 Ausgaben noch keine
+    Kategorie tragen, arbeitet das Steuerbüro auf einem Zwischenstand weiter
+    und merkt es nicht.
+
+    Kein automatisches Hochladen in die Nextcloud: der Beleg-Ordner wird
+    ohnehin gespiegelt, ein zweiter Weg dorthin wäre ein zweiter Mechanismus
+    für dieselbe Frage.
+    """
+    with ui.card().classes("w-full").mark("ub-uebergabe"):
+        ui.label("Übergabe ans Steuerbüro").classes("font-medium")
+        ui.label("Eine Datei mit allen Belegen nach Jahr und Monat, dem "
+                 "Kontenjournal als CSV und einem Deckblatt, das auch nennt, "
+                 "was noch offen ist.").classes(f"text-xs {ton.STILL}")
+        zeilen = len(uebergabe.journal(zustand["von"], zustand["bis"]))
+        ohne_nummer = sum(1 for r in uebergabe.receipts.list_receipts(100000)
+                          if not (r.get("nummer") or "").strip())
+        ui.label(f"{zeilen} Journalzeilen"
+                 + (f" · {ohne_nummer} Belege bekommen dabei ihre Belegnummer"
+                    if ohne_nummer else "")).classes(f"text-xs {ton.STILL}")
+
+        def laden():
+            daten = uebergabe.paket(zustand["von"], zustand["bis"])
+            teil = f"_{zustand['von']}_{zustand['bis']}" if zustand["von"] else ""
+            ui.download(daten, f"Uebergabe{teil}.zip")
+            ui.notify("Paket erstellt ✓ – die Belegnummern sind vergeben.",
+                      type="positive")
+
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.button("Paket herunterladen", icon="download", on_click=laden) \
+                .props("unelevated no-caps").mark("uebergabe-laden")
+            ui.button("Nur das Journal (CSV)", icon="table_view",
+                      on_click=lambda: ui.download(
+                          uebergabe.journal_csv(zustand["von"], zustand["bis"]),
+                          "Kontenjournal.csv")) \
+                .props("flat no-caps").mark("uebergabe-csv")
 
 
 def _monatstabelle(monate):

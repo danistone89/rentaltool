@@ -199,8 +199,8 @@ def test_nachlesen_findet_die_falschen_angaben():
     aenderungen = receipts.nachlesen(eigene=[])
     assert len(aenderungen) == 1
     a = aenderungen[0]
-    assert a["alt"] == ("Netto", "34,80")
-    assert a["neu"] == ("Haufe Service Center GmbH", "41,41")
+    assert a["alt"][:2] == ("Netto", "34,80")
+    assert a["neu"][:2] == ("Haufe Service Center GmbH", "41,41")
 
 
 def test_was_schon_stimmt_taucht_nicht_auf():
@@ -341,3 +341,38 @@ def test_die_echte_dkb_abrechnung_liefert_keinen_haendler():
     assert receipts.guess_merchant(text, eigene=["Daniel Steinhauß"]) == ""
     # Der Betrag stimmt trotzdem – und er ist es, der die Zuordnung traegt.
     assert receipts.guess_amount(text + "185,68 -\nNeuer Saldo\n") == "185,68"
+
+
+# ------------------------------------------- Das Belegdatum (B9, 8.8.2026)
+# Ohne Belegdatum landet im Uebergabepaket JEDER Beleg im Monat des Uploads –
+# am Bestand lagen alle 30 unter „2026/08". Die Ordnerstruktur nach Jahr und
+# Monat waere damit wertlos.
+def test_das_rechnungsdatum_gewinnt():
+    text = "Rena Textilpflege GmbH\nRechnungsdatum 30.04.2026\nLeistung 01.04.2026\n"
+    assert receipts.guess_datum(text) == "2026-04-30"
+
+
+def test_ohne_schluesselwort_zaehlt_das_erste_datum():
+    text = "Beitragsnachweis\n23.04.2026 an die Knappschaft übermittelt\n"
+    assert receipts.guess_datum(text) == "2026-04-23"
+
+
+def test_die_englische_schreibweise_wird_gelesen():
+    """Booking schreibt „03/05/2026" – Tag zuerst, wie in Europa üblich."""
+    assert receipts.guess_datum("Invoice date 03/05/2026\n") == "2026-05-03"
+
+
+def test_ein_datum_in_der_zukunft_zaehlt_nicht():
+    """„Den Betrag buchen wir am 07.05.2026 ab" ist kein Belegdatum."""
+    from datetime import date
+    text = "Rechnungsdatum 27.04.2026\nbuchen wir am 07.05.2026 ab\n"
+    assert receipts.guess_datum(text, heute=date(2026, 4, 30)) == "2026-04-27"
+
+
+def test_ohne_datum_bleibt_es_leer():
+    assert receipts.guess_datum("Kein Datum weit und breit\n") == ""
+    assert receipts.guess_datum("") == ""
+
+
+def test_unsinnige_jahre_werden_verworfen():
+    assert receipts.guess_datum("Beleg 30.04.1999\n") == ""

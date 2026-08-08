@@ -88,8 +88,11 @@ def nachlesen(eigene=None, belege=None):
         alt_m, alt_a = r.get("merchant") or "", r.get("amount") or ""
         neu_m = alt_m if "merchant" in hand else (guess_merchant(text, eigene) or alt_m)
         neu_a = alt_a if "amount" in hand else (guess_amount(text) or alt_a)
-        if (neu_m, neu_a) != (alt_m, alt_a):
-            raus.append({"beleg": r, "alt": (alt_m, alt_a), "neu": (neu_m, neu_a)})
+        alt_d = (r.get("datum") or "").strip()
+        neu_d = alt_d if "datum" in hand else (guess_datum(text) or alt_d)
+        if (neu_m, neu_a, neu_d) != (alt_m, alt_a, alt_d):
+            raus.append({"beleg": r, "alt": (alt_m, alt_a, alt_d),
+                         "neu": (neu_m, neu_a, neu_d)})
     return raus
 
 
@@ -97,7 +100,9 @@ def uebernehmen(aenderungen):
     """Vorgeschlagene Aenderungen schreiben. Gibt die Anzahl zurueck."""
     n = 0
     for a in aenderungen:
-        update_receipt(a["beleg"]["id"], merchant=a["neu"][0], amount=a["neu"][1])
+        update_receipt(a["beleg"]["id"], merchant=a["neu"][0], amount=a["neu"][1],
+                       datum=a["neu"][2] if len(a["neu"]) > 2 else
+                       a["beleg"].get("datum", ""))
         n += 1
     return n
 
@@ -702,3 +707,52 @@ def eigene_namen(cfg):
         if isinstance(apt, dict) and apt.get("name"):
             teile.append(apt["name"])
     return [x.strip() for x in teile + [voll] if x and len(x.strip()) > 2]
+
+
+# Ein Datum in deutscher (30.04.2026) oder rutschender (03/05/2026) Schreibweise.
+_DATUM = re.compile(r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})")
+
+# Woran das Belegdatum benannt ist – von der staerksten Aussage abwaerts.
+_DATUMSWORT = ("rechnungsdatum", "belegdatum", "abrechnungsdatum", "datum", "vom")
+
+
+def guess_datum(text, heute=None):
+    """Das Datum, unter dem der Beleg gebucht gehoert.
+
+    **Warum es das braucht.** Ohne Belegdatum faellt die Ablage auf den
+    Upload-Tag zurueck – am Bestand vom 8.8.2026 lagen dadurch alle 30 Belege
+    im Ordner „2026/08". Eine Uebergabe nach Jahr und Monat waere wertlos.
+
+    Zuerst die Zeile mit einem Schluesselwort („Rechnungsdatum"), sonst das
+    erste Datum im Text. **Daten in der Zukunft zaehlen nicht**: „Den Betrag
+    buchen wir am 07.05.2026 ab" ist eine Ankuendigung, kein Belegdatum.
+    """
+    from datetime import date
+    if not text:
+        return ""
+    heute = heute or date.today()
+
+    def _lesen(treffer):
+        tag, monat, jahr = (int(x) for x in treffer)
+        jahr += 2000 if jahr < 100 else 0
+        try:
+            d = date(jahr, monat, tag)
+        except ValueError:
+            return None
+        # Vor 2015 und nach heute ist kein Beleg dieses Betriebs.
+        return d if 2015 <= d.year and d <= heute else None
+
+    zeilen = text.splitlines()
+    for wort in _DATUMSWORT:
+        for ln in zeilen:
+            if wort not in ln.lower():
+                continue
+            for treffer in _DATUM.findall(ln):
+                d = _lesen(treffer)
+                if d:
+                    return d.isoformat()
+    for treffer in _DATUM.findall(text):
+        d = _lesen(treffer)
+        if d:
+            return d.isoformat()
+    return ""

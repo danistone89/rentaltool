@@ -357,7 +357,22 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Kategorie auszuwählen — auch dieselbe — bestätigt sie, dann verschwindet das
   Zeichen. Eine Buchhaltung, in der man nicht sieht, was der Mensch entschieden
   hat und was das Werkzeug, kann man nicht verantworten.
-* **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
+* **B9 ist fertig (8.8.2026) — damit ist die Buchhaltungskette geschlossen.**
+  Im Überblick gibt es „Übergabe ans Steuerbüro": eine ZIP mit den Belegen nach
+  Jahr und Monat (`0007_2026-03-14_Rossmann_27,81.pdf`), dem Kontenjournal als
+  CSV und einem Deckblatt, das auch nennt, was offen ist.
+  **Das Journal kommt jetzt aus den Bewegungen, nicht aus den Belegen** — eine
+  Zeile je Posten. Das alte `buchhaltung.journal_zeile` kannte die 45 Ausgaben
+  ohne Beleg nicht und keine Aufteilung; es gab ein unvollständiges Bild, das
+  vollständig aussah. Was fehlt, steht als Vermerk in der Spalte „Hinweis".
+  **Belegnummern** werden beim Paketbau vergeben (laufend je Jahr, nach
+  Belegdatum) und stehen im Dateinamen wie im Journal.
+  **Beim ersten echten Paket aufgefallen:** alle 30 Belege lagen unter
+  `2026/08`, weil keiner ein Belegdatum trug. Jetzt liest `guess_datum` es aus
+  dem Text (24 von 30), der Rest kommt in `_ohne Belegdatum`.
+* **Alle Pakete B1–B9 sind erledigt.** Offen bleiben: der Echtbetrieb (35+
+  Commits auf dem Zweig, live läuft der Stand von gestern) und die offene Frage
+  zur E-Rechnung im Fahrplan. — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
@@ -367,6 +382,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1119 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1152 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

@@ -619,10 +619,10 @@ def _nachlese_knopf(rerender):
             with ui.scroll_area().classes("w-full h-[340px]"):
                 for a in aenderungen:
                     with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                        ui.label(f"{a['alt'][0] or '—'} · {a['alt'][1] or '—'}") \
+                        ui.label(" · ".join(x or "—" for x in a['alt'])) \
                             .classes(f"text-xs w-1/2 truncate {ton.STILL}")
                         ui.icon("arrow_forward").classes(f"text-xs {ton.ZART}")
-                        ui.label(f"{a['neu'][0] or '—'} · {a['neu'][1] or '—'}") \
+                        ui.label(" · ".join(x or "—" for x in a['neu'])) \
                             .classes("text-xs w-1/2 truncate")
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button(t("Abbrechen"), on_click=dlg.close).props("flat no-caps")
