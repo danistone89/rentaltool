@@ -20,34 +20,38 @@ def _eur(wert):
     return ("−" if wert < 0 else "") + s + " €"
 
 
-def _kategorie_wahl(bewegung):
-    """Die Kategorie einer Ausgabe wählen – und die Wahl merken.
+def _kategorie_wahl(bewegung, neu_zeichnen):
+    """Die Kategorie direkt in der Zeile – ein Klick für den einfachen Fall.
 
-    Das ist der Kern der Bedienung: einmal zuordnen, und derselbe Empfänger
-    wird beim nächsten Auszug von allein erkannt. Ohne das Lernen wäre jeder
-    Monat dieselbe Handarbeit – und genau davor soll das Werkzeug bewahren.
+    **Warum sie zurückkommt.** Bis Paket B2 stand sie hier; seither musste man
+    jede Bewegung erst aufklappen. Bei 17 Lohnzahlungen ist das der Unterschied
+    zwischen einem Nachmittag und einer Minute (so gemeldet am 8.8.2026).
+
+    Sie erscheint **nur bei Ausgaben ohne Posten**. Wo schon etwas hängt, gilt
+    die Maske: ein Klick kann eine Aufteilung nicht kennen. Und bei einem
+    Eingang entscheidet die zugeordnete Rechnung, was ein Erlös ist – nicht der
+    Name des Absenders.
     """
-    from app import buchhaltung, db, stammdaten
+    from app import buchhaltung
     from app.ui.basis import CFG
 
+    if (bewegung.get("umbuchung") or bewegung.get("betrag", 0) >= 0
+            or zuordnung.hat_posten(bewegung["id"])):
+        return
+
     def gesetzt(e):
-        kategorie = e.value or ""
-        klasse = buchhaltung.klasse_fuer(kategorie) if kategorie else ""
-        db.speichern(konto.TABELLE, bewegung["id"],
-                     dict(bewegung, kategorie=kategorie, klasse=klasse,
-                          herkunft="hand"))
-        k = stammdaten.kategorie_lernen(bewegung.get("gegenpartei"), kategorie)
-        hinweis = (f"Gemerkt: „{k['name']}“ ist ab jetzt {kategorie}." if k
-                   else "Kategorie gesetzt.")
-        ui.notify(hinweis, type="positive", timeout=2500)
+        if not e.value:
+            return
+        if konto.schnell_zuordnen(bewegung["id"], e.value):
+            ui.notify(f"Zugeordnet ✓ – „{bewegung.get('gegenpartei') or ''}“ ist ab "
+                      "jetzt gemerkt.", type="positive", timeout=2500)
+            neu_zeichnen()
 
     ui.select({"": "— zuordnen —",
                **{x: x for x in buchhaltung.kategorien(CFG)}},
-              value=bewegung.get("kategorie") or "", on_change=gesetzt) \
+              value="", on_change=gesetzt) \
         .props("dense borderless options-dense").classes(
-            "text-xs shrink-0 w-[190px] " +
-            (ton.AUF_HINWEIS if bewegung.get("klasse") in ("Privat/prüfen",
-                                                           "Ausgabe/prüfen") else "")) \
+            f"text-xs shrink-0 w-[190px] {ton.STILL}") \
         .mark(f"kat-{bewegung['id']}")
 
 
@@ -590,6 +594,59 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
             _beleg_knopf(bewegung, neu_zeichnen)
 
 
+def _gelerntes_knopf(neu_zeichnen):
+    """„Gelerntes anwenden" – die Erkennung auf vorhandene Bewegungen (8.8.2026).
+
+    **Warum es das braucht.** Die Erkennung lief nur beim Einlesen. Wer danach
+    einen Empfänger zuordnet, half damit erst dem nächsten Auszug – an den
+    echten Daten blieben nach der Zuordnung von „Valeriya Remez" fünf weitere
+    Zahlungen an dieselbe Person offen.
+
+    **Mit Vorschau.** Ein Knopf, der stillschweigend Dutzende Bewegungen
+    umschreibt, ist nicht nachvollziehbar.
+    """
+    vorschau = konto.vorschau_gelernt()
+    if not vorschau:
+        return
+
+    def anwenden(dlg):
+        n = konto.gelerntes_anwenden(vorschau)
+        dlg.close()
+        ui.notify(f"{n} Bewegungen zugeordnet ✓", type="positive")
+        neu_zeichnen()
+
+    def oeffnen():
+        with ui.dialog() as dlg, ui.card().classes("w-[640px] max-w-full gap-2"):
+            ui.label("Gelerntes anwenden").classes("font-medium")
+            ui.label("Diese Bewegungen gehören zu Empfängern, die schon einmal "
+                     "zugeordnet wurden. Was bereits eine Kategorie trägt, "
+                     "bleibt unangetastet.").classes(f"text-xs {ton.STILL}")
+            with ui.scroll_area().classes("w-full h-[340px]"):
+                for v in vorschau:
+                    b = v["bewegung"]
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.label(_d(b.get("datum"))) \
+                            .classes(f"text-xs w-20 shrink-0 {ton.STILL}")
+                        ui.label(b.get("gegenpartei") or "—") \
+                            .classes("text-xs flex-grow min-w-0 truncate")
+                        ui.label(_eur(b.get("betrag", 0))) \
+                            .classes("text-xs w-24 text-right shrink-0")
+                        ui.label(v["kategorie"]).classes("text-xs w-1/3 truncate")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Abbrechen", on_click=dlg.close).props("flat no-caps")
+                ui.button(f"{len(vorschau)} Bewegungen zuordnen",
+                          on_click=lambda: anwenden(dlg)) \
+                    .props("unelevated no-caps").mark("gelernt-ok")
+        dlg.open()
+
+    with ui.row().classes("w-full items-center gap-2"):
+        ui.icon("auto_awesome").classes(f"text-sm {ton.AUF_HINWEIS}")
+        ui.label(f"{len(vorschau)} Bewegungen gehören zu Empfängern, die Sie "
+                 "schon zugeordnet haben.").classes(f"text-xs {ton.AUF_HINWEIS}")
+        ui.button("Ansehen und übernehmen", on_click=oeffnen) \
+            .props("flat dense no-caps size=sm").mark("gelernt-open")
+
+
 def _monatsprobe(schluessel):
     """Je Monat: gebuchte Provision gegen den Monatsbeleg des Portals (B4b/B5b).
 
@@ -777,6 +834,7 @@ def render_konto():
             fehlen_ids = {x["id"] for x in konto.ohne_beleg()}
             offen_ids = {x["id"] for x in offen}
             with ui.card().classes("w-full").mark("konto-liste"):
+                _gelerntes_knopf(zeichnen)
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.label("Bewegungen").classes("font-medium")
                     ui.space()
@@ -815,6 +873,9 @@ def render_konto():
                                 if b.get("text") and b["text"] != b.get("gegenpartei"):
                                     ui.label(b["text"]) \
                                         .classes("text-xs text-slate-400 truncate")
+                            # Ein Klick statt Aufklappen – nur beim einfachen
+                            # Fall, siehe `_kategorie_wahl`.
+                            _kategorie_wahl(b, zeichnen)
                             if b.get("umbuchung"):
                                 ui.label("Umbuchung") \
                                     .classes("text-xs text-slate-400 shrink-0")

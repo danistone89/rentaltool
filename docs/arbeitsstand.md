@@ -254,6 +254,18 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Plattform automatisch.
   Zwei Altposten (790,27 € Provision, 400,07 € Rechnung) tragen noch keine
   Kategorie – im Konto stehen sie gelb markiert und lassen sich dort setzen.
+* **Nach B6 nachgezogen (8.8.2026)** — aus der Frage „wie tagge ich denn eine
+  Gehaltszahlung?" kamen drei Befunde:
+  1. Die **Kategorieauswahl in der Zeile** gab es bis B2, danach musste man
+     jede Bewegung aufklappen. Sie ist zurück – aber nur bei Ausgaben ohne
+     Posten, und sie legt jetzt einen **Posten** an statt nur ein Feld zu
+     setzen, damit „zugeordnet" nur eine Bedeutung hat.
+  2. Das **Gelernte wirkte nicht rückwirkend**: die Erkennung lief nur beim
+     Einlesen. Neuer Knopf „Gelerntes anwenden" mit Vorschau.
+  3. Die Arbeitsliste **„Nicht zugeordnet" wurde nie leer**: eine über die
+     Maske vollständig aufgeteilte Bewegung zählte weiter mit.
+  An den echten Daten durchgespielt: **zwei Zuordnungen von Hand → 24 weitere
+  Bewegungen** automatisch, Liste von 78 auf 52.
 * **Nächstes Paket: B7** — der Überblick: Einnahmen, Ausgaben, Ergebnis je
   Monat, Wohnung und Kategorie.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
@@ -263,6 +275,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 977 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 996 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

@@ -96,9 +96,85 @@ def ohne_zuordnung():
     Das ist die Arbeitsliste – und später das Maß dafür, ob die Übergabe ans
     Steuerbüro vollständig ist (AP25).
     """
-    return [b for b in alle()
-            if b.get("betrag", 0) < 0 and not b.get("umbuchung")
-            and not (b.get("kategorie") or "").strip()]
+    raus = []
+    for b in alle():
+        if b.get("betrag", 0) >= 0 or b.get("umbuchung"):
+            continue
+        if (b.get("kategorie") or "").strip():
+            continue
+        # Wer die Maske benutzt, legt Posten an und setzt das Feld nicht. Ohne
+        # diese Zeile wurde die Liste nie leer – an den echten Daten stand eine
+        # vollstaendig aufgeteilte Bewegung weiter darin (8.8.2026). Halb
+        # aufgeteilt zaehlt weiter mit: der Rest gehoert noch nirgends hin.
+        if zuordnung.hat_posten(b["id"]) and zuordnung.ist_fertig(b):
+            continue
+        raus.append(b)
+    return raus
+
+
+def schnell_zuordnen(bewegung_id, kategorie):
+    """Eine ganze Ausgabe mit einem Klick zuordnen – der einfache Fall.
+
+    **Warum es das wieder gibt.** Bis Paket B2 stand die Kategorieauswahl in
+    der Zeile; seither muss man jede Bewegung erst aufklappen. Bei 17
+    Lohnzahlungen ist das der Unterschied zwischen einem Nachmittag und einer
+    Minute (so gemeldet am 8.8.2026).
+
+    Angelegt wird ein **Posten** ueber den ganzen Betrag – nicht nur das Feld.
+    Sonst gaebe es zwei Vorstellungen davon, was „zugeordnet" heisst, und die
+    Auswertung liefe je nach Weg anders.
+
+    **Nur, solange nichts anderes dran haengt.** Wo schon Posten sind, gilt die
+    Maske: ein Klick kann eine Aufteilung nicht kennen.
+    """
+    from app import buchhaltung, stammdaten
+    kategorie = (kategorie or "").strip()
+    b = db.holen(TABELLE, bewegung_id)
+    if not kategorie or b is None or b.get("umbuchung"):
+        return None
+    if b.get("betrag", 0.0) >= 0 or zuordnung.hat_posten(bewegung_id):
+        return None
+    satz, _meldung = zuordnung.hinzufuegen(bewegung_id, zuordnung.KATEGORIE,
+                                           b.get("betrag", 0.0), kategorie)
+    if satz is None:
+        return None
+    db.speichern(TABELLE, bewegung_id,
+                 dict(b, kategorie=kategorie, klasse=buchhaltung.klasse_fuer(kategorie),
+                      herkunft="hand"))
+    # Der Kern der Bedienung: einmal zuordnen, danach von allein erkannt.
+    stammdaten.kategorie_lernen(b.get("gegenpartei"), kategorie)
+    return db.holen(TABELLE, bewegung_id)
+
+
+def vorschau_gelernt():
+    """Welche vorhandenen Bewegungen wuerde die Erkennung jetzt treffen?
+
+    **Das Gelernte wirkte bisher nicht rueckwirkend.** `zuordnen` laeuft nur
+    beim Einlesen; wer danach einen Empfaenger zuordnet, hilft damit erst dem
+    naechsten Auszug. An den echten Daten blieben so nach der Zuordnung von
+    „Valeriya Remez" fuenf weitere Zahlungen an dieselbe Person offen.
+
+    Gibt Vorschlaege zurueck, **ohne zu schreiben** – ein Lauf, der
+    stillschweigend Dutzende Bewegungen umschreibt, waere nicht
+    nachvollziehbar.
+    """
+    raus = []
+    for b in ohne_zuordnung():
+        kategorie, klasse, art = erkennen(b)
+        if not kategorie:
+            continue
+        raus.append({"bewegung": b, "kategorie": kategorie, "klasse": klasse,
+                     "herkunft": art})
+    return raus
+
+
+def gelerntes_anwenden(vorschau):
+    """Die Vorschlaege aus `vorschau_gelernt` schreiben. Gibt die Anzahl zurueck."""
+    n = 0
+    for v in vorschau:
+        if schnell_zuordnen(v["bewegung"]["id"], v["kategorie"]):
+            n += 1
+    return n
 
 
 # ----------------------------------------------------------- Beleg zur Buchung

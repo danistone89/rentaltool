@@ -1,0 +1,200 @@
+"""Ein Klick je Zeile – und das Gelernte auch rückwirkend anwenden.
+
+Gemeldet am 8.8.2026: „wie tagge ich denn eine Gehaltszahlung unter konto?"
+Dahinter steckten drei Dinge, die am Bestand nachweisbar sind:
+
+* Die **Kategorieauswahl in der Zeile** gab es bis Paket B2; seither muss man
+  jede Bewegung erst aufklappen.
+* Das **Gelernte wirkte nicht rückwirkend**: nach der Zuordnung von „Valeriya
+  Remez" blieben 5 weitere Zahlungen an dieselbe Person ohne Kategorie, weil
+  die Erkennung nur beim Einlesen läuft.
+* Die Arbeitsliste **„Nicht zugeordnet" wurde nie leer**: eine über die Maske
+  vollständig aufgeteilte Bewegung zählte weiter mit, weil sie am Feld
+  `kategorie` hängt und die Maske nur Posten anlegt. An den echten Daten war
+  genau eine Bewegung betroffen (Gabriel, −280,50 €, `ist_fertig` = True).
+"""
+from app import konto, stammdaten, zuordnung as z
+
+
+def _bewegung(betrag, gegenpartei, bid, datum="2026-06-12", text="", kategorie=""):
+    from app import db
+    satz = {"id": bid, "datum": datum, "betrag": betrag, "gegenpartei": gegenpartei,
+            "text": text, "konto": "giro", "umbuchung": False, "kategorie": kategorie}
+    db.anlegen(konto.TABELLE, satz)
+    return satz
+
+
+# --------------------------------------------- Die Arbeitsliste wird leer
+def test_eine_aufgeteilte_bewegung_gilt_als_zugeordnet():
+    """Sonst bleibt der Zähler stehen, egal wie viel man arbeitet."""
+    b = _bewegung(-280.50, "Gabriel", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -280.50, "Löhne/Gehälter Minijob")
+    assert konto.ohne_zuordnung() == []
+
+
+def test_eine_halb_aufgeteilte_bewegung_bleibt_in_der_liste():
+    """Halb erledigt ist nicht erledigt – sonst fiele der Rest unter den Tisch."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    assert [x["id"] for x in konto.ohne_zuordnung()] == ["w1"]
+
+
+def test_ohne_alles_bleibt_die_bewegung_offen():
+    _bewegung(-100.0, "Baumarkt", "w1")
+    assert [x["id"] for x in konto.ohne_zuordnung()] == ["w1"]
+
+
+def test_das_kategoriefeld_allein_genuegt_weiterhin():
+    """Bewegungen aus der Erkennung tragen nur das Feld – sie sind erledigt."""
+    _bewegung(-100.0, "Rena", "w1", kategorie="Wäscherei (Rena)")
+    assert konto.ohne_zuordnung() == []
+
+
+# ------------------------------------------------- Ein Klick in der Zeile
+def test_ein_klick_ordnet_die_ganze_bewegung_zu():
+    b = _bewegung(-280.50, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    p = z.posten("w1")
+    assert len(p) == 1 and p[0]["betrag"] == -280.50
+    assert p[0]["kategorie"] == "Löhne/Gehälter Minijob"
+    assert z.ist_fertig(konto.holen("w1"))
+
+
+def test_der_klick_setzt_auch_das_feld_und_die_klasse():
+    """Das Feld traegt die Erkennung und den Rueckfall der Auswertung."""
+    _bewegung(-280.50, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    b = konto.holen("w1")
+    assert b["kategorie"] == "Löhne/Gehälter Minijob"
+    assert b["klasse"] == "Ausgabe" and b["herkunft"] == "hand"
+
+
+def test_der_klick_merkt_sich_den_empfaenger():
+    """Der Kern der Bedienung: einmal zuordnen, danach von allein erkannt."""
+    _bewegung(-280.50, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    k = stammdaten.kreditor_zu("Valeriya Remez")
+    assert k and k.get("kategorie") == "Löhne/Gehälter Minijob"
+
+
+def test_ohne_kategorie_passiert_nichts():
+    _bewegung(-280.50, "Valeriya Remez", "w1")
+    assert konto.schnell_zuordnen("w1", "") is None
+    assert z.posten("w1") == []
+
+
+def test_wo_schon_posten_haengen_wird_nichts_ueberschrieben():
+    """Dort gilt die Maske – ein Klick koennte eine Aufteilung nicht kennen."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    assert konto.schnell_zuordnen("w1", "Ausstattung/GWG (JYSK)") is None
+    assert len(z.posten("w1")) == 1
+
+
+def test_eine_umbuchung_wird_nicht_zugeordnet():
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "u1", "datum": "2026-06-12", "betrag": -500.0,
+                               "gegenpartei": "Kreditkartenabrechnung", "text": "",
+                               "konto": "giro", "umbuchung": True, "kategorie": ""})
+    assert konto.schnell_zuordnen("u1", "Wäscherei (Rena)") is None
+
+
+# --------------------------------------- Gelerntes rueckwirkend anwenden
+def test_die_vorschau_findet_die_gelernten_empfaenger():
+    """Nach EINER Zuordnung sollen die uebrigen Zahlungen derselben Person
+    gefunden werden – an den echten Daten waren das 5 weitere."""
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _bewegung(-318.12, "Valeriya Remez", "w3", datum="2026-04-08")
+    v = konto.vorschau_gelernt()
+    assert sorted(x["bewegung"]["id"] for x in v) == ["w2", "w3"]
+    assert v[0]["kategorie"] == "Löhne/Gehälter Minijob"
+
+
+def test_was_schon_eine_kategorie_hat_bleibt_unberuehrt():
+    """Sonst naehme ein spaeterer Lauf eine Handkorrektur wieder zurueck."""
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05",
+              kategorie="Ausstattung/GWG (JYSK)")
+    assert [x["bewegung"]["id"] for x in konto.vorschau_gelernt()] == []
+
+
+def test_ohne_gelernten_empfaenger_wird_nichts_vorgeschlagen():
+    _bewegung(-176.17, "Gabriel Chukwuneke", "w1")
+    assert konto.vorschau_gelernt() == []
+
+
+def test_anwenden_schreibt_und_legt_posten_an():
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    n = konto.gelerntes_anwenden(konto.vorschau_gelernt())
+    assert n == 1
+    assert konto.holen("w2")["kategorie"] == "Löhne/Gehälter Minijob"
+    assert z.ist_fertig(konto.holen("w2"))
+    # Zweiter Lauf findet nichts mehr.
+    assert konto.vorschau_gelernt() == []
+
+
+def test_eingaenge_bekommen_keine_kategorie_verpasst():
+    """Was ein Erloes ist, entscheidet die Zuordnung zu einer Rechnung – nicht
+    der Name des Absenders."""
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _bewegung(1200.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    assert [x["bewegung"]["id"] for x in konto.vorschau_gelernt()] == []
+
+
+# ------------------------------------------------------------- Die Anzeige
+def _in_client(bauen):
+    from nicegui import ui
+    from nicegui.client import Client
+    with Client(lambda: None):
+        with ui.card():
+            bauen()
+
+
+def test_die_auswahl_erscheint_an_einer_offenen_ausgabe():
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    b = _bewegung(-280.50, "Valeriya Remez", "w1")
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._kategorie_wahl(b, lambda: None)
+    # Nicht bloss „ist durchgelaufen": es muss wirklich ein Feld dastehen.
+    assert len(karte.default_slot.children) == 1
+
+
+def test_die_auswahl_fehlt_wo_schon_posten_haengen():
+    """Dort gilt die Maske – ein Klick koennte eine Aufteilung nicht kennen."""
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._kategorie_wahl(b, lambda: None)
+    assert not karte.default_slot.children
+
+
+def test_der_gelernt_knopf_laesst_sich_zeichnen():
+    from app.ui import kontoblatt
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _in_client(lambda: kontoblatt._gelerntes_knopf(lambda: None))
+
+
+def test_ohne_vorschlaege_erscheint_der_knopf_nicht():
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    _bewegung(-176.17, "Unbekannt", "w1")
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._gelerntes_knopf(lambda: None)
+    assert not karte.default_slot.children
