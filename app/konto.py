@@ -418,6 +418,12 @@ def importieren(rohdaten, heute=None):
     niemand rätselt, warum aus 169 Zeilen 12 neue Sätze wurden.
     """
     konto, art, gelesen = kontoauszug.lesen(rohdaten, heute=heute)
+    # Die Kopfzeilen (Zeitraum, Kontostand) tragen die einzige Angabe, mit der
+    # sich spaeter Vollstaendigkeit pruefen laesst – bisher wurden sie
+    # uebersprungen (B8).
+    from app import vollstaendigkeit
+    kopf = kontoauszug.kopfdaten(kontoauszug._zeilen(rohdaten), art)
+    vollstaendigkeit.merken(konto, kopf)
     neu = doppelt = 0
     with db.transaktion():
         for b in gelesen:
@@ -436,7 +442,9 @@ def importieren(rohdaten, heute=None):
                 doppelt += 1
     bericht = kontoauszug.zusammenfassung(gelesen)
     bericht.update({"konto": konto, "art": art, "neu": neu, "doppelt": doppelt,
-                    "erkannt": zuordnen()})
+                    "erkannt": zuordnen(), "zeitraum": (kopf.get("von", ""),
+                                                        kopf.get("bis", "")),
+                    "stand": kopf.get("stand")})
     return bericht
 
 

@@ -1064,7 +1064,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B5** | Eingangsbelege – beide Wege zusammenführen | L | ✅ erledigt (8.8.2026) |
 | **B6** | Kategorien an der Zuordnung | S | ✅ erledigt (8.8.2026) |
 | **B7** | Der Überblick | L | ✅ erledigt (8.8.2026) |
-| **B8** | Vollständigkeit | M | offen |
+| **B8** | Vollständigkeit | M | ✅ erledigt (8.8.2026) |
 | **B9** | Übergabe ans Steuerbüro | L | offen |
 
 Sie lösen AP20, AP23, AP25 und AP18 ab.

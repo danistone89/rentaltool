@@ -150,6 +150,36 @@ def kontoname(zeilen, art):
     return f"VISA {ziffern[-1]}" if ziffern else (erste[1] if len(erste) > 1 else art)
 
 
+def kopfdaten(zeilen, art):
+    """Zeitraum, Stichtag und Kontostand aus dem Vorspann des Auszugs (B8).
+
+    Sie stehen dort seit jeher und wurden bisher übersprungen – ohne sie lässt
+    sich **Vollständigkeit gar nicht behaupten**. Erst der Vergleich zweier
+    Kontostände sagt, ob zwischen zwei Auszügen Bewegungen fehlen.
+
+    Gibt `{"von", "bis", "stand"}` zurück; `stand` ist None, wenn der Vorspann
+    fehlt. Nichts zu behaupten ist besser, als eine Null zu erfinden – die
+    sähe aus wie ein leergeräumtes Konto.
+    """
+    von = bis = ""
+    stand = None
+    for zeile in zeilen[:15]:
+        felder = [_text(z) for z in zeile]
+        kopf = (felder[0] if felder else "").lower()
+        wert = felder[1] if len(felder) > 1 else ""
+        if kopf.startswith("zeitraum"):
+            teile = re.findall(r"(\d{2}\.\d{2}\.\d{2,4})", wert)
+            if len(teile) == 2:
+                von, bis = datum(teile[0]), datum(teile[1])
+        elif kopf.startswith(("kontostand", "saldo")):
+            # „Kontostand vom 24.07.2026:" traegt den Stichtag im Schluesselwort.
+            tag = re.findall(r"(\d{2}\.\d{2}\.\d{2,4})", felder[0])
+            if tag:
+                bis = bis or datum(tag[0])
+            stand = betrag(wert)
+    return {"von": von, "bis": bis, "stand": stand}
+
+
 def lesen(rohdaten, heute=None):
     """Einen Auszug einlesen: (konto, art, [bewegungen]).
 

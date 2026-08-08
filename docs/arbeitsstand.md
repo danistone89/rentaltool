@@ -283,8 +283,20 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   deshalb blass, mit der offenen Summe daneben.
   **„Je Wohnung" trägt heute fast nichts:** 1 von 27 Posten, kein einziger
   Beleg hat eine Wohnung. Die Abdeckung steht über der Tabelle.
-* **Nächstes Paket: B8** — Vollständigkeit: Saldo gegen den Kontoauszug,
-  lückenlose Zeiträume, Restbeträge ≠ 0.
+* **B8 ist fertig (8.8.2026):** die Kopfzeilen des DKB-Auszugs (Zeitraum,
+  Kontostand) werden jetzt mitgeschrieben — vorher wurden sie übersprungen,
+  und ohne sie ließ sich Vollständigkeit gar nicht behaupten. Daraus drei
+  Prüfungen, oben im Überblick vor den Zahlen: **Saldosprung** (Differenz
+  zweier Kontostände gegen die Summe der Bewegungen dazwischen, möglich ab dem
+  zweiten Auszug eines Kontos), **Zeitraumlücke**, und die **offenen Arbeiten**
+  an einer Stelle. Kein Ampel-Urteil.
+  **Für den vorhandenen Bestand greift die Saldoprobe noch nicht** — die 193
+  Bewegungen kamen vor B8 herein. Die Anzeige sagt das ausdrücklich.
+  Offene Arbeiten am Probe-Bestand: 62 Ausgaben ohne Kategorie, 46 ohne Beleg,
+  1 Posten ohne Kategorie.
+* **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
+  nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
+  Buchung.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
@@ -292,6 +304,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1036 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1063 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

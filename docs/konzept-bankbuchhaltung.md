@@ -444,11 +444,55 @@ blass, und unter der Tabelle steht, wie viel fehlt.
 `app/ui/ueberblick.py` als eigener Bereich, `tests/test_ueberblick.py`
 (23 Prüfungen)
 
-### B8 · Vollständigkeit
+### B8 · Vollständigkeit — ✅ erledigt (8.8.2026)
 
 Saldo-Abgleich gegen den Kontoauszug, lückenlose Zeiträume, Liste der
 Bewegungen mit Restbetrag ≠ 0 und der fehlenden Belege. *(war AP25)*
 · *Größe:* M
+
+**Warum das der wichtigste Prüfstein ist.** B7 zeigt Zahlen. Ob sie etwas
+wert sind, hängt daran, ob *alle* Bewegungen da sind — und das sieht man ihnen
+nicht an. Ein fehlender Auszugsmonat macht keinen Fehler, er macht ein
+falsches, plausibel aussehendes Ergebnis.
+
+**Am Bestand nachgesehen (8.8.2026):** die Kopfzeilen des DKB-Auszugs tragen
+alles, was dafür nötig ist —
+
+```
+"DKB-Business";"DE62..."
+"Zeitraum:";"01.01.2026 - 24.07.2026"
+"Kontostand vom 24.07.2026:";"5.765,34 €"
+```
+
+— sie werden beim Einlesen bisher aber **übersprungen**. Ohne sie lässt sich
+Vollständigkeit gar nicht behaupten.
+
+* **B8a · Kopfdaten mitschreiben.** Je Import ein Satz: Konto, Zeitraum,
+  Stichtag, Kontostand. Der Saldo-Abgleich funktioniert dann **ab dem zweiten
+  Auszug** eines Kontos: die Differenz zweier Kontostände muss der Summe der
+  Bewegungen dazwischen entsprechen. Stimmt sie nicht, fehlen Bewegungen —
+  ohne dass man wüsste welche, aber man weiß *dass*.
+* **B8b · Lücken im Zeitraum.** Decken die eingelesenen Auszüge einen
+  durchgehenden Zeitraum ab, oder fehlt ein Monat?
+* **B8c · Die offenen Arbeiten an einer Stelle.** Restbeträge ≠ 0, Ausgaben
+  ohne Kategorie, fehlende Belege, Posten ohne Kategorie — die Listen gibt es
+  verstreut; hier stehen sie zusammen mit einer Zahl davor.
+
+**Bewusst kein Ampel-Gesamturteil.** „Alles in Ordnung" wäre eine Behauptung
+über Daten, die das Werkzeug nicht kennen kann — etwa ein Konto, von dem noch
+nie ein Auszug kam. Gezeigt wird, was geprüft wurde und was dabei herauskam.
+
+**Der Befund steht ganz oben im Überblick, vor den Zahlen.** Wer die Zahlen
+erst liest und die Einschränkung danach, hat sie schon geglaubt.
+
+**Für den vorhandenen Bestand gilt er noch nicht:** die 193 Bewegungen wurden
+vor B8 eingelesen, Kopfdaten gibt es dafür keine. Die Anzeige sagt das
+ausdrücklich, statt „keine Saldosprünge" zu melden — was wie „geprüft und in
+Ordnung" aussähe. Ab dem nächsten Import greift die Probe.
+
+*Umgesetzt:* `kontoauszug.kopfdaten`, `app/vollstaendigkeit.py`, Tabelle
+`auszuege`, Karte im Bereich Überblick, `tests/test_vollstaendigkeit.py`
+(24 Prüfungen)
 
 ### B9 · Übergabe ans Steuerbüro
 

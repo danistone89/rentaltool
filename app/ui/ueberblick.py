@@ -17,7 +17,7 @@ als eine, die man aus einem Balken schätzt.
 """
 from nicegui import ui
 
-from app import konto, ueberblick
+from app import konto, ueberblick, vollstaendigkeit
 from app.ui.basis import _d
 from app.ui import ton
 
@@ -56,6 +56,7 @@ def render_ueberblick():
                 ui.label("Noch keine Bewegungen – erst im Bereich Konto einen "
                          "Auszug einlesen.").classes("text-sm text-slate-400")
                 return
+            _vollstaendigkeit()
             _monatstabelle(monate)
             _kategorietabelle(zustand)
             _wohnungstabelle(zustand)
@@ -69,6 +70,65 @@ def render_ueberblick():
         bis.on("change", lambda e: (zustand.update(bis=bis.value or ""), zeichnen()))
         ui.label("Leer lassen = alles.").classes(f"text-xs {ton.STILL}")
     zeichnen()
+
+
+def _vollstaendigkeit():
+    """Steht der Überblick überhaupt auf vollständigen Daten? (B8)
+
+    **Ganz oben, vor den Zahlen.** Ein fehlender Auszugsmonat macht keinen
+    Fehler, er macht ein falsches, plausibel aussehendes Ergebnis. Wer die
+    Zahlen erst liest und die Einschränkung danach, hat sie schon geglaubt.
+
+    **Kein Ampel-Urteil.** „Alles in Ordnung" wäre eine Behauptung über Daten,
+    die das Werkzeug nicht kennen kann – etwa ein Konto, von dem noch nie ein
+    Auszug kam.
+    """
+    b = vollstaendigkeit.befund()
+    with ui.card().classes("w-full").mark("ub-vollstaendigkeit"):
+        ui.label("Steht das auf vollständigen Daten?").classes("font-medium")
+        if not b["auszuege"]:
+            ui.label("Zu den eingelesenen Bewegungen liegen keine Kopfdaten vor "
+                     "(Zeitraum und Kontostand). Sie entstehen ab dem nächsten "
+                     "Import – bis dahin lässt sich Vollständigkeit nicht "
+                     "prüfen.").classes(f"text-xs {ton.AUF_HINWEIS}")
+        else:
+            ui.label(f"{b['auszuege']} Auszüge erfasst · "
+                     + ", ".join(b["konten"])).classes(f"text-xs {ton.STILL}")
+            if not b["saldo_pruefbar"]:
+                ui.label("Der Saldo lässt sich erst ab dem zweiten Auszug eines "
+                         "Kontos prüfen – vorher fehlt der Anfangswert.") \
+                    .classes(f"text-xs {ton.AUF_HINWEIS}")
+            elif not b["saldospruenge"]:
+                ui.label("Kontostände und Bewegungen gehen auf.") \
+                    .classes(f"text-xs {ton.ERFOLG}")
+        for s in b["saldospruenge"]:
+            ui.label(f"{s['konto']}: zwischen {_d(s['von'])} und {_d(s['bis'])} "
+                     f"fehlen {_eur(abs(s['differenz']))}. Erwartet "
+                     f"{_eur(s['erwartet'])}, im Auszug steht "
+                     f"{_eur(s['gemeldet'])}.") \
+                .classes(f"text-xs {ton.AUF_HINWEIS}").mark("ub-saldosprung")
+        for l in b["luecken"]:
+            ui.label(f"{l['konto']}: für {_d(l['von'])} bis {_d(l['bis'])} liegt "
+                     "kein Auszug vor.").classes(f"text-xs {ton.AUF_HINWEIS}") \
+                .mark("ub-luecke")
+
+        o = b["offene_arbeiten"]
+        posten = [("Bewegungen mit offenem Rest", o["rest"]),
+                  ("Ausgaben ohne Kategorie", o["ohne_kategorie"]),
+                  ("Buchungen ohne Beleg", o["ohne_beleg"]),
+                  ("Posten ohne Kategorie", o["posten_ohne_kategorie"])]
+        if any(n for _name, n in posten):
+            ui.label("Noch zu tun – im Bereich Konto:") \
+                .classes(f"text-xs mt-1 {ton.STILL}")
+            with ui.element("div").classes("w-full grid grid-cols-[auto_1fr] gap-x-3"):
+                for name, n in posten:
+                    if not n:
+                        continue
+                    ui.label(str(n)).classes("text-sm font-medium text-right")
+                    ui.label(name).classes("text-sm")
+        else:
+            ui.label("Alle Bewegungen sind zugeordnet.") \
+                .classes(f"text-xs {ton.ERFOLG}")
 
 
 def _monatstabelle(monate):

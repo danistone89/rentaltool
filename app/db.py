@@ -70,6 +70,10 @@ TABELLEN = {
     # deckt mehrere Rechnungen ab und trägt den Provisionsbeleg dagegen.
     "zuordnungen": {"bewegung": "$.bewegung_id", "zart": "$.art",
                     "ziel": "$.ziel_id"},
+    # Kopfdaten der eingelesenen Auszuege (B8). Ohne sie laesst sich
+    # Vollstaendigkeit nicht behaupten: erst der Vergleich zweier Kontostaende
+    # sagt, ob dazwischen Bewegungen fehlen.
+    "auszuege": {"akonto": "$.konto", "abis": "$.bis"},
 }
 
 _lokal = threading.local()
