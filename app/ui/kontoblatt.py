@@ -98,21 +98,45 @@ def _beleg_waehlen(bewegung, neu_zeichnen):
                 .mark(f"bw-add-{r['id']}")
 
     def oeffnen():
-        with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+        with ui.dialog() as dlg, ui.card().classes("w-[560px] max-w-full gap-2"):
             ui.label("Vorhandenen Beleg zuordnen").classes("font-medium")
-            if frei:
-                ui.label(f"Noch keiner Bewegung zugeordnet ({len(frei)}) – "
-                         "wahrscheinlichster zuerst").classes(f"text-xs {ton.STILL}")
-                for k in frei[:20]:
-                    zeile(k["beleg"], k["grund"], dlg)
-            if offen:
-                ui.separator()
-                ui.label("Noch nicht ganz verteilt – etwa der Monatsbeleg eines "
-                         "Portals").classes(f"text-xs {ton.STILL}")
-                for r in offen[:20]:
-                    verteilt, soll, _ = bz.belegprobe(r)
-                    zeile(r, f"davon {_eur(verteilt)} verteilt, "
-                             f"{_eur(round((soll or 0) - verteilt, 2))} offen", dlg)
+            # Kein Deckel bei 20: wer weiss, welchen Beleg er sucht, muss ihn
+            # finden koennen, auch wenn er nicht zufaellig oben steht.
+            liste = ui.column().classes("w-full gap-1")
+
+            def zeichnen(suche=""):
+                f_frei = bz.filtern(frei, suche, "beleg")
+                f_offen = bz.filtern(offen, suche, "beleg")
+                liste.clear()
+                with liste:
+                    if not f_frei and not f_offen:
+                        ui.label("Nichts gefunden – Suchbegriff ändern.") \
+                            .classes(f"text-xs {ton.AUF_HINWEIS}")
+                    with ui.scroll_area().classes("w-full h-[320px]"):
+                        if f_frei:
+                            ui.label(f"Noch keiner Bewegung zugeordnet "
+                                     f"({len(f_frei)} von {len(frei)}) – "
+                                     "wahrscheinlichster zuerst") \
+                                .classes(f"text-xs {ton.STILL}")
+                            for k in f_frei:
+                                zeile(k["beleg"], k["grund"], dlg)
+                        if f_offen:
+                            ui.separator()
+                            ui.label("Noch nicht ganz verteilt – etwa der "
+                                     "Monatsbeleg eines Portals") \
+                                .classes(f"text-xs {ton.STILL}")
+                            for r in f_offen:
+                                verteilt, soll, _ = bz.belegprobe(r)
+                                zeile(r, f"davon {_eur(verteilt)} verteilt, "
+                                         f"{_eur(round((soll or 0) - verteilt, 2))} offen",
+                                      dlg)
+
+            if len(frei) + len(offen) > 8:
+                ui.input(placeholder="Suchen: Händler, Datum, Betrag",
+                         on_change=lambda e: zeichnen(e.value)) \
+                    .props("dense outlined clearable").classes("w-full") \
+                    .mark(f"bw-suche-{bewegung['id']}")
+            zeichnen()
             ui.button("Schließen", on_click=dlg.close).props("flat no-caps dense")
         dlg.open()
 

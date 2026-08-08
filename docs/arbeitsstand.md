@@ -228,7 +228,8 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   bestehende Fehler behoben: ein Beleg löschte die Aufteilung einer Zahlung,
   und an einer Portal-Auszahlung buchte er den Umsatz statt der Provision (der
   zweite fiel erst an den echten Daten auf). Die Monatsprobe aus B4b ist damit
-  anzeigbar.
+  anzeigbar. Nach der ersten Benutzung nachgebessert: Mehrfach-Upload (bis 30
+  Dateien) und Suche statt Deckel in beiden Zuordnungsmasken.
 * **Nächstes Paket: B6** — Kategorien an der Zuordnung statt an der Bewegung.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
@@ -237,6 +238,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 912 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 923 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

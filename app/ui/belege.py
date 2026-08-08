@@ -384,25 +384,55 @@ def render_belege():
                     .classes("min-w-[220px]")
                 apt_sel.on_value_change(lambda e: sc.update(apt=e.value))
 
-                async def handle(e):
-                    try:
-                        content, name = await _read_upload(e)
-                    except Exception as ex:
-                        ui.notify(t("Upload fehlgeschlagen: {fehler}", fehler=ex), type="negative"); return
-                    ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
-                    ui.notify(t("Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …"), type="info", timeout=4000)
+                async def _einen(datei, nr, gesamt):
+                    """Eine Datei verarbeiten. Gibt (doc, fehler) zurueck.
+
+                    Zuschnitt, PDF und OCR dauern je Beleg mehrere Sekunden.
+                    Bei einem Stapel ist deshalb wichtig, dass der Zaehler
+                    mitlaeuft – sonst sieht es aus, als haenge die Seite.
+                    """
                     from nicegui import run
-                    doc = await run.io_bound(_process_and_add, content, ext, True)
-                    ui.notify(t("Beleg erfasst ✓") + (t(" (als PDF)") if doc.get("pdf") else ""),
-                              type="positive")
+                    try:
+                        content = await datei.read()
+                        name = getattr(datei, "name", None) or "foto.jpg"
+                    except Exception as ex:
+                        return None, str(ex)
+                    ext = (name.rsplit(".", 1)[-1] if "." in name else "jpg").lower()[:4] or "jpg"
+                    if gesamt > 1:
+                        ui.notify(t("Beleg {nr} von {gesamt} wird verarbeitet …",
+                                    nr=nr, gesamt=gesamt), type="info", timeout=2500)
+                    else:
+                        ui.notify(t("Beleg wird verarbeitet (Zuschnitt, PDF, OCR) …"),
+                                  type="info", timeout=4000)
+                    try:
+                        return await run.io_bound(_process_and_add, content, ext, True), None
+                    except Exception as ex:
+                        return None, str(ex)
+
+                async def _stapel(dateien):
+                    fertig, fehler = await _stapel_verarbeiten(dateien, _einen)
+                    if fertig:
+                        ui.notify(t("{n} Belege erfasst ✓", n=fertig) if fertig > 1
+                                  else t("Beleg erfasst ✓"), type="positive")
+                    for problem in fehler[:3]:
+                        ui.notify(t("Upload fehlgeschlagen: {fehler}", fehler=problem),
+                                  type="negative", timeout=8000)
                     render_alles()
+
+                async def handle_viele(e):
+                    await _stapel(list(e.files))
 
                 with ui.row().classes("w-full items-center gap-2 flex-wrap"):
                     ui.button(t("Beleg scannen"), icon="document_scanner", on_click=_open_scanner) \
                         .props("unelevated no-caps").mark("scan-open")
-                    ui.upload(auto_upload=True, on_upload=handle, label=t("Foto oder PDF")) \
+                    ui.upload(auto_upload=True, multiple=True, max_files=30,
+                              on_upload=None, on_multi_upload=handle_viele,
+                              label=t("Fotos oder PDFs")) \
                         .props('accept="image/*,application/pdf"') \
-                        .classes("hk-upload max-w-[220px]")
+                        .classes("hk-upload max-w-[220px]").mark("beleg-upload")
+                ui.label(t("Mehrere Dateien auf einmal sind möglich – Zuschnitt, "
+                           "PDF und Texterkennung laufen dann nacheinander.")) \
+                    .classes(f"text-xs {ton.STILL}")
                 if not receipts.ocr_available():
                     ui.label(t("Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
                        "Belege werden gespeichert, aber nicht automatisch ausgelesen.")) \
@@ -552,6 +582,32 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
                 ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-slate-600")
 
 
+async def _stapel_verarbeiten(dateien, einzeln):
+    """Mehrere Belege nacheinander verarbeiten. Gibt (fertig, fehler) zurück.
+
+    **Nacheinander, nicht gleichzeitig:** Zuschnitt, PDF und OCR laufen im
+    Thread-Pool; zehn davon parallel bringen den Server eher zum Stocken, als
+    dass sie Zeit sparten.
+
+    **Ein Fehler stoppt den Stapel nicht.** Sonst verhinderte eine unlesbare
+    Datei in der Mitte alles Nachfolgende – und man wüsste hinterher nicht,
+    welche Belege angekommen sind.
+
+    `einzeln(datei, nr, gesamt)` gibt (ergebnis, fehlertext) zurück.
+    """
+    fertig, fehler = 0, []
+    for i, datei in enumerate(dateien, 1):
+        try:
+            _doc, problem = await einzeln(datei, i, len(dateien))
+        except Exception as ex:                # noqa: BLE001 – ein Beleg darf
+            problem = str(ex)                  # den Stapel nicht abbrechen
+        if problem:
+            fehler.append(problem)
+        else:
+            fertig += 1
+    return fertig, fehler
+
+
 def _bewegungszeile(r, rerender):
     """Zu welcher Bankbewegung gehört dieser Beleg – und wenn zu keiner: welche
     käme in Frage? (B5a/B5d)
@@ -591,8 +647,7 @@ def _bewegungszeile(r, rerender):
         return
 
     alle_k = belegzuordnung.bewegungen_zu(r)
-    kandidaten = alle_k[:8]
-    if not kandidaten:
+    if not alle_k:
         ui.label(t("Noch keiner Bankbewegung zugeordnet.")) \
             .classes(f"text-xs {ton.AUF_HINWEIS}")
         return
@@ -609,33 +664,47 @@ def _bewegungszeile(r, rerender):
         rerender()
 
     def oeffnen():
-        with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+        with ui.dialog() as dlg, ui.card().classes("w-[560px] max-w-full gap-2"):
             ui.label(t("Passende Bankbewegung wählen")).classes("font-medium")
             ui.label(t("Wahrscheinlichste zuerst – sortiert nach Empfänger und "
-                       "Datum. Der Betrag ist nur ein Hinweis: von den vorhandenen "
-                       "Belegen trägt kaum einer einen.")) \
+                       "Datum. Der Betrag ist nur ein Hinweis: von den "
+                       "vorhandenen Belegen trägt kaum einer einen.")) \
                 .classes(f"text-xs {ton.STILL}")
-            if all(k["grund"] == "offen" for k in kandidaten):
-                # Ohne diesen Satz liest man acht beliebige Zeilen als
-                # Vorschlag. Sie sind hier nur die zeitlich naechsten von 122 –
-                # kein Merkmal des Belegs trifft zu.
-                ui.label(t("Nichts passt eindeutig: dieser Beleg trägt weder "
-                           "einen Betrag noch einen Händler, der auf dem Auszug "
-                           "vorkommt. Oben ergänzen verbessert die Vorschläge. "
-                           "Gezeigt werden die {n} zeitlich nächsten von {g}.",
-                           n=len(kandidaten), g=len(alle_k))) \
-                    .classes(f"text-xs {ton.AUF_HINWEIS}")
-            for k in kandidaten:
-                b = k["bewegung"]
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    with ui.column().classes("gap-0 min-w-0 flex-grow"):
-                        ui.label(b.get("gegenpartei") or "—").classes("text-sm truncate")
-                        ui.label(f"{_d(b.get('datum'))} · {k['grund']}") \
-                            .classes(f"text-xs {ton.STILL} truncate")
-                    ui.label(f"{buchhaltung.betrag_text(b.get('betrag', 0))} €") \
-                        .classes("text-sm w-24 text-right shrink-0")
-                    ui.button(icon="add", on_click=lambda i=b["id"]: zuordnen(i, dlg)) \
-                        .props("flat dense round").mark(f"bz-add-{b['id']}")
+            # ALLE Ausgaben stehen zur Wahl, nicht die ersten acht. Eine
+            # Vorauswahl half nur, solange die richtige Bewegung zufaellig
+            # oben stand – wer weiss, wohin sein Beleg gehoert, muss sie
+            # finden koennen. Statt eines Deckels: suchen und scrollen.
+            liste = ui.column().classes("w-full gap-1")
+
+            def zeichnen(suche=""):
+                treffer = belegzuordnung.filtern(alle_k, suche)
+                liste.clear()
+                with liste:
+                    ui.label(t("{n} von {g} Bewegungen", n=len(treffer),
+                               g=len(alle_k))).classes(f"text-xs {ton.STILL}")
+                    if not treffer:
+                        ui.label(t("Nichts gefunden – Suchbegriff ändern.")) \
+                            .classes(f"text-xs {ton.AUF_HINWEIS}")
+                    with ui.scroll_area().classes("w-full h-[320px]"):
+                        for k in treffer:
+                            b = k["bewegung"]
+                            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                                    ui.label(b.get("gegenpartei") or "—") \
+                                        .classes("text-sm truncate")
+                                    ui.label(f"{_d(b.get('datum'))} · {k['grund']}") \
+                                        .classes(f"text-xs {ton.STILL} truncate")
+                                ui.label(f"{buchhaltung.betrag_text(b.get('betrag', 0))} €") \
+                                    .classes("text-sm w-24 text-right shrink-0")
+                                ui.button(icon="add",
+                                          on_click=lambda i=b["id"]: zuordnen(i, dlg)) \
+                                    .props("flat dense round").mark(f"bz-add-{b['id']}")
+
+            ui.input(placeholder=t("Suchen: Empfänger, Verwendungszweck, Datum, Betrag"),
+                     on_change=lambda e: zeichnen(e.value)) \
+                .props("dense outlined clearable").classes("w-full") \
+                .mark(f"bz-suche-{r['id']}")
+            zeichnen()
             ui.button(t("Schließen"), on_click=dlg.close).props("flat no-caps dense")
         dlg.open()
 

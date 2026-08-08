@@ -361,3 +361,49 @@ def test_die_rechnungen_einer_auszahlung_bleiben_unberuehrt():
     konto.beleg_anhaengen("p1", "prov")
     arten = [(x["art"], x["betrag"]) for x in z.posten("p1")]
     assert arten == [("rechnung", 620.00), ("beleg", -145.87)]
+
+
+# ------------------------------------------------- Suchen statt Deckel
+def test_die_suche_findet_ueber_den_empfaenger():
+    """122 Kandidaten sind kein Fehler – nur die ersten acht zu zeigen schon.
+    Wer weiss, zu welcher Abbuchung sein Beleg gehoert, muss sie finden."""
+    a = _bewegung(-27.81, "DREWAG-Stadtwerke DD GmbH", "w1", datum="2026-07-20")
+    b = _bewegung(-99.00, "Baumarkt Nord", "w2", datum="2026-03-02")
+    k = [{"bewegung": a, "grund": "offen"}, {"bewegung": b, "grund": "offen"}]
+    assert [x["bewegung"]["id"] for x in bz.filtern(k, "drewag")] == ["w1"]
+
+
+def test_mehrere_woerter_muessen_alle_vorkommen():
+    a = _bewegung(-27.81, "DREWAG-Stadtwerke DD GmbH", "w1", datum="2026-07-20")
+    b = _bewegung(-99.00, "DREWAG-Stadtwerke DD GmbH", "w2", datum="2026-03-02")
+    k = [{"bewegung": a, "grund": "offen"}, {"bewegung": b, "grund": "offen"}]
+    assert [x["bewegung"]["id"] for x in bz.filtern(k, "drewag 2026-07")] == ["w1"]
+
+
+def test_die_suche_findet_ueber_den_betrag():
+    a = _bewegung(-27.81, "Unbekannt", "w1")
+    b = _bewegung(-99.00, "Unbekannt", "w2")
+    k = [{"bewegung": a, "grund": "offen"}, {"bewegung": b, "grund": "offen"}]
+    assert [x["bewegung"]["id"] for x in bz.filtern(k, "27,81")] == ["w1"]
+    assert [x["bewegung"]["id"] for x in bz.filtern(k, "27.81")] == ["w1"]
+
+
+def test_die_suche_findet_im_verwendungszweck():
+    a = _bewegung(-27.81, "Unbekannt", "w1", text="Rechnung 4711 Juli")
+    b = _bewegung(-99.00, "Unbekannt", "w2", text="Dauerauftrag")
+    k = [{"bewegung": a, "grund": "offen"}, {"bewegung": b, "grund": "offen"}]
+    assert [x["bewegung"]["id"] for x in bz.filtern(k, "4711")] == ["w1"]
+
+
+def test_ohne_suchbegriff_bleibt_alles_stehen():
+    a = _bewegung(-27.81, "Unbekannt", "w1")
+    k = [{"bewegung": a, "grund": "offen"}]
+    assert bz.filtern(k, "") == k and bz.filtern(k, "   ") == k
+
+
+def test_die_suche_funktioniert_auch_ueber_belege():
+    """Dieselbe Maske auf der anderen Seite: Belege an einer Bewegung."""
+    r1 = _beleg("q1", "ALDI", "27,81")
+    r2 = _beleg("q2", "Baumarkt", "99,00")
+    k = [{"beleg": r1, "grund": "offen"}, {"beleg": r2, "grund": "offen"}]
+    assert [x["beleg"]["id"] for x in bz.filtern(k, "aldi", "beleg")] == ["q1"]

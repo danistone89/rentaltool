@@ -216,3 +216,33 @@ def teilweise_verteilt(limit=500):
             continue
         raus.append(r)
     return raus
+
+
+def filtern(kandidaten, suche, feld="bewegung"):
+    """Vorschläge auf einen Suchbegriff einengen.
+
+    **Warum Suche statt Deckel.** Die Kandidatenliste umfasst alle Ausgaben –
+    an den echten Daten 122. Die ersten acht zu zeigen war bequem, aber falsch:
+    wer weiß, zu welcher Abbuchung sein Beleg gehört, fand sie nicht, weil sie
+    auf Platz 40 stand. Sortierung ist eine Hilfe, kein Ersatz für Suchen.
+
+    Gesucht wird in allem, was auf dem Auszug steht: Empfänger,
+    Verwendungszweck, Datum und Betrag. Mehrere Wörter müssen **alle**
+    vorkommen – so lässt sich „drewag juli" eingeben.
+    """
+    worte = [w for w in str(suche or "").lower().split() if w]
+    if not worte:
+        return list(kandidaten)
+    raus = []
+    for k in kandidaten:
+        satz = k[feld] if isinstance(k, dict) and feld in k else k
+        heu = " ".join([
+            str(satz.get("gegenpartei") or ""), str(satz.get("text") or ""),
+            str(satz.get("merchant") or ""), str(satz.get("datum") or ""),
+            # Beträge in beiden Schreibweisen, damit „27,81" und „27.81" gehen.
+            f"{satz.get('betrag', satz.get('amount', ''))}".replace(".", ","),
+            f"{satz.get('betrag', satz.get('amount', ''))}",
+        ]).lower()
+        if all(w in heu for w in worte):
+            raus.append(k)
+    return raus

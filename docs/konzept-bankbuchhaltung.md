@@ -326,6 +326,19 @@ stellt gebuchte Provision und Belegbetrag je Monat gegenüber. An den echten
 Daten durchgespielt: ein Beleg über 265,87 €, verteilt auf zwei
 Juni-Auszahlungen, Probe stimmt.
 
+**Nachgebessert nach der ersten Benutzung (8.8.2026):**
+
+* **Mehrere Belege auf einmal.** Der Upload nahm eine Datei je Auswahl – im
+  Alltag sammelt man Quittungen und lädt sie gemeinsam hoch. Jetzt bis zu 30,
+  nacheinander verarbeitet (Zuschnitt, PDF und OCR laufen im Thread-Pool;
+  gleichzeitig brächte keine Zeit, nur Last). **Ein Fehler stoppt den Stapel
+  nicht** – sonst verhinderte eine unlesbare Datei in der Mitte alles
+  Nachfolgende, und man wüsste hinterher nicht, was angekommen ist.
+* **Alle passenden Bewegungen, nicht die ersten acht.** Die Vorauswahl half
+  nur, solange die richtige Bewegung zufällig oben stand. Jetzt stehen alle
+  122 zur Wahl – scrollbar, mit Suche über Empfänger, Verwendungszweck, Datum
+  und Betrag. Sortierung ist eine Hilfe, kein Ersatz fürs Suchen.
+
 *Umgesetzt:* `app/belegzuordnung.py`, `konto.beleg_anhaengen/beleg_loesen`,
 `zuordnung.ziel_setzen/bewegungen_zu`, `verrechnung.monatsuebersicht`, Masken in
 `app/ui/kontoblatt.py` und `app/ui/belege.py`, `tests/test_belegzuordnung.py`
