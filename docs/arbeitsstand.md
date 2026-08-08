@@ -458,9 +458,23 @@ Der knifflige Teil steckt in `_offen_merken`: NiceGUI meldet beim Aufklappen
 einer Zeile auch das Zuklappen der vorigen, in beliebiger Reihenfolge — wer
 beim Zuklappen bedingungslos leert, klappt alles zu.
 
+**Mehrere auswählen statt stillem Mitziehen.** Der Betrieb hat den Weg
+umgedreht: *„es wäre viel sinnvoller, dass man mehrere Bewegungen auswählen
+kann und dann eine Kategorie setzt, als dies automatisch wie bisher zu machen.
+So kann man erst filtern, manuell auswählen und dann Kategorie setzen."*
+
+Jede offene Ausgabe hat jetzt einen Haken; über der Liste steht „*n*
+ausgewählt", eine Kategorieauswahl mit „+" für eine neue, und „Kategorie
+setzen". Dazu „Alle im Filter" — filtern, alles nehmen, einmal setzen.
+Angefasst wird **nur**, was angehakt ist.
+
+Damit ist das **automatische Mitziehen abgeschaltet** (`schnell_zuordnen(...,
+mitziehen=False)`). Gelernt wird weiter, und „Gelerntes anwenden" bleibt der
+ausdrückliche Weg für die Automatik — dort steht es im Knopf.
+
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1222 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1233 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

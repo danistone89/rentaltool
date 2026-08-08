@@ -706,6 +706,53 @@ def _kategoriewahl():
             **{k: k for k in konto.vergebene_kategorien()}}
 
 
+def _auswahlleiste(zustand, sichtbare, neu_zeichnen):
+    """Was mit den ausgewählten Bewegungen geschehen soll (8.8.2026).
+
+    **Filtern, auswählen, setzen.** Der Weg, den der Betrieb dem stillen
+    Mitziehen vorgezogen hat: *„so kann man erst filtern, manuell auswählen und
+    dann Kategorie setzen."* Angefasst wird nur, was angehakt ist.
+
+    Die Leiste erscheint erst mit der ersten Auswahl – solange nichts gewählt
+    ist, wäre sie eine leere Zeile über der Liste.
+    """
+    from app import buchhaltung
+    from app.ui.basis import CFG
+
+    gewaehlt = zustand["auswahl"]
+    with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+        ui.button("Alle im Filter", icon="checklist",
+                  on_click=lambda: (gewaehlt.update(x["id"] for x in sichtbare
+                                                    if not x.get("umbuchung")
+                                                    and x.get("betrag", 0) < 0
+                                                    and not zuordnung.hat_posten(x["id"])),
+                                    neu_zeichnen())) \
+            .props("flat dense no-caps size=sm").mark("konto-alle-waehlen")
+        if not gewaehlt:
+            return
+        ui.label(f"{len(gewaehlt)} ausgewählt").classes("text-sm font-medium")
+        kat = ui.select({"": "— Kategorie —",
+                         **{x: x for x in buchhaltung.kategorien(CFG)}}, value="") \
+            .props("dense outlined options-dense").classes("w-[240px]") \
+            .mark("konto-sammel-kategorie")
+        _neue_kategorie_knopf(kat, neu_zeichnen)
+
+        def setzen():
+            n = konto.mehrere_zuordnen(list(gewaehlt), kat.value or "")
+            if not n:
+                ui.notify("Bitte erst eine Kategorie wählen.", type="warning")
+                return
+            gewaehlt.clear()
+            ui.notify(f"{n} Bewegungen zugeordnet ✓", type="positive")
+            neu_zeichnen()
+
+        ui.button("Kategorie setzen", icon="done_all", on_click=setzen) \
+            .props("unelevated no-caps dense").mark("konto-sammel-setzen")
+        ui.button("Auswahl aufheben", icon="close",
+                  on_click=lambda: (gewaehlt.clear(), neu_zeichnen())) \
+            .props("flat no-caps dense").mark("konto-auswahl-weg")
+
+
 def _filterzeile(zustand, neu_zeichnen):
     """Suchen, nach Kategorie und Zeitraum einengen (8.8.2026).
 
@@ -921,7 +968,7 @@ def render_konto():
     # gearbeitet wird: sie bleibt aufgeklappt und im Filter stehen, damit man
     # das Ergebnis der Zuordnung sieht (so gemeldet am 8.8.2026).
     zustand = {"sicht": "alle", "suche": "", "kategorie": "", "von": "", "bis": "",
-               "offen_id": ""}
+               "offen_id": "", "auswahl": set()}
 
     async def _ein_auszug(datei):
         """Einen Auszug einlesen. Gibt (bericht, fehlertext) zurück."""
@@ -1066,6 +1113,21 @@ def render_konto():
                     ui.label("Zugeordnet, aber der Beleg fehlt. Privatentnahmen, "
                              "Löhne, Darlehen und Dauerbelege stehen hier bewusst "
                              "nicht.").classes(f"text-xs {ton.STILL}")
+                # Die Leiste für die Mehrfachauswahl wird für sich neu
+                # gezeichnet: ein Haken soll die Liste nicht neu aufbauen,
+                # sonst klappt bei jedem Anhaken alles zusammen.
+                leiste = ui.row().classes("w-full")
+
+                def auswahlleiste_zeichnen(sichtbare=bewegungen):
+                    leiste.clear()
+                    with leiste:
+                        _auswahlleiste(zustand, sichtbare, zeichnen)
+
+                class _Leiste:
+                    refresh = staticmethod(auswahlleiste_zeichnen)
+                auswahlleiste = _Leiste()
+                auswahlleiste_zeichnen()
+
                 # Jede Zeile lässt sich aufklappen. Zugeklappt sagt sie, ob die
                 # Bewegung fertig ist; aufgeklappt steht die Zuordnungsmaske
                 # darin. So bleibt die Liste lesbar und die Arbeit ist einen
@@ -1082,6 +1144,22 @@ def render_konto():
                             offen_id=_offen_merken(zustand["offen_id"], i, e.value)))
                     with zeile.add_slot("header"):
                         with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                            # Auswählen, ohne die Zeile aufzuklappen: der Haken
+                            # sitzt in der Kopfzeile, sein Klick darf sich nicht
+                            # als Klick auf die Zeile fortpflanzen.
+                            if not b.get("umbuchung") and b.get("betrag", 0) < 0 \
+                                    and not zuordnung.hat_posten(b["id"]):
+                                hk = ui.checkbox(value=b["id"] in zustand["auswahl"]) \
+                                    .props("dense").classes("shrink-0") \
+                                    .mark(f"pick-{b['id']}")
+                                hk.on("click.stop", lambda _e: None)
+                                hk.on_value_change(
+                                    lambda e, i=b["id"]: (
+                                        zustand["auswahl"].add(i) if e.value
+                                        else zustand["auswahl"].discard(i),
+                                        auswahlleiste.refresh()))
+                            else:
+                                ui.element("div").classes("w-6 shrink-0")
                             ui.label(_d(b["datum"])) \
                                 .classes("text-xs text-slate-400 w-20 shrink-0")
                             with ui.column().classes("gap-0 min-w-0 flex-grow"):

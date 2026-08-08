@@ -112,7 +112,7 @@ def ohne_zuordnung():
     return raus
 
 
-def schnell_zuordnen(bewegung_id, kategorie):
+def schnell_zuordnen(bewegung_id, kategorie, mitziehen=False):
     """Eine ganze Ausgabe mit einem Klick zuordnen – der einfache Fall.
 
     **Warum es das wieder gibt.** Bis Paket B2 stand die Kategorieauswahl in
@@ -153,9 +153,14 @@ def schnell_zuordnen(bewegung_id, kategorie):
         return None, []
     # Der Kern der Bedienung: einmal zuordnen, danach von allein erkannt.
     stammdaten.kategorie_lernen(b.get("gegenpartei"), kategorie)
-    weitere = [x["id"] for x in ohne_zuordnung()
-               if x["id"] != bewegung_id and _gleicher_empfaenger(x, b)
-               and _setzen(x, kategorie)]
+    # **Nur auf ausdrueckliche Ansage.** Bis zum 8.8.2026 zog ein einzelner
+    # Klick alle Zahlungen desselben Empfaengers mit. Gewuenscht wurde
+    # stattdessen Kontrolle: filtern, auswaehlen, setzen (`mehrere_zuordnen`).
+    # Gelernt wird weiter, und „Gelerntes anwenden" bleibt der ausdrueckliche
+    # Weg fuer die Automatik.
+    weitere = ([x["id"] for x in ohne_zuordnung()
+                if x["id"] != bewegung_id and _gleicher_empfaenger(x, b)
+                and _setzen(x, kategorie)] if mitziehen else [])
     return db.holen(TABELLE, bewegung_id), weitere
 
 
@@ -255,7 +260,8 @@ def gelerntes_anwenden(vorschau):
     """
     erledigt = set()
     for v in vorschau:
-        satz, weitere = schnell_zuordnen(v["bewegung"]["id"], v["kategorie"])
+        satz, weitere = schnell_zuordnen(v["bewegung"]["id"], v["kategorie"],
+                                         mitziehen=True)
         if satz:
             erledigt.add(v["bewegung"]["id"])
             erledigt.update(weitere)
@@ -588,7 +594,7 @@ def je_kategorie(von="", bis="", konto=""):
     return summen
 
 
-def ganz_zuordnen(bewegung_id, kategorie):
+def ganz_zuordnen(bewegung_id, kategorie, mitziehen=False):
     """Wie `schnell_zuordnen`, aber auch aus der Zuordnungsmaske heraus.
 
     **Warum es das braucht.** Bis zum 8.8.2026 taten die beiden Wege
@@ -605,7 +611,7 @@ def ganz_zuordnen(bewegung_id, kategorie):
     """
     # Die Pruefung auf vorhandene Posten steckt schon in `schnell_zuordnen` –
     # hier keine zweite, sonst laufen sie mit der Zeit auseinander.
-    return schnell_zuordnen(bewegung_id, kategorie)
+    return schnell_zuordnen(bewegung_id, kategorie, mitziehen)
 
 
 def aus_posten_lernen():
@@ -731,3 +737,33 @@ def filtern(bewegungen, suche="", kategorie="", von="", bis="", behalten=""):
                 continue
         raus.append(b)
     return raus
+
+
+def mehrere_zuordnen(bewegung_ids, kategorie):
+    """Mehreren ausgewaehlten Bewegungen dieselbe Kategorie geben (8.8.2026).
+
+    **Filtern, auswaehlen, setzen** – der Weg, den der Betrieb dem stillen
+    Mitziehen vorgezogen hat: *„so kann man erst filtern, manuell auswaehlen
+    und dann Kategorie setzen."* Angefasst wird **nur**, was ausgewaehlt ist.
+
+    Wer auswaehlt, entscheidet – auch gegen eine automatisch erkannte
+    Kategorie. Uebersprungen wird nur, was schon Posten traegt (dort gilt die
+    Maske) und was keine Ausgabe ist.
+
+    Der Empfaenger wird dabei gelernt, damit der naechste Auszug ihn von allein
+    erkennt. Gibt die Zahl der zugeordneten Bewegungen zurueck.
+    """
+    from app import stammdaten
+    kategorie = (kategorie or "").strip()
+    if not kategorie:
+        return 0
+    n = 0
+    for bid in bewegung_ids or []:
+        b = db.holen(TABELLE, bid)
+        if b is None or b.get("umbuchung") or zuordnung.hat_posten(bid):
+            continue
+        if not _setzen(b, kategorie, ueberschreiben=True):
+            continue
+        stammdaten.kategorie_lernen(b.get("gegenpartei"), kategorie)
+        n += 1
+    return n

@@ -203,17 +203,21 @@ def test_ohne_vorschlaege_erscheint_der_knopf_nicht():
 
 # ------------------------------- Gleicher Empfaenger: sofort mit erledigen
 def test_die_uebrigen_zahlungen_desselben_empfaengers_gehen_mit():
-    """Gemeldet am 8.8.2026: „habe einer Valeriya-Remez-Buchung Gehaelter
-    zugeordnet, bei allen anderen hat sich nichts geaendert."
+    """Das Mitziehen gibt es weiterhin – aber nur noch auf ausdrueckliche
+    Ansage (`mitziehen=True`), nicht mehr bei jedem einzelnen Klick.
 
-    Das Lernen griff, aber erst auf Klick. Wer gerade entschieden hat, wofuer
-    eine Zahlung an diese Person ist, hat es fuer alle entschieden.
+    Am 8.8.2026 zunaechst als Automatik gebaut („habe einer
+    Valeriya-Remez-Buchung Gehaelter zugeordnet, bei allen anderen hat sich
+    nichts geaendert"), am selben Tag zugunsten der Auswahl zurueckgenommen:
+    „so kann man erst filtern, manuell auswaehlen und dann Kategorie setzen."
+    Benutzt wird es noch von „Gelerntes anwenden".
     """
     _bewegung(-619.77, "Valeriya Remez", "w1", datum="2026-06-22")
     _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
     _bewegung(-318.12, "Valeriya Remez", "w3", datum="2026-04-08")
     _bewegung(-176.17, "Gabriel", "w4", datum="2026-05-27")
-    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob",
+                                         mitziehen=True)
     assert sorted(weitere) == ["w2", "w3"]
     assert konto.holen("w2")["kategorie"] == "Löhne/Gehälter Minijob"
     assert z.ist_fertig(konto.holen("w3"))
@@ -317,7 +321,8 @@ def test_die_maske_lernt_und_zieht_mit_wie_die_zeile():
     _bewegung(-153.80, "TARGOBANK AG", "w1", datum="2026-01-02")
     _bewegung(-153.80, "TARGOBANK AG", "w2", datum="2026-02-02")
     _bewegung(-153.80, "TARGOBANK AG", "w3", datum="2026-03-02")
-    satz, weitere = konto.ganz_zuordnen("w1", "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)")
+    satz, weitere = konto.ganz_zuordnen(
+        "w1", "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)", mitziehen=True)
     assert satz is not None and sorted(weitere) == ["w2", "w3"]
     assert stammdaten.kreditor_zu("TARGOBANK AG") is not None
 
@@ -426,7 +431,8 @@ def test_mitgezogen_wird_weiterhin_nur_was_noch_nichts_traegt():
     _bewegung(-73.78, "Smoobu GmbH", "w2", datum="2026-03-02",
               kategorie="Wäscherei (Rena)")
     _bewegung(-73.78, "Smoobu GmbH", "w3", datum="2026-04-28")
-    _satz, weitere = konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)")
+    _satz, weitere = konto.schnell_zuordnen("w1", "Software (Smoobu Channelmanager)",
+                                            mitziehen=True)
     assert weitere == ["w3"]
     assert konto.holen("w2")["kategorie"] == "Wäscherei (Rena)"
 
