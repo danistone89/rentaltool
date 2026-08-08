@@ -803,31 +803,58 @@ def render_konto():
     # sonst springt die Liste nach jedem Posten auf „Alle" zurueck.
     zustand = {"sicht": "alle"}
 
-    async def hochladen(e):
+    async def _ein_auszug(datei):
+        """Einen Auszug einlesen. Gibt (bericht, fehlertext) zurück."""
         try:
-            rohdaten, name = await _read_upload(e)
-            bericht = konto.importieren(rohdaten)
-        except ValueError as fehler:                # unbekanntes Format
-            ui.notify(str(fehler), type="warning", timeout=8000)
-            return
+            rohdaten = await datei.read()
         except Exception as fehler:
-            ui.notify(f"Auszug konnte nicht gelesen werden: {fehler}", type="negative")
-            return
-        teile = [f"{bericht['neu']} neu"]
-        if bericht["doppelt"]:
-            teile.append(f"{bericht['doppelt']} schon vorhanden")
-        if bericht["umbuchungen"]:
-            teile.append(f"{bericht['umbuchungen']} Umbuchungen")
-        ui.notify(f"{bericht['konto']}: " + " · ".join(teile), type="positive",
-                  timeout=6000)
+            return None, f"Datei nicht lesbar: {fehler}"
+        try:
+            return konto.importieren(rohdaten), None
+        except ValueError as fehler:                # unbekanntes Format
+            return None, str(fehler)
+        except Exception as fehler:
+            return None, f"Auszug konnte nicht gelesen werden: {fehler}"
+
+    async def auszuege_laden(e):
+        """Mehrere Auszüge auf einmal – Girokonto und Karte gehören zusammen.
+
+        Die Kreditkartenabrechnung steht auf dem Girokonto als **eine**
+        Sammelbuchung; die Einzelkäufe stehen im Kartenauszug. Beide in einem
+        Zug einzulesen ist der Normalfall, nicht die Ausnahme – vorher ging nur
+        eine Datei je Auswahl.
+
+        **Ein Fehler stoppt den Stapel nicht.** Sonst verhinderte eine falsche
+        Datei alles Nachfolgende, und man wüsste nicht, was angekommen ist.
+        """
+        berichte, fehler = [], []
+        for datei in list(getattr(e, "files", None) or [e.file]):
+            bericht, problem = await _ein_auszug(datei)
+            (fehler if problem else berichte).append(problem or bericht)
+        for b in berichte:
+            teile = [f"{b['neu']} neu"]
+            if b["doppelt"]:
+                teile.append(f"{b['doppelt']} schon vorhanden")
+            if b["umbuchungen"]:
+                teile.append(f"{b['umbuchungen']} Umbuchungen")
+            von, bis = b.get("zeitraum") or ("", "")
+            if von and bis:
+                teile.append(f"{_d(von)}–{_d(bis)}")
+            ui.notify(f"{b['konto']}: " + " · ".join(teile), type="positive",
+                      timeout=6000)
+        for problem in fehler[:3]:
+            ui.notify(problem, type="warning", timeout=9000)
         zeichnen()
 
     with ui.row().classes("w-full items-center gap-3"):
-        ui.upload(auto_upload=True, on_upload=hochladen, label="Auszug (CSV) wählen") \
+        ui.upload(auto_upload=True, multiple=True, max_files=12,
+                  on_upload=None, on_multi_upload=auszuege_laden,
+                  label="Auszüge (CSV) wählen") \
             .props('accept=".csv,text/csv"').classes("hk-upload w-[240px]") \
             .mark("konto-upload")
-        ui.label("DKB-Business oder DKB-VISA, als CSV exportiert.") \
-            .classes("text-xs text-slate-400")
+        ui.label("DKB-Business und DKB-VISA, als CSV exportiert – beide "
+                 "zusammen auswählbar. Das Format wird an der Spaltenzeile "
+                 "erkannt.").classes("text-xs text-slate-400")
 
     def zeichnen():
         inhalt.clear()

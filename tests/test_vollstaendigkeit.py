@@ -334,3 +334,49 @@ def test_zwei_zyklen_werden_nicht_vermischt():
     zweiter = [p for p in vs.kartenproben() if p["pruefbar"]][0]
     assert zweiter["kaeufe"] == -25.0 and zweiter["anzahl"] == 1
     assert zweiter["differenz"] == 0.0
+
+
+# ------------------------------- Beide Auszuege in einem Zug (8.8.2026)
+KARTE_CSV = ('"Karte";"DKB-VISA-Business-Card";"4998 •••• •••• 8136"\n""\n'
+             '"Saldo vom 20.02.2026:";"-0 EUR"\n""\n'
+             '"Belegdatum";"Wertstellung";"Status";"Beschreibung";"Umsatztyp";'
+             '"Betrag (€)";"Fremdwährungsbetrag"\n'
+             '"20.02.26";"20.02.26";"Gebucht";"Ausgleich Kreditkarte gem";'
+             '"Lastschrift";"56,93";""\n'
+             '"05.02.26";"06.02.26";"Gebucht";"Rossmann 2424";"Im Geschäft";'
+             '"-30";""\n'
+             '"08.02.26";"09.02.26";"Gebucht";"dm";"Im Geschäft";"-26,93";""\n')
+
+
+def test_beide_formate_landen_im_selben_bestand():
+    """Girokonto und Karte gehen ueber dasselbe Feld – das Format wird an der
+    Spaltenzeile erkannt („Buchungsdatum" gegen „Belegdatum")."""
+    konto.importieren(_auszug("01.02.2026", "28.02.2026", "1.000,00 €",
+                              [("24.02.26", "-56,93")]))
+    konto.importieren(KARTE_CSV)
+    assert sorted(konto.konten()) == ["DE62120300001310062102", "VISA 8136"]
+
+
+def test_erst_die_bank_dann_die_karte_loest_den_hinweis_auf():
+    """Der Ablauf aus dem Betrieb: erst den Bankmonat, dann den Kartenauszug.
+    Nach dem ersten Schritt fehlt der Kartenauszug und wird gemeldet, nach dem
+    zweiten nicht mehr."""
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-02-24", "betrag": -56.93,
+                               "gegenpartei": "Deutsche Kreditbank Berlin",
+                               "text": "KREDITKARTENABRECHNUNG VISA -ABR. 4998",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    assert len(vs.sammelbuchungen_ohne_karte()) == 1
+    konto.importieren(KARTE_CSV)
+    assert vs.sammelbuchungen_ohne_karte() == []
+    # Und der Ausgleich deckt genau die beiden Kaeufe.
+    p = vs.kartenproben()[0]
+    assert p["ausgleich"] == 56.93 and p["kaeufe"] == -56.93
+
+
+def test_die_kontoseite_laesst_sich_nach_dem_umbau_zeichnen():
+    """Rauchprobe fuer das mehrfachfaehige Upload-Feld."""
+    from app.ui import kontoblatt
+    konto.importieren(_auszug("01.02.2026", "28.02.2026", "1.000,00 €",
+                              [("24.02.26", "-56,93")]))
+    _in_client(kontoblatt.render_konto)
