@@ -410,9 +410,27 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
 
+## Am 8.8.2026 ausgerollt
+
+Der Echtbetrieb läuft auf dem neuen Stand; die 78 Altrechnungen sind dort
+eingelesen (alle mit Original-PDF und mit ihrer Buchung verbunden),
+Nummernkreis ab 2026-0079, Rechnungen erst ab Abreise 01.01.2026. Bewegungen
+und Belege lädt der Betrieb selbst hoch — die Probe-Daten wurden nicht
+übertragen (`deploy.sh` rollt nur Code aus).
+
+**Direkt danach aufgefallen:** live waren nur 145 statt 189 Giro-Bewegungen —
+von den zwei Auszugsdateien war nur die zweite eingelesen (ab 01.03.), Januar
+und Februar standen mit 0,00 € Eingang da. **Die Lückenprüfung schwieg**: sie
+vergleicht aufeinanderfolgende Auszüge, und bei einem einzigen gibt es nichts
+zu vergleichen. Das Signal lag woanders — die Karte wurde im Januar und Februar
+ausgeglichen, aber auf dem Girokonto stand keine Abrechnung dazu. Dafür gibt es
+jetzt `vollstaendigkeit.ausgleich_ohne_abrechnung`: die Gegenrichtung zu
+`sammelbuchungen_ohne_karte` und die gefährlichere, weil ein fehlender
+Bankauszug **alle** Einnahmen und Ausgaben eines Zeitraums verschwinden lässt.
+
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1191 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1195 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

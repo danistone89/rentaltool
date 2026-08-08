@@ -123,6 +123,15 @@ def _vollstaendigkeit():
                      "Kartenauszug vor. Solange er fehlt, stehen die "
                      "Einzelausgaben dieses Monats nirgends.") \
                 .classes(f"text-xs {ton.AUF_HINWEIS}").mark("ub-karte-fehlt")
+        for s in b["giro_fehlt"]:
+            # Die gefaehrlichere Richtung: fehlt der BANKauszug, fehlen alle
+            # Einnahmen und Ausgaben des Zeitraums, nicht nur Kartenkaeufe.
+            ui.label(f"Die Kreditkarte wurde am {_d(s.get('datum'))} mit "
+                     f"{_eur(abs(s.get('betrag', 0)))} ausgeglichen – auf dem "
+                     "Girokonto steht dazu keine Abrechnung. Für diesen "
+                     "Zeitraum fehlt vermutlich der Kontoauszug des "
+                     "Girokontos.").classes(f"text-xs {ton.AUF_HINWEIS}") \
+                .mark("ub-giro-fehlt")
         for p in b["kartenproben"]:
             ui.label(f"Kartenabrechnung {_d(p['datum'])}: ausgeglichen wurden "
                      f"{_eur(p['ausgleich'])}, erfasst sind aber nur "

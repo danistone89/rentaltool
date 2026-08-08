@@ -582,3 +582,38 @@ def test_der_befund_nennt_die_automatisch_erkannten():
                                "kategorie": "Software (Smoobu Channelmanager)",
                                "herkunft": "kreditor"})
     assert vs.offene_arbeiten()["automatisch"] == 1
+
+
+# ------------- Der fehlende Bankauszug (live aufgefallen, 8.8.2026)
+# Live war nur einer der beiden Giro-Auszuege eingelesen (ab 01.03.), der fuer
+# Januar/Februar fehlte. Die Lueckenpruefung schwieg – sie vergleicht
+# aufeinanderfolgende Auszuege, und bei EINEM gibt es nichts zu vergleichen.
+# Das Signal lag woanders: die Kreditkarte wurde im Januar und Februar
+# ausgeglichen, aber auf dem Girokonto steht keine Abrechnung dazu.
+def test_ein_ausgleich_ohne_abrechnung_faellt_auf():
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    offen = vs.ausgleich_ohne_abrechnung()
+    assert len(offen) == 1 and offen[0]["betrag"] == 185.68
+
+
+def test_mit_abrechnung_ist_alles_gut():
+    from app import db
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "DKB", "text": "KREDITKARTENABRECHNUNG",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    assert vs.ausgleich_ohne_abrechnung() == []
+
+
+def test_ein_anderer_betrag_gilt_nicht_als_gegenstueck():
+    from app import db
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -56.93,
+                               "gegenpartei": "DKB", "text": "KREDITKARTENABRECHNUNG",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    assert len(vs.ausgleich_ohne_abrechnung()) == 1
+
+
+def test_der_befund_nennt_den_fehlenden_auszug():
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    assert len(vs.befund()["giro_fehlt"]) == 1

@@ -228,6 +228,7 @@ def befund():
             "kartenproben": [p for p in kartenproben()
                              if p["pruefbar"] and abs(p["differenz"]) >= 0.005],
             "karte_ohne_auszug": sammelbuchungen_ohne_karte(),
+            "giro_fehlt": ausgleich_ohne_abrechnung(),
             "offene_arbeiten": offene_arbeiten()}
 
 
@@ -283,6 +284,33 @@ def kartenproben():
                          "differenz": round(a.get("betrag", 0.0) + summe, 2),
                          "pruefbar": vorher is not None})
             vorher = a.get("datum", "")
+    return raus
+
+
+def ausgleich_ohne_abrechnung():
+    """Kartenausgleiche, zu denen auf dem Girokonto keine Abrechnung steht.
+
+    **Die andere Richtung – und die gefährlichere.** `sammelbuchungen_ohne_karte`
+    findet den fehlenden *Kartenauszug*; hier fehlt der *Bankauszug*. Dann
+    fehlen nicht nur ein paar Kartenkäufe, sondern **alle Einnahmen und
+    Ausgaben dieses Zeitraums**.
+
+    Am 8.8.2026 im Echtbetrieb aufgetreten: von zwei Giro-Auszügen war nur der
+    zweite eingelesen (ab 01.03.), Januar und Februar standen mit 0,00 €
+    Eingang da. Die Lückenprüfung schwieg – sie vergleicht aufeinanderfolgende
+    Auszüge, und bei einem einzigen gibt es nichts zu vergleichen. Die Karte
+    wurde in beiden Monaten ausgeglichen; nur die Abrechnung auf dem Girokonto
+    fehlte. Genau daran ist es zu erkennen.
+    """
+    abrechnungen = [round(abs(b.get("betrag", 0.0)), 2) for b in konto.alle()
+                    if b.get("umbuchung") and _ist(b, _ABRECHNUNG)]
+    raus = []
+    for b in konto.alle():
+        if not b.get("umbuchung") or not _ist(b, _AUSGLEICH):
+            continue
+        if round(abs(b.get("betrag", 0.0)), 2) in abrechnungen:
+            continue
+        raus.append(b)
     return raus
 
 
