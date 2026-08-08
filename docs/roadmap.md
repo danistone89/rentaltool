@@ -1140,7 +1140,33 @@ ausdrücklich als unzuverlässig bezeichnet hat).
   Bankbewegungen eindeutig zugeordnet, keine mehrdeutig.
   ✅ erledigt (8.8.2026)
 * **B11d · Zuordnen.** Je Auszahlung die Rechnungen mit ihrem **Bruttobetrag**
-  und die Provision aus der Quelle des Portals. Vorschau vor dem Schreiben.
+  und die Provision aus der Quelle des Portals. Vorschau vor dem Schreiben —
+  sie steht aufgeklappt an der Bewegung, mit Reservierungsnummer, Gast,
+  Rechnungsnummer und Betrag; ein Knopf bucht alles.
+
+  **Zwei Sperren, die erst der Lauf gegen die echten Daten hervorgebracht hat:**
+
+  *Die Auszahlung deckt die Rechnungen nicht* (`deckt_nicht`) — Airbnb zahlt
+  einen langen Aufenthalt in Monatsraten aus. Bei Monica Huang (86 Nächte,
+  6.102,99 €) hätten **4.540 €** unter „Provision" gestanden. Solche Fälle
+  werden gar nicht gebucht; je Rate gehört ein Teilbetrag dazu, von Hand.
+
+  *Die Rechnung weicht ab* (`weicht_ab`) — sie ist niedriger als das, was das
+  Portal dem Gast berechnet hat; bei den übernommenen Smoobu-Rechnungen (B10)
+  ist das die Beherbergungssteuer, die dort nicht auf der Rechnung stand. Die
+  Rechnungen gehören trotzdem an die Auszahlung, aber der Rest ist dann nicht
+  bloß Provision und wird nicht gebucht.
+
+  Für die Provision gibt es **keine Vorgabekategorie** — die Vorgaben sind
+  wörtlich die SUMIF-Kriterien des Workbooks, eine dazuerfundene liefe still
+  ins Leere. Das Werkzeug merkt sich stattdessen die, die schon einmal an einem
+  Provisionsposten stand.
+
+  An den echten Daten (55 Portal-Eingänge, Stand 8.8.2026): 27 in einem Zug
+  fertig, 19 mit gebuchten Rechnungen und Provision von Hand, 4 gesperrt
+  (Ratenzahlung), 3 warten noch auf ihre Rechnung, 2 liegen nach dem Ende des
+  Berichtszeitraums. 73 Rechnungsposten entstünden.
+  ✅ erledigt (8.8.2026)
 
 Beide Dateien gehen in denselben Upload wie die Kontoauszüge; das Werkzeug
 erkennt am Inhalt, was es ist.

@@ -481,7 +481,118 @@ def _provisionszeile(bewegung, rest, neu_zeichnen):
             .mark(f"prov-{bewegung['id']}")
 
 
-def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
+def _buchungen_um(bewegung):
+    """Die Smoobu-Buchungen rund um den Zahltag, als {id: Satz}.
+
+    Eng gefasstes Fenster: drei Jahre bei jedem Zeichnen waren ein Abruf, den
+    niemand braucht. Ein Aufenthalt liegt selten mehr als ein halbes Jahr von
+    seiner Zahlung entfernt.
+    """
+    from app import data
+    tag = (bewegung.get("datum") or "")[:10]
+    if not tag:
+        return {}
+    try:
+        von, bis = f"{int(tag[:4]) - 1}-07-01", f"{int(tag[:4]) + 1}-06-30"
+        return {b.get("id"): b for b in data._reservations(von, bis)}
+    except Exception:
+        # Fehlt der Smoobu-Zugang, geht es ohne – dann steht der volle
+        # Rechnungsbetrag daneben und die Auszahlung findet ihre Rechnungen nicht.
+        return {}
+
+
+def _auszahlungsvorschau(bewegung, buchungen, neu_zeichnen):
+    """Die Auszahlung aus dem Portalbericht – mit allem, was drinsteckt (B11d).
+
+    **Der Unterschied zur Vorschlagsliste darunter:** hier wird nichts
+    geschätzt. Der Bericht des Portals nennt die Reservierungen dieser
+    Auszahlung namentlich; das Werkzeug geht die Kette bis zur Rechnung entlang
+    und legt vor, was es buchen würde. Ein Klick statt einer Suche.
+    """
+    from app import auszahlungszuordnung as az, buchhaltung
+    from app.ui.basis import CFG
+
+    v = az.vorschau(bewegung, buchungen)
+    if not v:
+        return
+    a = v["auszahlung"]
+    with ui.column().classes("w-full gap-1 mt-1 mb-2 p-2 rounded "
+                             "bg-slate-50").mark(f"az-{bewegung['id']}"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.icon("receipt_long").classes("text-slate-400")
+            ui.label(f"Auszahlung laut Bericht · {_d(a.get('datum'))} · "
+                     f"{len(a.get('reservierungen') or [])} Reservierungen") \
+                .classes("text-sm font-medium flex-grow")
+        for z in v["zeilen"]:
+            r = z["reservierung"]
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.label(r.get("nummer") or "—") \
+                    .classes(f"text-xs {ton.STILL} w-28 shrink-0 truncate")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    name = (z["rechnung"] or {}).get("gast") or r.get("gast") \
+                        or (z["buchung"] or {}).get("guest-name") or "—"
+                    ui.label(name).classes("text-sm truncate")
+                    hinweis = z["problem"] or (
+                        f"Rechnung Nr. {(z['rechnung'] or {}).get('nummer') or '—'}")
+                    ui.label(hinweis).classes(
+                        f"text-xs truncate "
+                        + (ton.AUF_HINWEIS if z["problem"] else ton.STILL))
+                ui.label(_eur(z["betrag"]) if z["betrag"] else "—") \
+                    .classes("text-sm w-24 text-right shrink-0")
+        # Die Provision ist kein eigener Eintrag im Bericht, sondern die
+        # Differenz. Beide Wege muessen zur selben Zahl fuehren.
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            ui.label("Einbehaltene Provision").classes(
+                f"text-xs {ton.STILL} flex-grow")
+            ui.label(_eur(v["laut_bericht"])).classes(
+                "text-sm w-24 text-right shrink-0")
+        if v["deckt_nicht"]:
+            # Der Fall Monica Huang: 86 Naechte, 6.102,99 EUR, von Airbnb in
+            # drei Monatsraten ausgezahlt. Eine Zuordnung der ganzen Rechnung
+            # an eine Rate waere falsch – und zwar um Tausende.
+            ui.label("Diese Auszahlung deckt die gefundenen Rechnungen nicht – "
+                     f"es blieben {_eur(v['rest'])} einbehalten, laut Bericht "
+                     f"sind es {_eur(v['laut_bericht'])}. Meist ist es ein "
+                     "langer Aufenthalt, den das Portal in Raten auszahlt: dann "
+                     "gehört je Rate ein Teilbetrag der Rechnung dazu. Das geht "
+                     "unten von Hand.") \
+                .classes(f"text-xs {ton.AUF_HINWEIS}")
+            return
+        if v["weicht_ab"]:
+            ui.label(f"Achtung: nach den Rechnungen blieben {_eur(v['rest'])} "
+                     f"übrig, laut Bericht sind es {_eur(v['laut_bericht'])}. "
+                     "Die Rechnung weicht von dem ab, was das Portal dem Gast "
+                     "berechnet hat – bei den übernommenen Smoobu-Rechnungen "
+                     "ist das die Beherbergungssteuer. Die Rechnungen gehören "
+                     "trotzdem hierher; der Rest ist dann aber nicht bloß "
+                     "Provision und wird nicht gebucht.") \
+                .classes(f"text-xs {ton.AUF_HINWEIS}")
+
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            kat = ui.select(
+                options=buchhaltung.kategorien(CFG), value=v["kategorie"] or None,
+                label="Kategorie der Provision", with_input=True) \
+                .props("dense outlined").classes("flex-grow min-w-0") \
+                .mark(f"az-kat-{bewegung['id']}")
+            _neue_kategorie_knopf(kat, neu_zeichnen)
+
+            def uebernehmen():
+                anzahl, meldung = az.uebernehmen(bewegung, kat.value or "",
+                                                 buchungen)
+                ui.notify(meldung, type="positive" if anzahl else "warning",
+                          timeout=8000)
+                if anzahl:
+                    neu_zeichnen()
+
+            ui.button("Auszahlung übernehmen", icon="playlist_add_check",
+                      on_click=uebernehmen) \
+                .props("dense unelevated no-caps size=sm").classes("shrink-0") \
+                .tooltip("Die Rechnungen dieser Auszahlung und die Provision "
+                         "in einem Zug buchen") \
+                .mark(f"az-add-{bewegung['id']}")
+
+
+def _rechnungsvorschlaege(bewegung, rest, buchungen, neu_zeichnen):
     """Offene Rechnungen zum Abhaken – die wahrscheinlichste zuerst.
 
     **Kein automatisches Buchen.** Von 65 Zahlungseingängen entspricht genau
@@ -494,22 +605,6 @@ def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
     """
     from app import data, zahlungsvorschlag as vs
     from app.ui.basis import CFG
-
-    # Die Smoobu-Buchungen liefern die Provision je Rechnung. Fehlt der Zugang,
-    # geht es ohne – dann steht der volle Rechnungsbetrag daneben.
-    # Eng gefasstes Fenster um den Zahltag: drei Jahre bei jedem Zeichnen waren
-    # ein Abruf, den niemand braucht. Ein Aufenthalt liegt selten mehr als ein
-    # halbes Jahr von seiner Zahlung entfernt.
-    tag = (bewegung.get("datum") or "")[:10]
-    buchungen = {}
-    if tag:
-        try:
-            von = f"{int(tag[:4]) - 1}-07-01"
-            bis = f"{int(tag[:4]) + 1}-06-30"
-            for b in data._reservations(von, bis):
-                buchungen[b.get("id")] = b
-        except Exception:
-            pass
 
     liste = vs.kandidaten(bewegung, CFG, buchungen)
     if not liste:
@@ -672,8 +767,13 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
         # ---- Ausgangsrechnungen (B3) ----------------------------------------
         # Nur bei Eingängen, und nur solange etwas offen ist.
         if bewegung.get("betrag", 0) > 0 and abs(rest) > 0.005:
+            # Einmal abrufen, zweimal benutzt: die Auszahlungsvorschau geht
+            # ueber die Reservierungsnummer, die Vorschlagsliste ueber Name und
+            # Wohnung.
+            buchungen = _buchungen_um(bewegung)
+            _auszahlungsvorschau(bewegung, buchungen, neu_zeichnen)
             _provisionszeile(bewegung, rest, neu_zeichnen)
-            _rechnungsvorschlaege(bewegung, rest, neu_zeichnen)
+            _rechnungsvorschlaege(bewegung, rest, buchungen, neu_zeichnen)
 
         # ---- Der Restbetrag --------------------------------------------------
         with ui.row().classes("w-full items-center gap-2 no-wrap"):

@@ -275,4 +275,4 @@ def test_die_vorschlagsliste_laesst_sich_zeichnen():
     _beleg_rechnung(2, "Marten Brunk", 773.68)
     with Client(lambda: None):
         with ui.card():
-            kontoblatt._rechnungsvorschlaege(b, 657.63, lambda: None)
+            kontoblatt._rechnungsvorschlaege(b, 657.63, {}, lambda: None)
