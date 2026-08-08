@@ -99,16 +99,37 @@ def _beleg_knopf(bewegung, neu_zeichnen):
         ui.notify("Beleg gespeichert und zugeordnet ✓", type="positive")
         neu_zeichnen()
 
+    def dauerbeleg():
+        """Einmal sagen, dass hier ein Vertrag statt monatlicher Belege gilt.
+
+        Ohne diesen Weg müsste man jede Mietzahlung einzeln abhaken – sieben im
+        Halbjahr, und im nächsten wieder. Gemerkt wird es am **Empfänger**,
+        nicht an der einzelnen Buchung.
+        """
+        from app import stammdaten
+        k = stammdaten.dauerbeleg_lernen(bewegung.get("gegenpartei"),
+                                         "Dauerbeleg (Vertrag liegt vor)",
+                                         bewegung.get("kategorie", ""))
+        ui.notify(f"„{k['name']}“ braucht künftig keinen Monatsbeleg mehr."
+                  if k else "Kein Empfänger erkennbar.",
+                  type="positive" if k else "warning")
+        neu_zeichnen()
+
     with ui.row().classes("items-center gap-0 shrink-0 no-wrap"):
         ui.upload(auto_upload=True, on_upload=hochladen, label="") \
             .props('accept="image/*,application/pdf" flat dense') \
             .classes("hk-upload w-[34px]").tooltip("Beleg hochladen") \
             .mark(f"beleg-up-{bewegung['id']}")
+        ui.button(icon="event_repeat", on_click=dauerbeleg) \
+            .props("flat dense round").classes(ton.ZART) \
+            .tooltip("Dauerbeleg: Vertrag liegt vor, keine Monatsbelege nötig – "
+                     "gilt ab jetzt für alle Zahlungen an diesen Empfänger") \
+            .mark(f"dauer-{bewegung['id']}")
         ui.button(icon="block",
                   on_click=lambda: (konto.beleg_nicht_noetig(bewegung["id"]),
                                     neu_zeichnen())) \
-            .props("flat dense round").classes("text-slate-300") \
-            .tooltip("Zu dieser Buchung gibt es keinen Beleg")
+            .props("flat dense round").classes(ton.ZART) \
+            .tooltip("Nur für diese eine Buchung: es gibt keinen Beleg")
 
 
 _ARTNAME = {zuordnung.RECHNUNG: "Ausgangsrechnung", zuordnung.BELEG: "Beleg",
@@ -134,6 +155,12 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
     rest = zuordnung.rest(bewegung)
 
     with ui.column().classes("w-full gap-1 pl-2 border-l-2 border-slate-100"):
+        # Ohne diesen Satz ist „+" nicht zu erraten – so gemeldet.
+        ui.label("Wofür war diese Zahlung? Eine Zahlung kann auf mehrere "
+                 "Kategorien aufgeteilt werden – bei einer Portal-Auszahlung "
+                 "auf mehrere Rechnungen plus die Provision. Der Rest unten "
+                 "zeigt, was davon noch offen ist.") \
+            .classes(f"text-xs {ton.STILL} mb-1")
         for satz in p:
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.label(_ARTNAME.get(satz["art"], satz["art"])) \
@@ -175,8 +202,13 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 if satz:
                     neu_zeichnen()
 
-            ui.button(icon="add", on_click=anlegen).props("round dense unelevated") \
-                .tooltip("Posten hinzufügen").mark(f"zu-plus-{bewegung['id']}")
+            # Beschriftung nach Lage: der erste Posten ist eine Zuordnung,
+            # jeder weitere teilt die Zahlung auf.
+            ui.button("Zuordnen" if not p else "Aufteilen", icon="add",
+                      on_click=anlegen) \
+                .props("dense unelevated no-caps size=sm") \
+                .tooltip("Diesen Betrag der gewählten Kategorie zuordnen") \
+                .mark(f"zu-plus-{bewegung['id']}")
 
         # ---- Der Restbetrag --------------------------------------------------
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
@@ -197,6 +229,9 @@ def render_konto():
         .classes("text-sm text-slate-500 mb-2")
 
     inhalt = ui.column().classes("w-full gap-3")
+    # Welche Sicht auf die Bewegungen gerade gilt. Ueberlebt das Neuzeichnen –
+    # sonst springt die Liste nach jedem Posten auf „Alle" zurueck.
+    zustand = {"sicht": "alle"}
 
     async def hochladen(e):
         try:
@@ -272,43 +307,33 @@ def render_konto():
                                  "Näherung.").classes("text-xs mt-2 " + ton.AUF_HINWEIS) \
                             .mark("konto-unklar")
 
-            # ---- Welche Belege fehlen noch? --------------------------------
-            # Die Frage aus dem Alltag, und spaeter das Mass dafuer, ob die
-            # Uebergabe ans Steuerbuero vollstaendig ist. Sie zaehlt nur, wo
-            # ueberhaupt ein Beleg zu erwarten ist - sonst staenden hier auch
-            # Privatentnahmen, Loehne und Darlehensraten.
-            fehlen = konto.ohne_beleg()
-            with ui.card().classes("w-full").mark("konto-fehlende-belege"):
-                with ui.row().classes("w-full items-center gap-2"):
-                    ui.icon("description").classes(
-                        "text-lg " + (ton.AUF_HINWEIS if fehlen else "text-slate-300"))
-                    ui.label("Fehlende Belege").classes("font-medium")
-                    ui.space()
-                    ui.label(str(len(fehlen))).classes(
-                        "text-sm " + (ton.AUF_HINWEIS if fehlen else "text-slate-400"))
-                if not fehlen:
-                    ui.label("Zu jeder Buchung, die einen Beleg braucht, liegt "
-                             "einer vor.").classes("text-xs text-slate-400")
-                else:
-                    ui.label("Privatentnahmen, Löhne, Darlehen und Dauerbelege "
-                             "stehen hier bewusst nicht – dafür gibt es keinen "
-                             "Lieferantenbeleg.").classes("text-xs text-slate-400")
-                    for b in fehlen[:30]:
-                        with ui.row().classes("w-full items-center gap-2 no-wrap py-1"):
-                            ui.label(_d(b["datum"])).classes(
-                                "text-xs text-slate-400 w-20 shrink-0")
-                            ui.label(b.get("gegenpartei") or "—") \
-                                .classes("text-sm truncate flex-grow min-w-0")
-                            ui.label(_eur(b["betrag"])).classes(
-                                "text-sm text-right w-24 shrink-0")
-                            _beleg_knopf(b, zeichnen)
-                    if len(fehlen) > 30:
-                        ui.label(f"… und {len(fehlen) - 30} weitere") \
-                            .classes("text-xs text-slate-400")
-
-            # ---- Die Bewegungen selbst --------------------------------------
+            # ---- Die Bewegungen -------------------------------------------
+            # EINE Liste, drei Sichten. Vorher stand daneben eine zweite Karte
+            # „Fehlende Belege" mit denselben Zeilen – zwei Listen, die dasselbe
+            # zeigen, verwirren mehr als sie helfen (so gemeldet am 8.8.2026).
+            fehlen_ids = {x["id"] for x in konto.ohne_beleg()}
+            offen_ids = {x["id"] for x in offen}
             with ui.card().classes("w-full").mark("konto-liste"):
-                ui.label("Bewegungen").classes("font-medium")
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.label("Bewegungen").classes("font-medium")
+                    ui.space()
+                    ui.toggle({"alle": f"Alle ({len(bewegungen)})",
+                               "offen": f"Nicht zugeordnet ({len(offen_ids)})",
+                               "beleg": f"Beleg fehlt ({len(fehlen_ids)})"},
+                              value=zustand["sicht"],
+                              on_change=lambda e: (zustand.update(sicht=e.value),
+                                                   zeichnen())) \
+                        .props("dense no-caps unelevated size=sm").mark("konto-sicht")
+                if zustand["sicht"] == "offen":
+                    bewegungen = [b for b in bewegungen if b["id"] in offen_ids]
+                    ui.label("Ausgänge ohne Kategorie. Erst zuordnen – vorher "
+                             "steht nicht fest, ob es dazu überhaupt einen Beleg "
+                             "gibt.").classes(f"text-xs {ton.STILL}")
+                elif zustand["sicht"] == "beleg":
+                    bewegungen = [b for b in bewegungen if b["id"] in fehlen_ids]
+                    ui.label("Zugeordnet, aber der Beleg fehlt. Privatentnahmen, "
+                             "Löhne, Darlehen und Dauerbelege stehen hier bewusst "
+                             "nicht.").classes(f"text-xs {ton.STILL}")
                 # Jede Zeile lässt sich aufklappen. Zugeklappt sagt sie, ob die
                 # Bewegung fertig ist; aufgeklappt steht die Zuordnungsmaske
                 # darin. So bleibt die Liste lesbar und die Arbeit ist einen

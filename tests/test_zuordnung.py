@@ -224,3 +224,25 @@ async def test_eine_umbuchung_hat_nichts_zuzuordnen(user: User, app_bereit):
     user.find(marker="nav-konto").click()
     user.find(marker=f"bew-{b['id']}").click()
     await user.should_see("nichts zuzuordnen")
+
+
+async def test_eine_liste_mit_drei_sichten_statt_zwei_listen(user: User, app_bereit):
+    """Vorher standen „Fehlende Belege" und „Bewegungen" als zwei Karten
+    nebeneinander und zeigten dieselben Zeilen – so gemeldet am 8.8.2026."""
+    _bewegung(-42.0, bid="s1", gegenpartei="Netto")
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    await user.should_see(marker="konto-sicht")
+    await user.should_see("Nicht zugeordnet")
+    await user.should_see("Beleg fehlt")
+    await user.should_not_see("Fehlende Belege")
+
+
+async def test_die_maske_erklaert_sich(user: User, app_bereit):
+    """„+" allein ist nicht zu erraten – auch das wurde gemeldet."""
+    b = _bewegung(-42.0, bid="s2", gegenpartei="Netto")
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    user.find(marker=f"bew-{b['id']}").click()
+    await user.should_see("Wofür war diese Zahlung?")
+    await user.should_see("Zuordnen")

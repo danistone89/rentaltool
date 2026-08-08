@@ -269,6 +269,30 @@ def kategorie_lernen(haendler, kategorie, wohnung=None):
     return vorhanden
 
 
+def dauerbeleg_lernen(haendler, text, kategorie=""):
+    """Für diesen Empfänger festhalten, dass ein Dauerbeleg vorliegt.
+
+    Miete, Darlehen, Software: der Vertrag liegt einmal vor, die monatliche
+    Abbuchung braucht kein eigenes Blatt. Ohne diesen Weg müsste man jede
+    einzelne Buchung von Hand abhaken – sieben Mietzahlungen im Halbjahr, und
+    im nächsten wieder.
+
+    Legt den Kreditor an, wenn es ihn noch nicht gibt. Gibt ihn zurück.
+    """
+    name = " ".join((haendler or "").split())
+    text = " ".join((text or "").split()) or "Dauerbeleg"
+    if not name:
+        return None
+    muster = _normal(name)
+    if not muster:
+        return None
+    k = kreditor_zu(name)
+    if k is None:
+        return kreditor_anlegen(name, kategorie, [muster], quelle="gelernt",
+                                dauerbeleg=text)
+    return kreditor_aendern(k["id"], dauerbeleg=text)
+
+
 def vorbelegung(haendler):
     """Was ein Beleg dieses Händlers vermutlich ist: (kategorie, wohnung, kreditor)."""
     k = kreditor_zu(haendler)
