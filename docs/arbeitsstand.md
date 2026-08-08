@@ -428,9 +428,21 @@ jetzt `vollstaendigkeit.ausgleich_ohne_abrechnung`: die Gegenrichtung zu
 `sammelbuchungen_ohne_karte` und die gefährlichere, weil ein fehlender
 Bankauszug **alle** Einnahmen und Ausgaben eines Zeitraums verschwinden lässt.
 
+## Beim ersten echten Durchgang (8.8.2026)
+
+**Portal-Auszahlungen: der Betrag nach Provision ist das stärkste Merkmal.**
+Am Bestand gemessen: **keine einzige Abbuchung an Booking** — die Provision
+wird aus der Auszahlung einbehalten —, und **42 von 48** Auszahlungen
+entsprechen genau *einer* Rechnung im Bereich 80–93 % ihres Betrags. Die
+Vorschlagsliste nennt das jetzt als Grund („Betrag passt nach Provision
+(15 %)") und stellt solche Treffer nach oben; bei Direktzahlern zählt die Quote
+nicht, dort wäre sie Zufall. Dazu steht der **Vertriebskanal** in der Zeile —
+bei einer Booking-Auszahlung sind Airbnb-Rechnungen keine Kandidaten, und das
+sah man ihr vorher nicht an.
+
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1195 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1201 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

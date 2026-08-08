@@ -36,6 +36,13 @@ _KENNUNG = re.compile(r"ID\.(\d+)")
 # Wo die gelernte Zuordnung Kennung -> Wohnung steht.
 CFG_SCHLUESSEL = "portal_wohnungen"
 
+# In welchem Bereich eine Portal-Auszahlung zu einer Rechnung passt. Booking
+# behaelt die Provision ein – am Bestand vom 8.8.2026 gab es KEINE einzige
+# Abbuchung an Booking, und 42 von 48 Auszahlungen entsprachen genau einer
+# Rechnung in diesem Bereich. Enger gefasst faellt die Streuung der
+# Provisionssaetze heraus, weiter gefasst passt irgendwann alles.
+PROVISION_VON, PROVISION_BIS = 0.80, 0.93
+
 
 def kennung(bewegung):
     """Die Portal-Kennung aus dem Verwendungszweck – oder ''."""
@@ -115,21 +122,33 @@ def kandidaten(bewegung, cfg=None, buchungen=None, jahr=None):
     dem er vorgeschlagen wird. Der Grund gehört dazu: ein Vorschlag, den man
     nicht nachvollziehen kann, wird entweder blind übernommen oder ignoriert.
     """
+    from app import verrechnung
     text = ((bewegung.get("gegenpartei") or "") + " " + (bewegung.get("text") or ""))
     woerter = _name_teile(text)
     wohnung = wohnung_zu_kennung(kennung(bewegung), cfg)
+    # Nur bei einer PORTAL-Auszahlung ist der Betrag um die Provision gemindert.
+    # Zahlt ein Gast direkt, wäre eine Quote von 85 % ein Zufall.
+    portal = bool(verrechnung.plattform_von(bewegung))
+    eingang = round(bewegung.get("betrag", 0.0), 2)
     raus = []
     for r in offene(jahr):
         betrag, provision = erwartet(r, buchungen)
         gast = _name_teile(r.get("gast", ""))
         namenstreffer = bool(gast & woerter)
         passt_wohnung = bool(wohnung) and r.get("wohnung") == wohnung
+        brutto = round((r.get("summen") or {}).get("brutto", 0.0), 2)
+        quote = (eingang / brutto) if (portal and brutto > 0) else 0.0
+        nach_provision = PROVISION_VON <= quote <= PROVISION_BIS
         grund = ("Name im Verwendungszweck" if namenstreffer else
+                 f"Betrag passt nach Provision ({round((1 - quote) * 100)} %)"
+                 if nach_provision else
                  "gleiche Wohnung" if passt_wohnung else "offen")
         raus.append({"rechnung": r, "erwartet": betrag, "provision": provision,
                      "namenstreffer": namenstreffer, "wohnung": passt_wohnung,
+                     "nach_provision": nach_provision,
                      "naehe": _naehe(r, bewegung), "grund": grund})
-    raus.sort(key=lambda k: (not k["namenstreffer"], not k["wohnung"], k["naehe"]))
+    raus.sort(key=lambda k: (not k["namenstreffer"], not k["nach_provision"],
+                             not k["wohnung"], k["naehe"]))
     return raus
 
 

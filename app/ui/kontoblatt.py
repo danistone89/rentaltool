@@ -528,8 +528,15 @@ def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
                     .classes(f"text-xs {ton.STILL} w-16 shrink-0")
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
                     ui.label(r.get("gast") or "—").classes("text-sm truncate")
-                    ui.label(f"{_d(r.get('datum'))} · {r.get('wohnung_name', '')} · "
-                             f"{k['grund']}").classes(f"text-xs {ton.STILL} truncate")
+                    # Der Kanal gehoert dazu: bei einer Booking-Auszahlung
+                    # sind Airbnb-Rechnungen keine Kandidaten, und das sieht
+                    # man der Zeile sonst nicht an.
+                    b_ = buchungen.get(r.get("buchung")) or {}
+                    kanal = (b_.get("channel") or {}).get("name", "")
+                    ui.label(" · ".join(x for x in
+                                        [_d(r.get('datum')), r.get('wohnung_name', ''),
+                                         kanal, k['grund']] if x)) \
+                        .classes(f"text-xs {ton.STILL} truncate")
                 # Gebucht wird der RECHNUNGSBETRAG, nicht der Auszahlungsbetrag.
                 # Sonst waere der Umsatz um die Provision zu niedrig und die
                 # Provision taeuchte als Ausgabe nie auf – genau der Fehler, den

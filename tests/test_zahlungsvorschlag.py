@@ -197,3 +197,82 @@ def test_ohne_provisionsangabe_bleibt_die_probe_still():
     z.hinzufuegen(b["id"], z.RECHNUNG, 379.48, ziel_id=r["id"])
     rest, erwartet, stimmt = vs.provisionsprobe(b, {})
     assert (rest, erwartet, stimmt) == (0.0, 0.0, True)
+
+
+# ------------- Portal-Auszahlungen: der Betrag nach Provision (8.8.2026)
+# Am Echtbestand gemessen: 42 von 48 Booking-Auszahlungen entsprechen GENAU
+# EINER Rechnung, abzueglich Provision (80-92 % des Rechnungsbetrags). Es gibt
+# keine einzige Abbuchung an Booking - die Provision wird einbehalten. Damit
+# ist die Quote das staerkste Merkmal, das es fuer diese Zahlungen gibt.
+def _zahlung(betrag, gegenpartei, bid, datum="2026-01-05", text=""):
+    from app import db, konto
+    satz = {"id": bid, "datum": datum, "betrag": betrag, "gegenpartei": gegenpartei,
+            "text": text, "konto": "giro", "umbuchung": False}
+    db.anlegen(konto.TABELLE, satz)
+    return satz
+
+
+def _beleg_rechnung(nr, gast, brutto, anreise="2026-01-02", buchung=""):
+    from app import db, rechnung
+    satz = {"id": f"r{nr}", "nummer": str(nr), "gast": gast, "datum": "2026-01-05",
+            "status": rechnung.GESENDET, "anreise": anreise, "abreise": anreise,
+            "buchung": buchung,
+            "summen": {"brutto": brutto, "netto": 0, "ust": 0, "durchlaufend": 0}}
+    db.anlegen("rechnungen", satz)
+    return satz
+
+
+def test_der_betrag_nach_provision_steht_oben():
+    """773,68 minus 15 % Provision sind 657,63 – das ist die Rechnung.
+
+    Die falsche liegt hier NAEHER am Zahltag: ohne das Betragsmerkmal stuende
+    sie oben, weil nur nach Datumsnaehe sortiert wuerde.
+    """
+    b = _zahlung(657.63, "Booking.com BV", "w1", datum="2026-01-05")
+    _beleg_rechnung(1, "Darius Drevinskas", 387.56, anreise="2026-01-05")
+    _beleg_rechnung(2, "Marten Brunk", 773.68, anreise="2025-12-01")
+    k = vs.kandidaten(b)
+    assert k[0]["rechnung"]["nummer"] == "2"
+    assert "Provision" in k[0]["grund"]
+
+
+def test_der_prozentsatz_steht_dabei():
+    """Damit der Mensch beurteilen kann, ob die Quote plausibel ist."""
+    b = _zahlung(657.63, "Booking.com BV", "w1")
+    _beleg_rechnung(2, "Marten Brunk", 773.68)
+    assert "15" in vs.kandidaten(b)[0]["grund"]
+
+
+def test_eine_unplausible_quote_zaehlt_nicht():
+    """Halber Betrag ist keine Provision, sondern eine andere Rechnung."""
+    b = _zahlung(400.00, "Booking.com BV", "w1")
+    _beleg_rechnung(1, "Wer", 800.00)
+    assert "Provision" not in vs.kandidaten(b)[0]["grund"]
+
+
+def test_der_name_schlaegt_die_quote():
+    """Bei einem Direktzahler ist der Name das sichere Merkmal."""
+    b = _zahlung(657.63, "Ernst, Anja", "w1", text="Fam. Ernst")
+    _beleg_rechnung(1, "Anja Ernst", 657.63)
+    _beleg_rechnung(2, "Wer Anders", 773.68)
+    k = vs.kandidaten(b)
+    assert k[0]["rechnung"]["nummer"] == "1"
+
+
+def test_bei_einer_direktzahlung_zaehlt_die_quote_nicht():
+    """Ein Gast zahlt den vollen Betrag – 85 % waeren dort ein Zufall."""
+    b = _zahlung(657.63, "Gockel, Katarina", "w1")
+    _beleg_rechnung(2, "Wer Anders", 773.68)
+    assert "Provision" not in vs.kandidaten(b)[0]["grund"]
+
+
+def test_die_vorschlagsliste_laesst_sich_zeichnen():
+    """Rauchprobe: Kanal und Provisionsgrund in der Zeile."""
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    b = _zahlung(657.63, "Booking.com BV", "w1")
+    _beleg_rechnung(2, "Marten Brunk", 773.68)
+    with Client(lambda: None):
+        with ui.card():
+            kontoblatt._rechnungsvorschlaege(b, 657.63, lambda: None)
