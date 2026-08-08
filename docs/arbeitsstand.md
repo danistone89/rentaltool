@@ -394,6 +394,9 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Entwürfe vorgeschlagen, darunter 78 Dubletten. Es bleiben 44: 39 aus der Zeit
   vor Rechnung Nr. 1, 4 nach Josan (neuer Weg) und **einer dazwischen** –
   Silvia Erdmann 29.12.2025–01.01.2026, dort fehlt eine Rechnung.
+  **Seit dem Stichtag `rechnung_ab` = 2026-01-01** schlägt das Werkzeug nur noch
+  **fünf** Entwürfe vor: Erdmann und die vier nach Josan. 2025 wird nicht mehr
+  berechnet (Ansage 8.8.2026).
 * **⚠ Offener Punkt:** Beträge eines Entwurfs lassen sich in der Oberfläche
   **nicht** ändern – nur die Anschrift. `rechnung.aendern(positionen=…)` kann
   es, die Maske bietet es nicht an. Wer wie bei Gockel von Hand korrigieren
@@ -410,6 +413,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1187 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1191 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

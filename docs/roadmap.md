@@ -1150,6 +1150,21 @@ diesen 44 liegen 39 vor Rechnung Nr. 1 (Oktober–Dezember 2025), 4 nach Josan
 (die gehören dem neuen Weg) und **einer dazwischen** – Silvia Erdmann,
 29.12.2025–01.01.2026, dort fehlt eine Rechnung.
 
+**Rechnungen erst ab einem Stichtag** (`config.rechnung_ab`, Abreisetag
+einschließlich). Ansage vom 8.8.2026: *2025 brauchen wir nicht, es geht nur ab
+2026.* Ohne die Grenze schlug das Werkzeug 39 Entwürfe für Aufenthalte aus
+Oktober bis Dezember 2025 vor. Mit `2026-01-01` bleiben **fünf**: Silvia
+Erdmann (Abreise 01.01.2026) und die vier nach Josan.
+
+> **Ein Irrtum von mir, hier festgehalten, damit er nicht wiederkehrt.** Ich
+> hatte gemeldet, 12 Airbnb-Buchungen seien storniert – die Preisdetails tragen
+> „Cancellation Host Fee / Cancellation Payout". Nachgeprüft: **alle 12**
+> Airbnb-Buchungen tragen das, ausnahmslos. Es ist die Bezeichnung der
+> Gebührenaufteilung, keine Stornierung. Monica Huangs Auszahlung von 4.977,29 €
+> kam in drei Monatsraten an (1.794,13 + 1.620,51 + 1.562,65) – sie war da. Die
+> Rechnungen Nr. 4, 6 und 13 sind richtig. Beinahe hätte ich dem Werkzeug
+> beigebracht, jede Airbnb-Buchung zu übergehen.
+
 > **Was dabei auffiel:** `rechnung.aendern` kann die **Positionen** eines
 > Entwurfs ändern, die Oberfläche bietet es aber nicht an – dort lässt sich nur
 > die Anschrift pflegen. Wer einen Betrag von Hand korrigieren will (wie bei

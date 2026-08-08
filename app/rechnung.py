@@ -338,17 +338,28 @@ def loeschen(rechnung_id):
 
 
 # ------------------------------------------------- Entwürfe nach Check-out
-def faellige_buchungen(jobs, heute=None):
+def faellige_buchungen(jobs, heute=None, ab=None, cfg=None):
     """Abgereiste Buchungen ohne Rechnung – dafür entsteht ein Entwurf.
 
     Erst nach dem Check-out: vorher kann sich der Betrag noch ändern, und eine
     Rechnung über einen Aufenthalt, der noch läuft, ist keine.
+
+    **`ab` grenzt nach unten ab** (`config.rechnung_ab`, Abreisetag
+    einschließlich). Für die Zeit vor der Umstellung soll das Werkzeug keine
+    Rechnungen vorschlagen – am Bestand vom 8.8.2026 waren das 39 Entwürfe für
+    Aufenthalte aus Oktober bis Dezember 2025, für die es nie Rechnungen geben
+    soll. Ohne Angabe bleibt alles wie bisher.
     """
     heute = (heute or date.today()).isoformat()
+    if ab is None:
+        ab = (cfg if cfg is not None else _cfg()).get("rechnung_ab", "") or ""
+    ab = str(ab)[:10]
     faellig = []
     for j in jobs or []:
-        ab = (j.get("departure") or "")[:10]
-        if not ab or ab > heute:
+        abreise = (j.get("departure") or "")[:10]
+        if not abreise or abreise > heute:
+            continue
+        if ab and abreise < ab:
             continue
         if zu_buchung(j.get("id")):
             continue

@@ -6,7 +6,7 @@ Ein grosser Dialog mit Reitern. Gespeichert wird in `config.json`.
 import os
 from datetime import date
 from nicegui import ui
-from app import buchhaltung, data, housekeeping, mailer, rechte, stammdaten
+from app import buchhaltung, data, housekeeping, mailer, rechnung, rechte, stammdaten
 from app.ui.basis import (CFG, DEFAULT_APP_URL, _apts, _checklisten_an,
                           _cur_user, _darf, _read_upload, spaeter, t)
 from app.ui import ton
@@ -158,6 +158,23 @@ def render_einstellungen(schliessen=None):
                     steuer_pct = ui.number("Steuersatz (%)",
                                            value=CFG.get("steuersatz", 0.06) * 100, step=0.1,
                                            format="%.1f").props("outlined dense")
+                    # Vor der Umstellung liefen die Rechnungen ueber Smoobu.
+                    # Ohne diese Grenze schlaegt das Werkzeug fuer jeden alten
+                    # Aufenthalt einen Entwurf vor – am 8.8.2026 waren das 39
+                    # aus Oktober bis Dezember 2025.
+                    rechnung_ab = ui.input(
+                        "Rechnungen erst ab Abreise",
+                        value=CFG.get("rechnung_ab", "")) \
+                        .props("type=date outlined dense") \
+                        .tooltip("Für Aufenthalte, die vorher endeten, schlägt das "
+                                 "Werkzeug keine Rechnung vor. Leer = alle.")
+                    rechnung_start = ui.number(
+                        "Erste eigene Rechnungsnummer",
+                        value=float(CFG.get("rechnung_startnummer",
+                                            rechnung.VORGABE_STARTNUMMER)),
+                        step=1, format="%.0f").props("outlined dense") \
+                        .tooltip("Gilt für das Jahr der Umstellung – davor "
+                                 "vergebene Nummern (z. B. aus Smoobu) bleiben frei.")
 
             with ui.tab_panel(t_arch):
                 ui.label("Jede Festschreibung wird revisionssicher abgelegt und zusätzlich "
@@ -469,6 +486,11 @@ def render_einstellungen(schliessen=None):
             CFG["archiv_spiegel"] = spiegel.value or ""
             CFG["reinigung_ordner"] = reinigung_ordner.value or ""
             CFG["belege_ordner"] = belege_ordner.value or ""
+            CFG["rechnung_ab"] = rechnung_ab.value or ""
+            if rechnung_start.value:
+                CFG["rechnung_startnummer"] = int(rechnung_start.value)
+                CFG["rechnung_startjahr"] = (rechnung_ab.value or "")[:4] \
+                    or CFG.get("rechnung_startjahr", "")
             CFG["uebergabe_ordner"] = uebergabe_ordner.value or ""
             CFG["archiv_webdav"] = {}   # Ablage über Ordner, nicht Nextcloud/WebDAV
             if (channel.value or "").strip():

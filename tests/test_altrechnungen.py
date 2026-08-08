@@ -315,3 +315,39 @@ def test_ein_zweiter_lauf_verbindet_nicht_neu(tmp_path):
     buchung = {"id": 999, "guest-name": "Alexander Josan", "arrival": "2026-07-28"}
     alt.buchungen_verknuepfen([buchung])
     assert alt.buchungen_verknuepfen([buchung]) == (0, 0)
+
+
+# --------------------------- Rechnungen erst ab einem Stichtag (8.8.2026)
+# Ansage: "2025 brauchen wir nicht. Es geht nur ab 2026." Ohne Grenze bot das
+# Werkzeug 39 Entwuerfe fuer Aufenthalte aus Oktober bis Dezember 2025 an –
+# fuer die es nie Rechnungen geben soll.
+def _job(bid, ab, gast="Wer"):
+    return {"id": bid, "guest-name": gast, "arrival": ab, "departure": ab}
+
+
+def test_ohne_grenze_kommt_alles():
+    from datetime import date
+    jobs = [_job(1, "2025-11-02"), _job(2, "2026-01-02")]
+    assert len(rechnung.faellige_buchungen(jobs, date(2026, 8, 8))) == 2
+
+
+def test_die_grenze_laesst_aeltere_aus():
+    from datetime import date
+    jobs = [_job(1, "2025-11-02"), _job(2, "2026-01-02")]
+    f = rechnung.faellige_buchungen(jobs, date(2026, 8, 8), ab="2026-01-01")
+    assert [b["id"] for b in f] == [2]
+
+
+def test_der_stichtag_selbst_zaehlt_mit():
+    """Silvia Erdmann reiste am 01.01.2026 ab – die gehoert dazu."""
+    from datetime import date
+    jobs = [_job(1, "2026-01-01", "Silvia Erdmann")]
+    assert rechnung.faellige_buchungen(jobs, date(2026, 8, 8), ab="2026-01-01") == jobs
+
+
+def test_die_grenze_kommt_aus_der_konfiguration():
+    from datetime import date
+    jobs = [_job(1, "2025-11-02"), _job(2, "2026-01-02")]
+    f = rechnung.faellige_buchungen(jobs, date(2026, 8, 8),
+                                    cfg={"rechnung_ab": "2026-01-01"})
+    assert [b["id"] for b in f] == [2]
