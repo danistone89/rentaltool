@@ -111,14 +111,19 @@ def saldospruenge():
         for alt, neu in zip(liste, liste[1:]):
             # Verglichen werden die STICHTAGE der Kontostände, nicht die
             # Zeiträume der Umsätze – siehe `merken`.
-            # Zwei Saetze mit gleichem Stichtag kann es nicht geben – der
-            # Schluessel ist Konto + Stichtag (siehe `merken`). Deshalb hier
-            # keine zusaetzliche Pruefung darauf.
-            start = _tag(alt.get("stichtag") or alt.get("bis"))
+            # **Nur Saetze mit Stichtag.** Zwei mit gleichem Stichtag kann es
+            # nicht geben – der Schluessel ist Konto + Stichtag (siehe
+            # `merken`). Aeltere Saetze aus der Zeit vor dieser Regel tragen
+            # keinen; sie zu vergleichen ergab am echten Bestand genau die
+            # erfundene Differenz, gegen die die Regel gebaut ist (23,90 EUR
+            # zwischen zwei Ausschnitten desselben Downloads).
+            if not (alt.get("stichtag") and neu.get("stichtag")):
+                continue
+            start = _tag(alt["stichtag"])
             if start is None:
                 continue
             von = (start + timedelta(days=1)).isoformat()
-            bis = neu.get("stichtag") or neu.get("bis")
+            bis = neu["stichtag"]
             summe = round(sum(b.get("betrag", 0.0)
                               for b in konto.alle(von, bis, konto_name)), 2)
             erwartet = round(alt["stand"] + summe, 2)

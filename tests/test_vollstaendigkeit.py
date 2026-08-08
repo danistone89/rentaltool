@@ -550,3 +550,23 @@ def test_die_maske_einer_umbuchung_laesst_sich_zeichnen():
          "kategorie": ""}
     db.anlegen(konto.TABELLE, b)
     _in_client(lambda: kontoblatt._beleg_knopf(b, lambda: None))
+
+
+def test_pruefpunkte_ohne_stichtag_werden_nicht_verglichen():
+    """Am echten Bestand aufgetreten: zwei Saetze, die vor der Berichtigung
+    entstanden sind, tragen keinen Stichtag. Verglichen ergaben sie genau die
+    erfundene Differenz, gegen die die Berichtigung gebaut wurde – hier
+    23,90 EUR zwischen zwei Ausschnitten desselben Downloads."""
+    from app import db
+    for i, (von, bis) in enumerate((("2026-01-01", "2026-02-28"),
+                                    ("2026-03-01", "2026-08-08"))):
+        db.anlegen(vs.TABELLE, {"id": f"alt{i}", "konto": "DE62", "von": von,
+                                "bis": bis, "stand": 2428.44,
+                                "erfasst": "2026-08-08T10:00:00"})
+    # Auf DEMSELBEN Konto – sonst summiert der Vergleich gar nichts und der
+    # Test wäre auch ohne den Schutz grün.
+    db.anlegen(konto.TABELLE, {"id": "w1", "datum": "2026-04-01", "betrag": -23.90,
+                               "gegenpartei": "Irgendwer", "text": "",
+                               "konto": "DE62", "umbuchung": False, "kategorie": ""})
+    assert vs.saldospruenge() == []
+    assert vs.befund()["saldo_pruefbar"] is False
