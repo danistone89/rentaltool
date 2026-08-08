@@ -48,6 +48,12 @@ git push origin "$ZWEIG"
 VORHER="$(ssh "$HOST" "cd $PFAD && git rev-parse HEAD")"
 say "Ausrollen nach $PFAD (Stand vorher: ${VORHER:0:8})"
 ssh "$HOST" "cd $PFAD && git fetch --quiet origin && git checkout --quiet $ZWEIG && git reset --hard --quiet origin/$ZWEIG && git log --oneline -1"
+# Zeitpunkt des Neustarts merken: die Rauchprobe darf nur Fehler ZAEHLEN, die
+# danach entstehen. Beim Herunterfahren meldet NiceGUI fuer jeden offenen
+# Browser-Tab einen Traceback ("JavaScript did not respond") – das ist kein
+# Fehler des neuen Stands, hat aber am 8.8.2026 ein gutes Ausrollen
+# zurueckgerollt, nur weil ein Tab offen war.
+SEIT="$(ssh "$HOST" "date '+%Y-%m-%d %H:%M:%S'")"
 ssh "$HOST" "systemctl restart $DIENST"
 
 # ---------------------------------------------------------------- Rauchprobe
@@ -60,7 +66,9 @@ for i in $(seq 1 10); do
   echo "   Versuch $i …"
 done
 
-FEHLER="$(ssh "$HOST" "journalctl -u $DIENST --since '2 min ago' --no-pager | grep -ciE 'traceback|error' || true")"
+FEHLER="$(ssh "$HOST" "journalctl -u $DIENST --since '$SEIT' --no-pager \
+  | grep -viE 'JavaScript did not respond|CancelledError|Stopping|Deactivated|Stopped' \
+  | grep -ciE 'traceback|error' || true")"
 if [ "$ok" = "1" ] && [ "${FEHLER:-0}" -eq 0 ]; then
   say "Fertig ✓  ($DIENST läuft, Anmeldeseite antwortet, kein Fehler im Log)"
   ssh "$HOST" "cd $PFAD && git log --oneline -1"
@@ -77,5 +85,5 @@ if ssh "$HOST" "curl -fsS --max-time 10 http://127.0.0.1:$PORT/login" 2>/dev/nul
 else
   echo "ACHTUNG: auch der alte Stand antwortet nicht. journalctl -u $DIENST prüfen."
 fi
-ssh "$HOST" "journalctl -u $DIENST --since '3 min ago' --no-pager | tail -25"
+ssh "$HOST" "journalctl -u $DIENST --since '$SEIT' --no-pager | tail -25"
 exit 1
