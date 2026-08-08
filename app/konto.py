@@ -126,24 +126,86 @@ def schnell_zuordnen(bewegung_id, kategorie):
 
     **Nur, solange nichts anderes dran haengt.** Wo schon Posten sind, gilt die
     Maske: ein Klick kann eine Aufteilung nicht kennen.
+
+    **Die uebrigen offenen Zahlungen desselben Empfaengers gehen mit.** Wer
+    gerade entschieden hat, wofuer eine Zahlung an diese Person ist, hat es
+    fuer alle entschieden – so gemeldet am 8.8.2026: „habe einer
+    Valeriya-Remez-Buchung Gehaelter zugeordnet, bei allen anderen hat sich
+    nichts geaendert." Zurueck kommt (bewegung, ids_der_mitgezogenen); die
+    Oberflaeche sagt es und bietet `zuruecknehmen` an.
+
+    Nicht mitgezogen wird, was schon eine Kategorie oder Posten traegt, und
+    kein Zahlungs**eingang**: was ein Erloes ist, entscheidet die Rechnung.
     """
     from app import buchhaltung, stammdaten
     kategorie = (kategorie or "").strip()
     b = db.holen(TABELLE, bewegung_id)
     if not kategorie or b is None or b.get("umbuchung"):
-        return None
+        return None, []
     if b.get("betrag", 0.0) >= 0 or zuordnung.hat_posten(bewegung_id):
-        return None
-    satz, _meldung = zuordnung.hinzufuegen(bewegung_id, zuordnung.KATEGORIE,
-                                           b.get("betrag", 0.0), kategorie)
-    if satz is None:
-        return None
-    db.speichern(TABELLE, bewegung_id,
-                 dict(b, kategorie=kategorie, klasse=buchhaltung.klasse_fuer(kategorie),
-                      herkunft="hand"))
+        return None, []
+    if not _setzen(b, kategorie):
+        return None, []
     # Der Kern der Bedienung: einmal zuordnen, danach von allein erkannt.
     stammdaten.kategorie_lernen(b.get("gegenpartei"), kategorie)
-    return db.holen(TABELLE, bewegung_id)
+    weitere = [x["id"] for x in ohne_zuordnung()
+               if x["id"] != bewegung_id and _gleicher_empfaenger(x, b)
+               and _setzen(x, kategorie)]
+    return db.holen(TABELLE, bewegung_id), weitere
+
+
+def _setzen(b, kategorie):
+    """Kategorie + Posten an einer offenen Ausgabe. True, wenn es geklappt hat."""
+    from app import buchhaltung
+    if b.get("betrag", 0.0) >= 0 or b.get("umbuchung"):
+        return False
+    if zuordnung.hat_posten(b["id"]) or (b.get("kategorie") or "").strip():
+        return False
+    satz, _meldung = zuordnung.hinzufuegen(b["id"], zuordnung.KATEGORIE,
+                                           b.get("betrag", 0.0), kategorie)
+    if satz is None:
+        return False
+    db.speichern(TABELLE, b["id"],
+                 dict(b, kategorie=kategorie, klasse=buchhaltung.klasse_fuer(kategorie),
+                      herkunft="hand"))
+    return True
+
+
+def _gleicher_empfaenger(a, b):
+    """Derselbe Zahlungsempfaenger? Ueber den Kreditor, sonst ueber den Namen."""
+    from app import stammdaten
+    ka = stammdaten.kreditor_zu(a.get("gegenpartei") or "")
+    kb = stammdaten.kreditor_zu(b.get("gegenpartei") or "")
+    if ka and kb:
+        return ka.get("id") == kb.get("id")
+    import re
+    def norm(x):
+        return re.sub(r"\W+", "", (x or "").lower())
+    return bool(norm(a.get("gegenpartei"))) and \
+        norm(a.get("gegenpartei")) == norm(b.get("gegenpartei"))
+
+
+def zuruecknehmen(bewegung_ids):
+    """Ein automatisches Mitziehen rueckgaengig machen.
+
+    Ohne Rueckweg waere das Mitziehen ein Risiko: es beruehrt Bewegungen, die
+    der Mensch nicht einzeln gesehen hat. Entfernt wird nur, was genau so
+    entstanden ist – **eine** Kategoriezuordnung ueber den vollen Betrag.
+    """
+    n = 0
+    for bid in bewegung_ids:
+        b = db.holen(TABELLE, bid)
+        if b is None:
+            continue
+        p = zuordnung.posten(bid)
+        if len(p) != 1 or p[0]["art"] != zuordnung.KATEGORIE:
+            continue                       # von Hand veraendert – stehen lassen
+        if abs(p[0]["betrag"] - b.get("betrag", 0.0)) > zuordnung.GENAU:
+            continue
+        zuordnung.entfernen(p[0]["id"])
+        db.speichern(TABELLE, bid, dict(b, kategorie="", klasse="", herkunft=""))
+        n += 1
+    return n
 
 
 def vorschau_gelernt():
@@ -172,7 +234,7 @@ def gelerntes_anwenden(vorschau):
     """Die Vorschlaege aus `vorschau_gelernt` schreiben. Gibt die Anzahl zurueck."""
     n = 0
     for v in vorschau:
-        if schnell_zuordnen(v["bewegung"]["id"], v["kategorie"]):
+        if schnell_zuordnen(v["bewegung"]["id"], v["kategorie"])[0]:
             n += 1
     return n
 

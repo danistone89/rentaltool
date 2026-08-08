@@ -42,10 +42,19 @@ def _kategorie_wahl(bewegung, neu_zeichnen):
     def gesetzt(e):
         if not e.value:
             return
-        if konto.schnell_zuordnen(bewegung["id"], e.value):
-            ui.notify(f"Zugeordnet ✓ – „{bewegung.get('gegenpartei') or ''}“ ist ab "
-                      "jetzt gemerkt.", type="positive", timeout=2500)
-            neu_zeichnen()
+        satz, weitere = konto.schnell_zuordnen(bewegung["id"], e.value)
+        if not satz:
+            return
+        name = bewegung.get("gegenpartei") or ""
+        if weitere:
+            # Es wurden Bewegungen berührt, die niemand einzeln gesehen hat –
+            # das muss man sagen und zurücknehmen können. Gemeldet am
+            # 8.8.2026: „bei allen anderen hat sich nichts geändert."
+            _mitgezogen_zeigen(name, e.value, weitere, neu_zeichnen)
+        else:
+            ui.notify(f"Zugeordnet ✓ – „{name}“ ist ab jetzt gemerkt.",
+                      type="positive", timeout=2500)
+        neu_zeichnen()
 
     ui.select({"": "— zuordnen —",
                **{x: x for x in buchhaltung.kategorien(CFG)}},
@@ -53,6 +62,49 @@ def _kategorie_wahl(bewegung, neu_zeichnen):
         .props("dense borderless options-dense").classes(
             f"text-xs shrink-0 w-[190px] {ton.STILL}") \
         .mark(f"kat-{bewegung['id']}")
+
+
+def _mitgezogen_zeigen(name, kategorie, ids, neu_zeichnen):
+    """Sagen, was außer der angeklickten Zeile noch zugeordnet wurde.
+
+    Wer entschieden hat, wofür eine Zahlung an diese Person ist, hat es für
+    alle entschieden – aber gesehen hat er nur die eine. Deshalb: Zahl nennen,
+    Rückweg anbieten.
+    """
+    with ui.dialog() as dlg, ui.card().classes("w-[480px] max-w-full gap-2"):
+        ui.label(f"{len(ids) + 1} Zahlungen zugeordnet").classes("font-medium")
+        ui.label(f"Alle offenen Zahlungen an „{name}“ stehen jetzt unter "
+                 f"„{kategorie}“ – die angeklickte und {len(ids)} weitere. "
+                 "Künftige Zahlungen an diesen Empfänger werden von allein "
+                 "erkannt.").classes(f"text-xs {ton.STILL}")
+        with ui.column().classes("w-full gap-1"):
+            for bid in ids[:12]:
+                b = konto.holen(bid)
+                if not b:
+                    continue
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    ui.label(_d(b.get("datum"))).classes(f"text-xs w-20 {ton.STILL}")
+                    ui.label(b.get("gegenpartei") or "—") \
+                        .classes("text-xs flex-grow min-w-0 truncate")
+                    ui.label(_eur(b.get("betrag", 0))) \
+                        .classes("text-xs w-24 text-right")
+            if len(ids) > 12:
+                ui.label(f"… und {len(ids) - 12} weitere") \
+                    .classes(f"text-xs {ton.STILL}")
+
+        def zurueck():
+            n = konto.zuruecknehmen(ids)
+            dlg.close()
+            ui.notify(f"{n} zurückgenommen – nur die angeklickte Zahlung bleibt "
+                      "zugeordnet.", type="warning")
+            neu_zeichnen()
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Nur diese eine", on_click=zurueck) \
+                .props("flat no-caps dense").mark("mitgezogen-zurueck")
+            ui.button("Gut so", on_click=dlg.close) \
+                .props("unelevated no-caps dense").mark("mitgezogen-ok")
+    dlg.open()
 
 
 def _beleg_waehlen(bewegung, neu_zeichnen):

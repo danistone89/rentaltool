@@ -79,7 +79,7 @@ def test_der_klick_merkt_sich_den_empfaenger():
 
 def test_ohne_kategorie_passiert_nichts():
     _bewegung(-280.50, "Valeriya Remez", "w1")
-    assert konto.schnell_zuordnen("w1", "") is None
+    assert konto.schnell_zuordnen("w1", "")[0] is None
     assert z.posten("w1") == []
 
 
@@ -87,7 +87,7 @@ def test_wo_schon_posten_haengen_wird_nichts_ueberschrieben():
     """Dort gilt die Maske – ein Klick koennte eine Aufteilung nicht kennen."""
     b = _bewegung(-100.0, "Baumarkt", "w1")
     z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
-    assert konto.schnell_zuordnen("w1", "Ausstattung/GWG (JYSK)") is None
+    assert konto.schnell_zuordnen("w1", "Ausstattung/GWG (JYSK)")[0] is None
     assert len(z.posten("w1")) == 1
 
 
@@ -96,7 +96,7 @@ def test_eine_umbuchung_wird_nicht_zugeordnet():
     db.anlegen(konto.TABELLE, {"id": "u1", "datum": "2026-06-12", "betrag": -500.0,
                                "gegenpartei": "Kreditkartenabrechnung", "text": "",
                                "konto": "giro", "umbuchung": True, "kategorie": ""})
-    assert konto.schnell_zuordnen("u1", "Wäscherei (Rena)") is None
+    assert konto.schnell_zuordnen("u1", "Wäscherei (Rena)")[0] is None
 
 
 # --------------------------------------- Gelerntes rueckwirkend anwenden
@@ -198,3 +198,109 @@ def test_ohne_vorschlaege_erscheint_der_knopf_nicht():
         with ui.card() as karte:
             kontoblatt._gelerntes_knopf(lambda: None)
     assert not karte.default_slot.children
+
+
+# ------------------------------- Gleicher Empfaenger: sofort mit erledigen
+def test_die_uebrigen_zahlungen_desselben_empfaengers_gehen_mit():
+    """Gemeldet am 8.8.2026: „habe einer Valeriya-Remez-Buchung Gehaelter
+    zugeordnet, bei allen anderen hat sich nichts geaendert."
+
+    Das Lernen griff, aber erst auf Klick. Wer gerade entschieden hat, wofuer
+    eine Zahlung an diese Person ist, hat es fuer alle entschieden.
+    """
+    _bewegung(-619.77, "Valeriya Remez", "w1", datum="2026-06-22")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _bewegung(-318.12, "Valeriya Remez", "w3", datum="2026-04-08")
+    _bewegung(-176.17, "Gabriel", "w4", datum="2026-05-27")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    assert sorted(weitere) == ["w2", "w3"]
+    assert konto.holen("w2")["kategorie"] == "Löhne/Gehälter Minijob"
+    assert z.ist_fertig(konto.holen("w3"))
+    # Ein anderer Empfaenger bleibt unberuehrt.
+    assert konto.holen("w4")["kategorie"] == ""
+
+
+def test_was_schon_zugeordnet_ist_wird_nicht_angefasst():
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05",
+              kategorie="Ausstattung/GWG (JYSK)")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    assert weitere == []
+    assert konto.holen("w2")["kategorie"] == "Ausstattung/GWG (JYSK)"
+
+
+def test_eingaenge_desselben_namens_gehen_nicht_mit():
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    _bewegung(1200.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    assert weitere == []
+
+
+def test_das_mitziehen_laesst_sich_zurueckdrehen():
+    """Ohne Rueckweg waere das automatische Mitziehen ein Risiko."""
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    konto.zuruecknehmen(weitere)
+    b = konto.holen("w2")
+    assert b["kategorie"] == "" and z.posten("w2") == []
+    # Die zuerst zugeordnete Bewegung bleibt stehen.
+    assert konto.holen("w1")["kategorie"] == "Löhne/Gehälter Minijob"
+
+
+def test_zuruecknehmen_ruehrt_fremde_posten_nicht_an():
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    konto.zuruecknehmen(["w1"])
+    assert len(z.posten("w1")) == 1
+
+
+def test_die_rueckmeldung_zum_mitziehen_laesst_sich_zeichnen():
+    from app.ui import kontoblatt
+    _bewegung(-619.77, "Valeriya Remez", "w1")
+    _bewegung(-530.00, "Valeriya Remez", "w2", datum="2026-05-05")
+    _b, weitere = konto.schnell_zuordnen("w1", "Löhne/Gehälter Minijob")
+    _in_client(lambda: kontoblatt._mitgezogen_zeigen(
+        "Valeriya Remez", "Löhne/Gehälter Minijob", weitere, lambda: None))
+
+
+# ------------------------- Die Schutzregeln in `_setzen` und `zuruecknehmen`
+# Sie greifen im normalen Ablauf nie, weil `ohne_zuordnung` schon filtert –
+# und blieben deshalb bei der Gegenprobe gruen. Ein Schutz, den kein Test
+# festhaelt, verschwindet beim naechsten Umbau unbemerkt.
+def test_setzen_ruehrt_eine_zugeordnete_bewegung_nicht_an():
+    b = _bewegung(-100.0, "Rena", "w1", kategorie="Wäscherei (Rena)")
+    assert konto._setzen(b, "Ausstattung/GWG (JYSK)") is False
+    assert konto.holen("w1")["kategorie"] == "Wäscherei (Rena)"
+
+
+def test_setzen_ruehrt_eine_bewegung_mit_posten_nicht_an():
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    assert konto._setzen(b, "Ausstattung/GWG (JYSK)") is False
+    assert len(z.posten("w1")) == 1
+
+
+def test_setzen_ruehrt_einen_eingang_nicht_an():
+    """Was ein Erloes ist, entscheidet die Rechnung – nicht der Absendername."""
+    b = _bewegung(1200.0, "Valeriya Remez", "w1")
+    assert konto._setzen(b, "Löhne/Gehälter Minijob") is False
+    assert z.posten("w1") == []
+
+
+def test_zuruecknehmen_laesst_einen_belegposten_stehen():
+    """Ein Beleg-Posten ueber den vollen Betrag ist NICHT so entstanden – er
+    haengt an einem Dokument und darf nicht mitgeloescht werden."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.BELEG, -100.0, "Wäscherei (Rena)", ziel_id="q1")
+    konto.zuruecknehmen(["w1"])
+    assert len(z.posten("w1")) == 1
+
+
+def test_zuruecknehmen_laesst_eine_aufteilung_stehen():
+    """Zwei Posten ueber zusammen den vollen Betrag: von Hand aufgeteilt."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -40.0, "Ausstattung/GWG (JYSK)")
+    konto.zuruecknehmen(["w1"])
+    assert len(z.posten("w1")) == 2

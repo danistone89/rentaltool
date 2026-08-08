@@ -266,6 +266,12 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
      Maske vollständig aufgeteilte Bewegung zählte weiter mit.
   An den echten Daten durchgespielt: **zwei Zuordnungen von Hand → 24 weitere
   Bewegungen** automatisch, Liste von 78 auf 52.
+  **Nachgebessert nach der ersten Benutzung:** der Knopf allein reichte nicht –
+  „habe einer Valeriya-Remez-Buchung Gehälter zugeordnet, bei allen anderen hat
+  sich nichts geändert." Jetzt gehen die **übrigen offenen Zahlungen desselben
+  Empfängers sofort mit** (bei Remez 5 weitere), mit Rückmeldung und Rückweg
+  („Nur diese eine"). Der Knopf „Gelerntes anwenden" bleibt für alles, was
+  vor dem Lernen schon dalag.
 * **Nächstes Paket: B7** — der Überblick: Einnahmen, Ausgaben, Ergebnis je
   Monat, Wohnung und Kategorie.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
@@ -275,6 +281,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 996 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1007 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```
