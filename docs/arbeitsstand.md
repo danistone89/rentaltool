@@ -213,13 +213,22 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Die Gäste zahlen dort zu viel, abgeführt werden korrekt 6 %. Zu korrigieren
   ist die Einstellung **in Smoobu/Booking.com**, nicht im Code. Solange offen,
   steht auf der Rechnung bewusst kein Prozentsatz.
-* **Nächste Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
+* **B4b ist fertig (8.8.2026):** Verrechnungskonto je Plattform, als Karte im
+  Bereich Konto. Am Probe-Bestand erkannt: 44 Booking- und 7 Airbnb-Eingänge
+  über 32.251 €. Der Saldo steht dort fast in voller Höhe offen, weil bisher
+  nur zwei Rechnungen zugeordnet sind — richtig so, das ist die Aussage.
+  Zwei Teile des Konzepts bewusst **nicht** gebaut: die „offene Forderung je
+  Plattform" (der Vertriebskanal steht nicht an der Rechnung) und die Anzeige
+  der Monatsprobe (braucht den Betrag vom Monatsbeleg, kommt mit B5).
+  Begründung jeweils in `docs/konzept-bankbuchhaltung.md`.
+* **Nächstes Paket: B5** — Eingangsbelege, beide Wege zusammenführen.
+* **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
 
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 703 Tests, Stand 7.8.2026 grün
+.venv/bin/python -m pytest -q     # 871 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

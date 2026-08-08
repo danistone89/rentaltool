@@ -10,7 +10,7 @@ werden. Ohne die Zahl daneben sieht das nach einem Fehler aus.
 """
 from nicegui import ui
 
-from app import konto, kontoauszug, zuordnung
+from app import konto, kontoauszug, verrechnung, zuordnung
 from app.ui.basis import _read_upload, _d
 from app.ui import ton
 
@@ -379,6 +379,63 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 _beleg_knopf(bewegung, neu_zeichnen)
 
 
+def _verrechnungskonten():
+    """Je Plattform ein Kontoblatt – Rechnungen rein, Provision und Auszahlung raus.
+
+    Das führt das Steuerbüro genauso. Der Sinn steht in der einen Zahl rechts:
+    solange der Saldo nicht null ist, fehlt zwischen Rechnung und Geldeingang
+    noch etwas. Die Zeilen darunter zeigen, wo.
+    """
+    konten = verrechnung.uebersicht()
+    if not konten:
+        return
+    with ui.card().classes("w-full").mark("verrechnungskonten"):
+        ui.label("Verrechnungskonten").classes("font-medium")
+        ui.label("Booking und Airbnb ziehen beim Gast ein und zahlen gesammelt "
+                 "netto aus. Geht ein Konto auf, ist der Saldo null.") \
+            .classes(f"text-xs {ton.STILL}")
+        for k in konten:
+            stimmt = abs(k["saldo"]) < 0.005
+            with ui.expansion().classes("w-full").props("dense") \
+                    .mark(f"vk-{k['schluessel']}") as auf:
+                with auf.add_slot("header"):
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.label(k["name"]).classes("text-sm font-medium")
+                        ui.space()
+                        for kopf, wert in (("Rechnungen", k["rechnungen"]),
+                                           ("Provision", k["provision"]),
+                                           ("Auszahlung", k["auszahlung"])):
+                            with ui.column().classes("gap-0 items-end shrink-0"):
+                                ui.label(kopf).classes(f"text-xs {ton.ZART}")
+                                ui.label(_eur(wert)).classes("text-xs")
+                        with ui.column().classes("gap-0 items-end w-28 shrink-0"):
+                            ui.label("Saldo").classes(f"text-xs {ton.ZART}")
+                            ui.label(_eur(k["saldo"])).classes(
+                                "text-sm font-medium "
+                                + (ton.ERFOLG if stimmt else ton.AUF_HINWEIS))
+                if not stimmt:
+                    # Ohne diesen Satz liest man die Zahl als Forderung. Sie ist
+                    # aber meist eine Lücke in der Erfassung – und das ist eine
+                    # andere Aufgabe als eine Mahnung.
+                    ui.label("Der Saldo ist nicht null: entweder ist eine "
+                             "Auszahlung noch keiner Rechnung zugeordnet, oder "
+                             "der Provisionsbeleg der Plattform fehlt noch.") \
+                        .classes(f"text-xs mb-1 {ton.AUF_HINWEIS}")
+                lauf = 0.0
+                with ui.element("div").classes(
+                        "w-full grid grid-cols-[auto_1fr_auto_auto] gap-x-4"):
+                    for kopf in ("Datum", "Vorgang", "Betrag", "Saldo"):
+                        ui.label(kopf).classes(f"text-xs {ton.ZART} "
+                                               + ("" if kopf in ("Datum", "Vorgang")
+                                                  else "text-right"))
+                    for z in k["zeilen"]:
+                        lauf = round(lauf + z["betrag"], 2)
+                        ui.label(_d(z["datum"])).classes(f"text-xs {ton.ZART}")
+                        ui.label(z["text"]).classes("text-xs truncate")
+                        ui.label(_eur(z["betrag"])).classes("text-xs text-right")
+                        ui.label(_eur(lauf)).classes(f"text-xs text-right {ton.STILL}")
+
+
 def render_konto():
     ui.label("Konto").classes("text-xl font-bold")
     ui.label("Kontoauszüge einlesen – Geschäftskonto und Kreditkarte. "
@@ -463,6 +520,8 @@ def render_konto():
                                  "zugeordnet – das Ergebnis ist so lange eine "
                                  "Näherung.").classes("text-xs mt-2 " + ton.AUF_HINWEIS) \
                             .mark("konto-unklar")
+
+            _verrechnungskonten()
 
             # ---- Die Bewegungen -------------------------------------------
             # EINE Liste, drei Sichten. Vorher stand daneben eine zweite Karte

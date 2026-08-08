@@ -199,6 +199,55 @@ Für Direktzahler zusätzlich der **Gastname** aus dem Verwendungszweck. Die
 zugeordnete Rechnung gilt damit als **bezahlt** und trägt ein Zahlungsdatum.
 · *Größe:* L
 
+### B4b · Verrechnungskonto je Plattform — ✅ erledigt (8.8.2026)
+
+**Der Betreiber hat entschieden: wie das Steuerbüro, mit Verrechnungskonto.**
+Ein laufender Saldo je Plattform zeigt, was sonst niemand sieht – ob Booking
+noch etwas schuldet, und ob ein Monat aufgeht.
+
+```
+Verrechnungskonto Booking.com
+  + Rechnung 2026-0031  Meier          620,00
+  + Rechnung 2026-0032  Schulz         540,00
+  − Provision (Monatsbeleg Juni)      −145,87
+  − Auszahlung 12.06.                −1014,13
+  ─────────────────────────────────────────────
+  Saldo                                  0,00  ✓
+```
+
+**Abgeleitet, nicht doppelt gebucht.** Es wäre möglich, für jede Rechnung und
+jede Provision eine zweite Bewegung auf einem Plattform-Konto zu erzeugen –
+echte doppelte Buchführung. Dagegen sprechen zwei Dinge: die Zahlen stünden
+zweimal im Bestand und könnten auseinanderlaufen, und jeder Fehler müsste an
+beiden Stellen korrigiert werden. Der Saldo lässt sich aus dem berechnen, was
+ohnehin da ist:
+
+    Saldo = Σ zugeordnete Rechnungen − Σ Provisionen − Σ Auszahlungen
+
+Dieselbe Zahl, eine Quelle. Was hinzukommt, ist die **Ansicht**: ein Kontoblatt
+je Plattform mit allen Zeilen und dem laufenden Saldo.
+
+**Was es zusätzlich sichtbar macht** – und der eigentliche Gewinn:
+
+* **Offene Forderung**: Rechnungen der Plattform, zu denen noch keine
+  Auszahlung zugeordnet ist. „Booking schuldet dir noch 2.340 €."
+  ⚠ **Nicht gebaut** – der Vertriebskanal steht nicht an der Rechnung, sondern
+  an der Buchung, und erreicht das Konto erst über die Zuordnung zur
+  Auszahlung. Eine Liste, die stattdessen *alle* offenen Rechnungen zeigt, sähe
+  nach einer Antwort aus und wäre keine. Der Saldo sagt, **dass** etwas fehlt;
+  **welche** Rechnung es ist, sagt die Vorschlagsliste aus B3. Sobald der Kanal
+  an der Rechnung steht (offener Punkt), lässt es sich nachtragen.
+* **Die Monatsprobe**: Die Summe der Provisions-Posten eines Monats muss den
+  **Monatsbeleg** treffen. Weicht sie ab, fehlt eine Rechnung oder eine
+  Auszahlung. Das ist die Prüfung, die vorher fälschlich gegen Smoobu lief –
+  jetzt gegen eine verlässliche Quelle.
+  ⚠ **Gerechnet, aber noch nicht bedienbar**: `verrechnung.monatsprobe` ist da
+  und geprüft, braucht aber den Betrag vom Monatsbeleg. Den gibt es erst,
+  wenn die Belege an den Bewegungen hängen – **B5**. Dort wird sie angezeigt.
+
+*Größe:* M · *Umgesetzt:* `app/verrechnung.py`, Karte „Verrechnungskonten" im
+Bereich Konto, `tests/test_verrechnung.py` (13 Prüfungen)
+
 ### B4 · Portalprovision gegenbuchen
 
 Booking und Airbnb schicken **monatlich einen Provisionsbeleg**; Airbnb dazu
