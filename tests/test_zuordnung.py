@@ -246,3 +246,27 @@ async def test_die_maske_erklaert_sich(user: User, app_bereit):
     user.find(marker=f"bew-{b['id']}").click()
     await user.should_see("Wofür war diese Zahlung?")
     await user.should_see("Zuordnen")
+
+
+async def test_die_rechnungsvorschlaege_stehen_offen_da(user: User, app_bereit):
+    """Sie lagen in einer verschachtelten Expansion – wer die Bewegung
+    aufklappte, sah nur eine zugeklappte Zeile und fand sie nicht (gemeldet
+    am 8.8.2026). Ein Vorschlag, den man suchen muss, ist keiner."""
+    from app import db, rechnung
+    db.anlegen("rechnungen", {
+        "id": "rx", "nummer": "2026-0001", "gast": "Anja Ernst",
+        "datum": "2026-08-07", "anreise": "2026-06-08", "abreise": "2026-06-12",
+        "wohnung": 1, "wohnung_name": "Cottaer Straße", "buchung": 1,
+        "status": rechnung.FESTGESCHRIEBEN,
+        "summen": {"brutto": 400.07, "netto": 0, "ust": 0, "durchlaufend": 0}})
+    b = _bewegung(400.07, bid="ernst1", gegenpartei="ERNST SASCHA U ANJA")
+    from app import db as _db
+    _db.speichern(konto.TABELLE, b["id"],
+                  dict(b, text="Buchung Cottaer Strase Fam. Ernst",
+                       datum="2026-06-11"))
+    await _anmelden(user)
+    user.find(marker="nav-konto").click()
+    user.find(marker=f"bew-{b['id']}").click()
+    await user.should_see(marker=f"vs-{b['id']}")
+    await user.should_see("Anja Ernst")
+    await user.should_see("Name im Verwendungszweck")

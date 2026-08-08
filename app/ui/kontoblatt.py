@@ -152,18 +152,30 @@ def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
 
     # Die Smoobu-Buchungen liefern die Provision je Rechnung. Fehlt der Zugang,
     # geht es ohne – dann steht der volle Rechnungsbetrag daneben.
+    # Eng gefasstes Fenster um den Zahltag: drei Jahre bei jedem Zeichnen waren
+    # ein Abruf, den niemand braucht. Ein Aufenthalt liegt selten mehr als ein
+    # halbes Jahr von seiner Zahlung entfernt.
+    tag = (bewegung.get("datum") or "")[:10]
     buchungen = {}
-    try:
-        for b in data._reservations("2025-01-01", "2027-12-31"):
-            buchungen[b.get("id")] = b
-    except Exception:
-        pass
+    if tag:
+        try:
+            von = f"{int(tag[:4]) - 1}-07-01"
+            bis = f"{int(tag[:4]) + 1}-06-30"
+            for b in data._reservations(von, bis):
+                buchungen[b.get("id")] = b
+        except Exception:
+            pass
 
     liste = vs.kandidaten(bewegung, CFG, buchungen)
     if not liste:
         return
-    with ui.expansion(f"Offene Rechnungen ({len(liste)})").classes("w-full") \
-            .props("dense").mark(f"vs-{bewegung['id']}"):
+    # KEIN zweites Aufklapp-Element. Vorher lagen die Vorschlaege in einer
+    # verschachtelten Expansion – zugeklappt sah man nur eine Zeile, und wer die
+    # Bewegung aufklappte, fand sie nicht (so gemeldet). Sie stehen jetzt
+    # sichtbar da, sobald es welche gibt.
+    with ui.column().classes("w-full gap-1 mt-1").mark(f"vs-{bewegung['id']}"):
+        ui.label(f"Offene Rechnungen ({len(liste)}) – die wahrscheinlichste zuerst") \
+            .classes(f"text-xs {ton.STILL}")
         for k in liste[:15]:
             r = k["rechnung"]
             with ui.row().classes("w-full items-center gap-2 no-wrap"):

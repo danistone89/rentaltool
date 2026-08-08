@@ -112,12 +112,34 @@ def test_eine_zugeordnete_rechnung_ist_bezahlt_und_verschwindet():
     assert r["id"] not in [x["id"] for x in vs.offene()]
 
 
-def test_eine_spaetere_rechnung_kann_nicht_gemeint_sein():
-    """Wer am 12. zahlt, kann keine Rechnung vom 20. begleichen."""
-    _rechnung(95, "Spaeter", 100.0, datum="2026-01-20")
-    _rechnung(96, "Frueher", 100.0, datum="2026-01-02")
-    liste = vs.kandidaten(_bewegung(100.0, datum="2026-01-12"))
-    assert [k["rechnung"]["gast"] for k in liste] == ["Frueher"]
+def test_eine_spaeter_ausgestellte_rechnung_bleibt_kandidat():
+    """**Der Denkfehler, den die Praxis aufgedeckt hat.** Eine fruehere Fassung
+    schloss Rechnungen aus, die nach dem Zahltag ausgestellt wurden. Das schien
+    plausibel und war falsch: Gaeste zahlen VOR dem Aufenthalt, die Rechnung
+    folgt danach.
+
+    An den echten Daten trugen alle 48 Rechnungen den Tag ihrer Erstellung
+    (7.8.2026), waehrend die Zahlungen von Januar bis Juli reichten - die Regel
+    verwarf damit JEDEN Kandidaten. Fuer die Zahlung der Familie Ernst vom
+    11.6. wurden null Rechnungen vorgeschlagen, obwohl die passende vorlag."""
+    _rechnung(60, "Anja Ernst", 400.07, datum="2026-08-07")
+    b = _bewegung(400.07, "Buchung Cottaer Strase Fam. Ernst",
+                  datum="2026-06-11", gegenpartei="ERNST SASCHA U ANJA")
+    liste = vs.kandidaten(b)
+    assert liste, "die Rechnung muss vorgeschlagen werden"
+    assert liste[0]["rechnung"]["gast"] == "Anja Ernst"
+    assert liste[0]["namenstreffer"]
+
+
+def test_der_aufenthalt_sortiert_naeher_als_das_rechnungsdatum():
+    """Sortiert wird ueber den Aufenthalt - der haengt mit der Zahlung
+    zusammen, das Ausstellungsdatum nicht."""
+    from app import db
+    for r, an, ab in ((97, "2026-06-08", "2026-06-12"), (98, "2026-11-01", "2026-11-05")):
+        satz = _rechnung(r, f"Gast{r}", 100.0, datum="2026-08-07")
+        db.speichern("rechnungen", satz["id"], dict(satz, anreise=an, abreise=ab))
+    liste = vs.kandidaten(_bewegung(100.0, datum="2026-06-11"))
+    assert liste[0]["rechnung"]["gast"] == "Gast97"
 
 
 def test_ohne_offene_rechnungen_bleibt_die_liste_leer():

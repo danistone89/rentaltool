@@ -118,15 +118,46 @@ def kandidaten(bewegung, cfg=None, buchungen=None, jahr=None):
         gast = _name_teile(r.get("gast", ""))
         namenstreffer = bool(gast & woerter)
         passt_wohnung = bool(wohnung) and r.get("wohnung") == wohnung
-        # Rechnungen, die nach dem Zahltag ausgestellt wurden, können nicht
-        # gemeint sein – aber nur, wenn beide Daten da sind.
-        if r.get("datum") and bewegung.get("datum") and r["datum"] > bewegung["datum"]:
-            continue
         grund = ("Name im Verwendungszweck" if namenstreffer else
                  "gleiche Wohnung" if passt_wohnung else "offen")
         raus.append({"rechnung": r, "erwartet": betrag, "provision": provision,
                      "namenstreffer": namenstreffer, "wohnung": passt_wohnung,
-                     "grund": grund})
-    raus.sort(key=lambda k: (not k["namenstreffer"], not k["wohnung"],
-                             k["rechnung"].get("datum", "")))
+                     "naehe": _naehe(r, bewegung), "grund": grund})
+    raus.sort(key=lambda k: (not k["namenstreffer"], not k["wohnung"], k["naehe"]))
     return raus
+
+
+def _naehe(r, bewegung):
+    """Wie weit liegt der **Aufenthalt** vom Zahltag entfernt (in Tagen)?
+
+    **Nicht das Rechnungsdatum.** Eine frühere Fassung schloss Rechnungen aus,
+    die nach dem Zahltag ausgestellt wurden – das schien plausibel und war
+    falsch: Gäste zahlen **vor** dem Aufenthalt, die Rechnung folgt danach. An
+    den echten Daten trugen alle 48 Rechnungen den Tag ihrer Erstellung
+    (7.8.2026), während die Zahlungen von Januar bis Juli reichten. Die Regel
+    hat damit **jeden** Kandidaten verworfen: null Vorschläge für eine Zahlung,
+    zu der es eine passende Rechnung gab.
+
+    Deshalb wird nichts mehr ausgeschlossen, nur noch sortiert – und zwar über
+    den Aufenthalt, der tatsächlich mit der Zahlung zusammenhängt.
+    """
+    tag = (bewegung.get("datum") or "")[:10]
+    if not tag:
+        return 10 ** 6
+    from datetime import date
+
+    def _d(s):
+        try:
+            j, m, t = str(s)[:10].split("-")
+            return date(int(j), int(m), int(t))
+        except (ValueError, AttributeError):
+            return None
+    zahltag = _d(tag)
+    an, ab = _d(r.get("anreise")), _d(r.get("abreise"))
+    if not zahltag or not (an or ab):
+        return 10 ** 5
+    # Liegt der Zahltag im Aufenthalt, ist die Nähe null.
+    if an and ab and an <= zahltag <= ab:
+        return 0
+    kandidat = min((abs((x - zahltag).days) for x in (an, ab) if x), default=10 ** 5)
+    return kandidat
