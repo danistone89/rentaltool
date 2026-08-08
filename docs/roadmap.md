@@ -1058,7 +1058,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 |---|---|---|---|
 | **B1** | Die Zuordnung als eigener Satz | M | ✅ erledigt (8.8.2026) |
 | **B2** | Die Zuordnungsmaske mit Restbetrag | L | ✅ erledigt (8.8.2026) |
-| **B3** | Ausgangsrechnungen zuordnen | L | offen |
+| **B3** | Ausgangsrechnungen zuordnen | L | ✅ erledigt (8.8.2026) |
 | **B4** | Portalprovision gegenbuchen | M | offen |
 | **B5** | Eingangsbelege – beide Wege zusammenführen | L | offen |
 | **B6** | Kategorien an der Zuordnung | S | offen |

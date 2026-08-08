@@ -136,6 +136,73 @@ _ARTNAME = {zuordnung.RECHNUNG: "Ausgangsrechnung", zuordnung.BELEG: "Beleg",
             zuordnung.KATEGORIE: "nur Kategorie"}
 
 
+def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
+    """Offene Rechnungen zum Abhaken – die wahrscheinlichste zuerst.
+
+    **Kein automatisches Buchen.** Von 65 Zahlungseingängen entspricht genau
+    einer exakt einem Rechnungsbetrag; die Portale zahlen netto nach Provision.
+    Das Werkzeug sortiert vor und nennt den Grund, entschieden wird hier.
+
+    Neben jeder Rechnung steht, was von ihr **ankommen müsste** – Betrag minus
+    Provision aus Smoobu. Damit zählt der Rest beim Abhaken sauber herunter,
+    und was am Ende übrig bleibt, ist die Provision.
+    """
+    from app import data, zahlungsvorschlag as vs
+    from app.ui.basis import CFG
+
+    # Die Smoobu-Buchungen liefern die Provision je Rechnung. Fehlt der Zugang,
+    # geht es ohne – dann steht der volle Rechnungsbetrag daneben.
+    buchungen = {}
+    try:
+        for b in data._reservations("2025-01-01", "2027-12-31"):
+            buchungen[b.get("id")] = b
+    except Exception:
+        pass
+
+    liste = vs.kandidaten(bewegung, CFG, buchungen)
+    if not liste:
+        return
+    with ui.expansion(f"Offene Rechnungen ({len(liste)})").classes("w-full") \
+            .props("dense").mark(f"vs-{bewegung['id']}"):
+        for k in liste[:15]:
+            r = k["rechnung"]
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.label(f"Nr. {r.get('nummer') or '—'}") \
+                    .classes(f"text-xs {ton.STILL} w-16 shrink-0")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    ui.label(r.get("gast") or "—").classes("text-sm truncate")
+                    ui.label(f"{_d(r.get('datum'))} · {r.get('wohnung_name', '')} · "
+                             f"{k['grund']}").classes(f"text-xs {ton.STILL} truncate")
+                if k["provision"]:
+                    ui.label(f"− {_eur(k['provision'])} Prov.") \
+                        .classes(f"text-xs {ton.STILL} shrink-0")
+                ui.label(_eur(k["erwartet"])).classes("text-sm w-24 text-right shrink-0")
+
+                def zuordnen(kk=k):
+                    r_ = kk["rechnung"]
+                    satz, meldung = zuordnung.hinzufuegen(
+                        bewegung["id"], zuordnung.RECHNUNG, kk["erwartet"],
+                        kategorie=bewegung.get("kategorie", ""), ziel_id=r_["id"],
+                        notiz=f"Rechnung {r_.get('nummer') or ''}".strip())
+                    if satz:
+                        # Die Wohnung hinter der Portal-Kennung lernen – beim
+                        # nächsten Auszug steht die richtige Liste schon oben.
+                        gelernt = vs.kennung_lernen(CFG, vs.kennung(bewegung),
+                                                    r_.get("wohnung"))
+                        if gelernt:
+                            data.save_config()
+                    ui.notify(meldung, type="positive" if satz else "warning")
+                    if satz:
+                        neu_zeichnen()
+
+                ui.button(icon="add", on_click=zuordnen) \
+                    .props("flat dense round").tooltip("Dieser Zahlung zuordnen") \
+                    .mark(f"vs-add-{r['id']}")
+        if len(liste) > 15:
+            ui.label(f"… und {len(liste) - 15} weitere offene Rechnungen") \
+                .classes(f"text-xs {ton.STILL}")
+
+
 def _zuordnungsmaske(bewegung, neu_zeichnen):
     """Eine Bewegung aufteilen – der Bildschirm, an dem die Arbeit stattfindet.
 
@@ -209,6 +276,11 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 .props("dense unelevated no-caps size=sm") \
                 .tooltip("Diesen Betrag der gewählten Kategorie zuordnen") \
                 .mark(f"zu-plus-{bewegung['id']}")
+
+        # ---- Ausgangsrechnungen (B3) ----------------------------------------
+        # Nur bei Eingängen, und nur solange etwas offen ist.
+        if bewegung.get("betrag", 0) > 0 and abs(rest) > 0.005:
+            _rechnungsvorschlaege(bewegung, rest, neu_zeichnen)
 
         # ---- Der Restbetrag --------------------------------------------------
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
