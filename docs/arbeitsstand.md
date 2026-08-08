@@ -230,6 +230,20 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   zweite fiel erst an den echten Daten auf). Die Monatsprobe aus B4b ist damit
   anzeigbar. Nach der ersten Benutzung nachgebessert: Mehrfach-Upload (bis 30
   Dateien) und Suche statt Deckel in beiden Zuordnungsmasken.
+* **Belegerkennung berichtigt (8.8.2026)** — nach dem ersten großen Upload
+  gemeldet: eine Lexware-Rechnung stand als „Netto 34,80 €" in der Liste. Der
+  Bankvorgang „Netto 34,80 €" passte scheinbar dazu. Nachgemessen an 31
+  Belegen: **13 hießen „Netto"**, weil `NETTO` in der Händlerliste stand und
+  als Teilzeichenkette im ganzen Dokument gesucht wurde — auf jeder Rechnung
+  steht „Nettobetrag", in jeder Tabelle „Netto" als Spaltenkopf. **5** trugen
+  die Seitenzahl („1/2") als Händler, **13 Beträge waren Datumsangaben**
+  (31,12 = 31.12.). Beim Lexware-Beleg kam beides zusammen: 34,80 war der
+  *Nettoanteil*, zu zahlen waren 41,41.
+  Ergebnis nach der Korrektur: falsche „Netto" 15 → 0, Seitenzahlen 5 → 0,
+  Datum-als-Betrag 13 → 0; Belege, deren Betrag exakt eine Bankbewegung trifft,
+  **6 → 14 von 31**. Für die bereits hochgeladenen Belege gibt es im
+  Belege-Bereich den Knopf „*n* Belege neu auslesen" mit Vorschau; von Hand
+  gepflegte Angaben bleiben unangetastet.
 * **Nächstes Paket: B6** — Kategorien an der Zuordnung statt an der Bewegung.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
@@ -238,6 +252,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 923 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 956 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

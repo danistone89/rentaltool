@@ -248,7 +248,7 @@ def render_belege():
         except Exception:
             text = ""
         aid = sc["apt"]
-        haendler = receipts.guess_merchant(text)
+        haendler = receipts.guess_merchant(text, eigene=receipts.eigene_namen(CFG))
         # Ein bekannter Lieferant bringt seine Kategorie mit (AP13). Die vom
         # Benutzer gewaehlte Wohnung schlaegt die Vorgabe des Kreditors – wer
         # sie ausdruecklich gesetzt hat, weiss es besser.
@@ -433,6 +433,8 @@ def render_belege():
                 ui.label(t("Mehrere Dateien auf einmal sind möglich – Zuschnitt, "
                            "PDF und Texterkennung laufen dann nacheinander.")) \
                     .classes(f"text-xs {ton.STILL}")
+                if bucht:
+                    _nachlese_knopf(render_alles)
                 if not receipts.ocr_available():
                     ui.label(t("Hinweis: OCR (Tesseract) ist auf dem Server nicht installiert – "
                        "Belege werden gespeichert, aber nicht automatisch ausgelesen.")) \
@@ -505,11 +507,13 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
                     merch = ui.input(placeholder=t("Händler"), value=r.get("merchant", "")) \
                         .props("dense borderless").classes("font-semibold flex-grow min-w-0")
                     merch.on("blur", lambda e, i=r["id"], f=merch:
-                             receipts.update_receipt(i, merchant=f.value or ""))
+                             receipts.update_receipt(i, von_hand=True,
+                                                     merchant=f.value or ""))
                     amount = ui.input(placeholder="€", value=r.get("amount", "")) \
                         .props("dense borderless").classes("w-20 text-right")
                     amount.on("blur", lambda e, i=r["id"], f=amount:
-                              receipts.update_receipt(i, amount=f.value or ""))
+                              receipts.update_receipt(i, von_hand=True,
+                                                      amount=f.value or ""))
                     ui.label("€").classes("text-sm text-slate-400")
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
                     ui.icon("home").classes("text-slate-400 text-sm shrink-0")
@@ -580,6 +584,57 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
         if r.get("ocr_text"):
             with ui.expansion(t("Erkannter Text (OCR)"), icon="document_scanner").classes("w-full"):
                 ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-slate-600")
+
+
+def _nachlese_knopf(rerender):
+    """Händler und Beträge vorhandener Belege neu auslesen (8.8.2026).
+
+    **Warum es diesen Knopf gibt.** Die frühere Erkennung lag oft daneben: von
+    31 hochgeladenen Belegen hießen 13 „Netto", 5 trugen die Seitenzahl als
+    Händler, und viele „Beträge" waren Datumsangaben. Wer schon hochgeladen
+    hat, müsste sonst alles von Hand berichtigen.
+
+    **Mit Vorschau.** Ein Knopf, der stillschweigend 31 Datensätze umschreibt,
+    ist nicht nachvollziehbar – hier steht vorher Zeile für Zeile, was sich
+    ändert. Von Hand gepflegte Angaben bleiben unangetastet.
+    """
+    aenderungen = receipts.nachlesen(eigene=receipts.eigene_namen(CFG))
+    if not aenderungen:
+        return
+
+    def uebernehmen(dlg):
+        n = receipts.uebernehmen(aenderungen)
+        dlg.close()
+        ui.notify(t("{n} Belege neu ausgelesen ✓", n=n), type="positive")
+        rerender()
+
+    def oeffnen():
+        with ui.dialog() as dlg, ui.card().classes("w-[640px] max-w-full gap-2"):
+            ui.label(t("Händler und Beträge neu auslesen")).classes("font-medium")
+            ui.label(t("Die frühere Erkennung nahm oft den falschen Namen – "
+                       "„Netto“ stand auf jeder Rechnung als „Nettobetrag“ – und "
+                       "las Datumsangaben als Beträge. Von Hand gepflegte "
+                       "Angaben bleiben unangetastet.")) \
+                .classes(f"text-xs {ton.STILL}")
+            with ui.scroll_area().classes("w-full h-[340px]"):
+                for a in aenderungen:
+                    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                        ui.label(f"{a['alt'][0] or '—'} · {a['alt'][1] or '—'}") \
+                            .classes(f"text-xs w-1/2 truncate {ton.STILL}")
+                        ui.icon("arrow_forward").classes(f"text-xs {ton.ZART}")
+                        ui.label(f"{a['neu'][0] or '—'} · {a['neu'][1] or '—'}") \
+                            .classes("text-xs w-1/2 truncate")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(t("Abbrechen"), on_click=dlg.close).props("flat no-caps")
+                ui.button(t("{n} Belege übernehmen", n=len(aenderungen)),
+                          on_click=lambda: uebernehmen(dlg)) \
+                    .props("unelevated no-caps").mark("nachlese-ok")
+        dlg.open()
+
+    ui.button(t("{n} Belege neu auslesen", n=len(aenderungen)),
+              icon="auto_fix_high", on_click=oeffnen) \
+        .props("flat dense no-caps size=sm").classes(ton.AUF_HINWEIS) \
+        .mark("nachlese-open")
 
 
 async def _stapel_verarbeiten(dateien, einzeln):

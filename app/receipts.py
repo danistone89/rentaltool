@@ -46,7 +46,13 @@ def list_receipts(limit=500):
     return db.alle(TABELLE, neueste_zuerst=True)[:limit]
 
 
-def update_receipt(receipt_id, **fields):
+def update_receipt(receipt_id, von_hand=False, **fields):
+    """Felder eines Belegs setzen.
+
+    `von_hand=True` merkt sich, welche Felder ein Mensch gepflegt hat. Das
+    Nachlesen (`nachlesen`) laesst diese Felder danach in Ruhe – sonst naehme
+    ein spaeterer Lauf jede Korrektur wieder zurueck.
+    """
     with db.transaktion():
         r = db.holen(TABELLE, receipt_id)
         if r is None:
@@ -54,7 +60,46 @@ def update_receipt(receipt_id, **fields):
         for k, v in fields.items():
             if k in _EDITABLE:
                 r[k] = v
+                if von_hand:
+                    r["hand"] = sorted(set(r.get("hand") or []) | {k})
         db.speichern(TABELLE, receipt_id, r)
+
+
+def nachlesen(eigene=None, belege=None):
+    """Haendler und Betrag aus dem gespeicherten Text neu bestimmen – als
+    **Vorschlag**, noch ohne zu schreiben.
+
+    **Warum das noetig ist.** Die alte Erkennung lag oft daneben (siehe
+    `guess_merchant`). Wer schon Belege hochgeladen hat – am 8.8.2026 waren es
+    31 –, muesste sie sonst alle von Hand berichtigen.
+
+    Zurueck kommt je Beleg ein Satz mit `alt` und `neu`, damit der Mensch vor
+    dem Schreiben sieht, was sich aendert. Ein Nachlesen, das stillschweigend
+    31 Datensaetze umschreibt, waere nicht nachvollziehbar.
+
+    **Von Hand gepflegte Felder bleiben unangetastet.**
+    """
+    raus = []
+    for r in (belege if belege is not None else list_receipts(100000)):
+        text = r.get("ocr_text") or ""
+        if not text.strip():
+            continue
+        hand = set(r.get("hand") or [])
+        alt_m, alt_a = r.get("merchant") or "", r.get("amount") or ""
+        neu_m = alt_m if "merchant" in hand else (guess_merchant(text, eigene) or alt_m)
+        neu_a = alt_a if "amount" in hand else (guess_amount(text) or alt_a)
+        if (neu_m, neu_a) != (alt_m, alt_a):
+            raus.append({"beleg": r, "alt": (alt_m, alt_a), "neu": (neu_m, neu_a)})
+    return raus
+
+
+def uebernehmen(aenderungen):
+    """Vorgeschlagene Aenderungen schreiben. Gibt die Anzahl zurueck."""
+    n = 0
+    for a in aenderungen:
+        update_receipt(a["beleg"]["id"], merchant=a["neu"][0], amount=a["neu"][1])
+        n += 1
+    return n
 
 
 def delete_receipt(receipt_id):
@@ -97,24 +142,68 @@ def ocr_image(path, lang="deu"):
             return ""
 
 
-_MONEY = re.compile(r"(\d{1,4}[.,]\d{2})")
+# Ein Geldbetrag – aber NICHT als Teil eines Datums. „31.12.2026" lieferte
+# vorher den Betrag „31,12"; an den echten Belegen war das der haeufigste
+# Fehler. Die Ausschluesse: keine Ziffer davor mit Punkt (Tag.Monat), keine
+# Ziffer dahinter mit Punkt (Monat.Jahr), keine weitere Ziffer direkt daneben.
+_MONEY = re.compile(r"(?<![\d.,])(\d{1,4}[.,]\d{2})(?![\d.,])")
+
+# Wonach der Endbetrag benannt ist – von der staerksten Aussage abwaerts.
+_SUMMENWORT = ("zu zahlen", "zahlbetrag", "rechnungsbetrag", "gesamtbetrag",
+               "gesamtsumme", "endbetrag", "summe", "gesamt", "total",
+               # Ganz zum Schluss das schwaechste Wort: „Den Betrag von 8,79 EUR
+               # buchen wir ab" ist die einzige Betragsangabe mancher Rechnung.
+               "betrag")
+
+# Zeilen, die zwar einen Betrag tragen, aber nie den Endbetrag: der Nettoanteil
+# und die Steuer stehen ueber dem, was zu zahlen ist.
+_TEILBETRAG = ("netto", "mwst", "ust", "umsatzsteuer", "steuer", "zwischensumme",
+               "rabatt", "skonto", "anzahlung")
 
 
 def guess_amount(text):
+    """Der zu zahlende Betrag aus dem Belegtext.
+
+    **Zwei Fehler, die der erste grosse Upload zeigte (8.8.2026):**
+
+    1. **Datumsangaben galten als Betraege.** „31.12.2026" wurde als „31,12"
+       gelesen. Da im Rueckfall der *groesste* Fund gewann, schlug ein Datum
+       jeden echten Kleinbetrag.
+    2. **Der Nettobetrag schlug den Gesamtbetrag.** Das Schluesselwort „betrag"
+       traf die Zeile „Nettobetrag 29,24" genauso wie „Gesamtbetrag 34,80" –
+       und die Nettozeile steht weiter oben.
+
+    Deshalb: Datumsanteile sind ausgeschlossen, die Schluesselwoerter sind
+    geordnet, und Zeilen mit Netto/Steuer/Zwischensumme zaehlen nur, wenn sich
+    sonst nichts findet.
+    """
     if not text:
         return ""
-    lines = text.splitlines()
-    for kw in ("summe", "gesamt", "zu zahlen", "total", "betrag", "eur", "€"):
-        for ln in lines:
-            if kw in ln.lower():
-                m = _MONEY.findall(ln)
-                if m:
-                    return m[-1].replace(".", ",")
-    allm = _MONEY.findall(text)
-    if allm:
-        def _val(x):
+    zeilen = text.splitlines()
+    for wort in _SUMMENWORT:
+        for i, ln in enumerate(zeilen):
+            klein = ln.lower()
+            if wort not in klein or any(x in klein for x in _TEILBETRAG):
+                continue
+            # Aus einer PDF-Tabelle kommen Beschriftung und Wert oft in
+            # getrennten Zeilen: „Gesamtbetrag EUR" / „41,41". Deshalb bis zu
+            # zwei Zeilen weiterlesen, bevor das Schluesselwort aufgegeben wird.
+            for kandidat in zeilen[i:i + 3]:
+                treffer = _MONEY.findall(kandidat)
+                if treffer:
+                    return treffer[-1].replace(".", ",")
+    # Erst jetzt die Zeilen, die einen Teilbetrag benennen – besser der
+    # Nettobetrag als gar nichts.
+    for ln in zeilen:
+        if any(x in ln.lower() for x in _SUMMENWORT):
+            treffer = _MONEY.findall(ln)
+            if treffer:
+                return treffer[-1].replace(".", ",")
+    alle = _MONEY.findall(text)
+    if alle:
+        def _wert(x):
             return float(x.replace(".", "").replace(",", "."))
-        return max(allm, key=_val).replace(".", ",")
+        return max(alle, key=_wert).replace(".", ",")
     return ""
 
 
@@ -398,16 +487,123 @@ def save_document(data, ext, mirror_dir=None, crop=True, corners=None):
     return {"photo": img_rel, "pdf": pdf_rel}
 
 
-def guess_merchant(text):
-    up = (text or "").upper()
-    for k in _KNOWN_MERCHANTS:
-        if k in up:
-            return "dm" if k == "DM" else k.capitalize()
-    for ln in (text or "").splitlines():
-        s = ln.strip()
-        if len(s) >= 3:
-            return s[:40]
+# Wie weit oben der Briefkopf steht. Der Absender einer Rechnung steht in den
+# ersten Zeilen; was weiter unten auftaucht, ist Fliesstext oder Tabelle.
+_KOPF_ZEILEN = 20
+
+# Rechtsformen, an denen ein Absender zu erkennen ist.
+_RECHTSFORM = re.compile(
+    r"(\bGmbH\b|\bmbH\b|\bAG\b|\bKG\b|\bUG\b|\bGbR\b|\bSE\b|"
+    r"\be\.\s?K\.|\be\.\s?V\.|&\s?Co\b|\bUC\b|\bLtd\b|\bB\.?V\.?\b)", re.I)
+
+# Zeilen, die nie ein Haendler sind: Seitenzahlen („1/2"), Beschriftungen
+# („Rechnungsnr.:"), Netzadressen, reine Zahlen und Daten.
+_KEIN_NAME = re.compile(
+    r"^(\d+\s*/\s*\d+|[\d.,\s€-]+|.*:\s*$|www\..*|.*@.*|"
+    r"\d{1,2}\.\d{1,2}\.\d{2,4}.*|"
+    # Anschriftzeilen des EMPFAENGERS: „01219 Dresden", „Herr", „Frau".
+    r"\d{5}\s+\S.*|(Herr|Frau|Firma|z\.\s?Hd\.?)\s*$)$", re.I)
+
+
+def _kopfzeilen(text, wie_viele=_KOPF_ZEILEN):
+    return [z.strip() for z in (text or "").splitlines() if len(z.strip()) > 2][:wie_viele]
+
+
+def _ist_eigener(zeile, eigene):
+    z = re.sub(r"\W+", "", (zeile or "").lower())
+    return any(z and re.sub(r"\W+", "", (e or "").lower()) in z for e in (eigene or []) if e)
+
+
+def guess_merchant(text, eigene=None):
+    """Wer hat diesen Beleg ausgestellt?
+
+    **Der Haendler steht im Briefkopf, nicht irgendwo im Dokument.** Die
+    fruehere Fassung suchte die bekannten Namen als Teilzeichenkette im ganzen
+    Text. Ergebnis nach dem ersten grossen Upload (8.8.2026): **13 von 31**
+    Belegen hiessen „Netto" – darunter Rechnungen von Telekom, Lexware, JYSK
+    und der Landeshauptstadt Dresden. Auf jeder Rechnung steht „Nettobetrag",
+    und in jeder Betragstabelle steht „Netto" als Spaltenkopf. Wortgrenzen
+    allein haetten den Spaltenkopf nicht abgefangen.
+
+    Drei Stufen, alle nur im Kopf des Dokuments:
+
+    1. **Bekannter Haendler** als ganzes Wort – dafuer war die Liste gedacht:
+       auf einem Kassenbon steht der Name oben und gross.
+    2. **Eine Zeile mit Rechtsform** (GmbH, AG, KG, UC …) – so stehen
+       Lieferanten auf Rechnungen. Der Ort hinter dem Komma faellt weg.
+    3. **Die erste brauchbare Zeile** – Behoerden und Vereine tragen keine
+       Rechtsform. Seitenzahlen, Beschriftungen („Rechnungsnr.:"),
+       Netzadressen und reine Zahlen zaehlen nicht.
+
+    `eigene`: Namen des eigenen Betriebs. Auf Portalabrechnungen steht der
+    eigene Name oben – als Empfaenger. Ohne diese Angabe hiesse der Beleg nach
+    dem eigenen Betrieb (an den echten Daten 5 von 31).
+    """
+    zeilen = [z for z in _kopfzeilen(text) if not _ist_eigener(z, eigene)]
+    # Der bekannte Haendler zaehlt nur ganz oben und nur, wenn die Zeile ihm
+    # gehoert: entweder faengt sie mit ihm an, oder sie ist kurz. Sonst gewinnt
+    # der Spaltenkopf „Position  Netto  Steuer  Brutto" einer Telekomrechnung –
+    # genau der gemeldete Fall.
+    for z in zeilen[:3]:
+        up = z.upper()
+        # „Gesamt Netto" ist eine Tabellenbeschriftung, kein Discounter. Eine
+        # Zeile, die einen Betrag benennt, kann kein Briefkopf sein.
+        # Bewusst OHNE „netto" selbst – sonst faellt der echte Kassenbon
+        # „NETTO Marken-Discount" mit heraus.
+        if any(w in z.lower() for w in _SUMMENWORT
+               + ("mwst", "ust", "umsatzsteuer", "steuer", "zwischensumme")):
+            continue
+        for k in _KNOWN_MERCHANTS:
+            muster = r"\b" + re.escape(k) + r"\b"
+            if re.match(muster, up) or (len(z) <= 25 and re.search(muster, up)):
+                return "dm" if k == "DM" else k.capitalize()
+    for z in zeilen:
+        if _ist_firmenzeile(z):
+            return _saeubern(z)
+    for z in zeilen:
+        if not _KEIN_NAME.match(z) and not _ist_fliesstext(z):
+            return _saeubern(z)
     return ""
+
+
+def _ist_firmenzeile(zeile):
+    """Eine Zeile, die einen Firmennamen traegt – nicht bloss eine Rechtsform.
+
+    Zwei Ausschluesse, beide an echten Belegen gefunden:
+
+    * **Fliesstext.** Im Kleingedruckten einer Lexware-Rechnung steht „… erfolgt
+      durch die Haufe Service Center GmbH im eigenen Namen …". Das ist ein Satz,
+      kein Briefkopf.
+    * **Bruchstuecke.** Bei einem mehrzeilig gesetzten Namen bleibt „GmbH wy"
+      uebrig. Vor der Rechtsform muss ein Name stehen.
+    """
+    m = _RECHTSFORM.search(zeile or "")
+    if not m or _KEIN_NAME.match(zeile) or _ist_fliesstext(zeile):
+        return False
+    return m.start() > 0 and len(zeile) <= 60
+
+
+def _ist_fliesstext(zeile):
+    """Ein Satz statt eines Namens: faengt klein an oder traegt Satzwoerter."""
+    z = (zeile or "").strip()
+    if not z:
+        return True
+    if z[0].islower():
+        return True
+    # Ein Briefkopf endet nicht mit einem Punkt. „VCW Verlag für
+    # ControllingWissen AG, Schäffer-Poeschel GmbH." ist das Ende eines Satzes
+    # im Kleingedruckten – und stand sonst als Absender da.
+    if z.endswith(".") and len(z.split()) >= 4 and not re.search(r"\b[A-Za-zÄÖÜ]\.$", z):
+        return True
+    return bool(re.search(r"\b(erfolgt|wir|ihre|ihr|bitte|durch die|im eigenen|"
+                          r"gemäß|gemaess|entsprechend|siehe|zahlen sie|"
+                          r"sind u\.|kommittenten)\b", z, re.I))
+
+
+def _saeubern(zeile):
+    """Ort, Postfach und OCR-Reste hinter dem Namen abschneiden."""
+    z = re.split(r"[,*]|\s+Postfach\b|\s+PF\b", zeile, 1)[0]
+    return z.strip(" -–·").strip()[:40]
 
 
 # --------------------------------------------------- Sammelmappe (AP10)
@@ -470,3 +666,21 @@ def sammelmappe(belege, titel, zeilen):
     roh = aus.tobytes()
     aus.close()
     return roh
+
+
+def eigene_namen(cfg):
+    """Namen, unter denen der eigene Betrieb auf fremden Belegen auftaucht.
+
+    Auf Portalabrechnungen und Lieferantenrechnungen steht der eigene Name
+    oben – als **Empfänger**. Ohne diese Liste hieße der Beleg nach dem eigenen
+    Betrieb; an den echten Daten betraf das 5 von 31 Belegen.
+    """
+    b = (cfg or {}).get("betreiber") or {}
+    # Bewusst OHNE den blossen Vornamen (`zusatz`): „Daniel" allein wuerde auch
+    # einen Lieferanten „Daniel Mueller GmbH" verwerfen.
+    teile = [b.get("name", ""), b.get("strasse", "")]
+    voll = " ".join(x for x in (b.get("zusatz", ""), b.get("name", "")) if x).strip()
+    for apt in ((cfg or {}).get("apartments") or {}).values():
+        if isinstance(apt, dict) and apt.get("name"):
+            teile.append(apt["name"])
+    return [x.strip() for x in teile + [voll] if x and len(x.strip()) > 2]
