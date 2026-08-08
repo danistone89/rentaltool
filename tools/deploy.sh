@@ -53,6 +53,11 @@ ssh "$HOST" "cd $PFAD && git fetch --quiet origin && git checkout --quiet $ZWEIG
 # Browser-Tab einen Traceback ("JavaScript did not respond") – das ist kein
 # Fehler des neuen Stands, hat aber am 8.8.2026 ein gutes Ausrollen
 # zurueckgerollt, nur weil ein Tab offen war.
+# Abhaengigkeiten nachziehen. Sie standen bisher nur in requirements.txt und
+# wurden von Hand installiert – eine neue Abhaengigkeit rollte damit als
+# funktionierender Code aus, dessen Funktion beim ersten Klick abbrach.
+ssh "$HOST" "cd $PFAD && .venv/bin/pip install --quiet --upgrade-strategy only-if-needed -r requirements.txt"
+
 SEIT="$(ssh "$HOST" "date '+%Y-%m-%d %H:%M:%S'")"
 ssh "$HOST" "systemctl restart $DIENST"
 

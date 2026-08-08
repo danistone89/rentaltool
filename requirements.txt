@@ -24,3 +24,4 @@ segno>=1.6
 # sich nicht als Absturz, sondern als "kommt bei manchen Geraeten still nicht
 # an". Zieht cryptography nach.
 pywebpush>=2.0
+openpyxl==3.1.5  # Auszahlungsberichte von Booking (B11)

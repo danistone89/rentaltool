@@ -74,6 +74,9 @@ TABELLEN = {
     # Vollstaendigkeit nicht behaupten: erst der Vergleich zweier Kontostaende
     # sagt, ob dazwischen Bewegungen fehlen.
     "auszuege": {"akonto": "$.konto", "abis": "$.bis"},
+    # Auszahlungsberichte der Portale (B11). Schluessel ist das Kuerzel aus
+    # dem Verwendungszweck – deshalb ist derselbe Bericht zweimal kein Fehler.
+    "portalauszahlungen": {"portal": "$.portal", "pdatum": "$.datum"},
 }
 
 _lokal = threading.local()

@@ -1105,10 +1105,23 @@ ausdrücklich als unzuverlässig bezeichnet hat).
   Bewegungen einen neuen Schlüssel, und der nächste Import legte alles ein
   zweites Mal an (gegengeprobt: 0 von 238 Schlüsseln blieben gleich).
   ✅ erledigt (8.8.2026)
-* **B11b · Booking-Bericht einlesen.** XLSX (`openpyxl` als neue Abhängigkeit —
-  auf dem Server noch nicht vorhanden). Schlüssel ist die Auszahlungsnummer:
-  ein zweiter Import derselben Auszahlung ändert nichts, egal welcher Zeitraum
-  gewählt wurde.
+* **B11b · Booking-Bericht einlesen.** XLSX (`openpyxl` als neue Abhängigkeit).
+  Schlüssel ist die Auszahlungsnummer: ein zweiter Import derselben Auszahlung
+  ändert nichts, egal welcher Zeitraum gewählt wurde. Der Bericht geht durch
+  **dieselbe** Auswahl wie die Kontoauszüge — was die Datei ist, wird an ihrem
+  Inhalt erkannt, nicht an einer zweiten Hochladestelle.
+
+  Zwei Dinge kamen beim Bauen dazu: Die Zahlungsgebühr (`Payments Service Fee`)
+  steht in einer **eigenen** Spalte und ist nicht Teil der Provision — wer nur
+  die Provision abzieht, sucht je Reservierung ein paar Euro. Und geht die
+  Summe der Reservierungen nicht auf den Auszahlungsbetrag auf, wird das
+  gemeldet statt still hingenommen.
+
+  An den echten Daten: 46 Auszahlungen, alle 46 gehen auf den Cent auf, 75
+  Reservierungen; 46 der 48 Booking-Eingänge auf dem Konto finden ihre
+  Auszahlung über das Kürzel, die zwei übrigen liegen nach dem Berichtsende.
+  `tools/deploy.sh` zieht seit hier die Abhängigkeiten auf dem Server nach.
+  ✅ erledigt (8.8.2026)
 * **B11c · Airbnb-Bericht einlesen.** CSV, Zeilenart `Payout` mit den
   folgenden `Buchung`-Zeilen. Verknüpfung über Betrag + Datum (±7 Tage).
   **Mehrdeutiges wird gezeigt, nicht geraten** — zahlt Airbnb zweimal denselben

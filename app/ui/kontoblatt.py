@@ -10,7 +10,7 @@ werden. Ohne die Zahl daneben sieht das nach einem Fehler aus.
 """
 from nicegui import ui
 
-from app import konto, kontoauszug, verrechnung, zuordnung
+from app import konto, kontoauszug, portalbericht, verrechnung, zuordnung
 from app.ui.basis import _read_upload, _d
 from app.ui import ton
 
@@ -971,13 +971,18 @@ def render_konto():
                "offen_id": "", "auswahl": set()}
 
     async def _ein_auszug(datei):
-        """Einen Auszug einlesen. Gibt (bericht, fehlertext) zurück."""
+        """Eine Datei einlesen. Gibt (bericht, fehlertext) zurück.
+
+        Kontoauszug oder Auszahlungsbericht – erkannt wird es am Inhalt, nicht
+        an einer zweiten Hochladestelle. Der Betrieb hat die Kette aus vielen
+        getrennten Schritten ausdrücklich als fehleranfällig benannt.
+        """
         try:
             rohdaten = await datei.read()
         except Exception as fehler:
             return None, f"Datei nicht lesbar: {fehler}"
         try:
-            return konto.importieren(rohdaten), None
+            return portalbericht.einlesen(rohdaten) or konto.importieren(rohdaten), None
         except ValueError as fehler:                # unbekanntes Format
             return None, str(fehler)
         except Exception as fehler:
@@ -1002,7 +1007,15 @@ def render_konto():
             teile = [f"{b['neu']} neu"]
             if b["doppelt"]:
                 teile.append(f"{b['doppelt']} schon vorhanden")
-            if b["umbuchungen"]:
+            if b.get("art") == "portal":
+                teile.append(f"{b['reservierungen']} Reservierungen")
+                if b["schief"]:
+                    # Geht eine Auszahlung nicht auf, fehlt im Bericht eine
+                    # Reservierung. Das muss auffallen, sonst bleibt spaeter
+                    # ein Rest der Auszahlung unerklaert.
+                    ui.notify(f"{len(b['schief'])} Auszahlungen gehen nicht auf",
+                              type="warning", timeout=9000)
+            elif b["umbuchungen"]:
                 teile.append(f"{b['umbuchungen']} Umbuchungen")
             von, bis = b.get("zeitraum") or ("", "")
             if von and bis:
@@ -1016,11 +1029,12 @@ def render_konto():
     with ui.row().classes("w-full items-center gap-3"):
         ui.upload(auto_upload=True, multiple=True, max_files=12,
                   on_upload=None, on_multi_upload=auszuege_laden,
-                  label="Auszüge (CSV) wählen") \
-            .props('accept=".csv,text/csv"').classes("hk-upload w-[240px]") \
+                  label="Auszüge und Berichte wählen") \
+            .props('accept=".csv,text/csv,.xlsx"').classes("hk-upload w-[240px]") \
             .mark("konto-upload")
-        ui.label("DKB-Business und DKB-VISA, als CSV exportiert – beide "
-                 "zusammen auswählbar. Das Format wird an der Spaltenzeile "
+        ui.label("DKB-Business und DKB-VISA als CSV, dazu der "
+                 "Auszahlungsbericht von Booking (XLSX) – alles zusammen "
+                 "auswählbar. Was die Datei ist, wird an ihrem Inhalt "
                  "erkannt.").classes("text-xs text-slate-400")
 
     def zeichnen():
