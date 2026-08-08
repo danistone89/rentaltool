@@ -146,12 +146,88 @@ def beleg_erwartet(bewegung):
     return True
 
 
+def holen(bewegung_id):
+    return db.holen(TABELLE, bewegung_id)
+
+
+def beleg_anhaengen(bewegung_id, beleg_id):
+    """Einen Beleg an eine Bewegung haengen, **ohne vorhandene Arbeit zu loeschen** (B5).
+
+    Der alte Weg (`beleg_setzen`) loeste zuerst alle Posten. Wer eine Zahlung
+    von 100 EUR auf Putzmittel (60) und Gastgeschenke (40) aufgeteilt hatte und
+    danach den Kassenbon anhaengte, verlor die Aufteilung – stillschweigend.
+
+    Drei Lagen, drei Antworten:
+
+    1. **Keine Posten** – der Beleg deckt die ganze Bewegung.
+    2. **Ein Rest ist offen** – der Beleg deckt genau diesen Rest.
+    3. **Nichts mehr offen** – ein zusaetzlicher Posten wuerde die Zahlung
+       doppelt buchen. Stattdessen bekommen die Posten ohne Gegenstueck ihr
+       Papier: aus „nur Kategorie" wird „Beleg", Betrag und Kategorie bleiben.
+       Genau der Fall des Provisionsbelegs, der monatlich zu einer bereits
+       gegengebuchten Auszahlung nachgereicht wird.
+
+       **Welche Posten?** Trifft der Betrag des Belegs genau einen von ihnen,
+       nur diesen – dann gibt es zu einer Zahlung zwei Belege, und jeder deckt
+       seinen Teil. Sonst alle: eine Quittung ueber 100 EUR gehoert zur ganzen
+       Zahlung, auch wenn die auf Putzmittel und Gastgeschenke aufgeteilt ist.
+       Haengte sie nur an einem Posten, meldete die Belegprobe spaeter eine
+       Luecke, die keine ist.
+
+    **Bei einem Zahlungseingang gilt nur Lage 3.** Ein Lieferantenbeleg kann
+    niemals den offenen Rest einer Auszahlung decken – der ist Umsatz. An den
+    echten Daten hat genau das zugeschlagen: der Provisionsbeleg ueber 265,87
+    EUR erzeugte an einer Booking-Auszahlung einen Posten ueber +1.348,42 EUR.
+    Er gehoert an die gegengebuchte **Provision**, also an einen negativen
+    Posten. Gibt es den noch nicht, passiert nichts – erst gegenbuchen.
+    """
+    from app import buchhaltung, receipts
+    b = db.holen(TABELLE, bewegung_id)
+    if b is None or not beleg_id:
+        return None
+    p = zuordnung.posten(bewegung_id)
+    offen = zuordnung.rest(b)
+    if b.get("betrag", 0.0) > 0:
+        ziel = [z for z in p if not z.get("ziel_id") and z["betrag"] < 0]
+        for z in ziel:
+            zuordnung.ziel_setzen(z["id"], zuordnung.BELEG, beleg_id)
+        return db.holen(TABELLE, bewegung_id) if ziel else None
+    if not p:
+        zuordnung.hinzufuegen(bewegung_id, zuordnung.BELEG, b.get("betrag", 0.0),
+                              kategorie=b.get("kategorie", ""), ziel_id=beleg_id)
+    elif abs(offen) >= zuordnung.GENAU:
+        zuordnung.hinzufuegen(bewegung_id, zuordnung.BELEG, offen,
+                              kategorie=b.get("kategorie", ""), ziel_id=beleg_id)
+    else:
+        ohne_ziel = [z for z in p if not z.get("ziel_id")]
+        if not ohne_ziel:
+            return None                       # jeder Posten hat schon sein Papier
+        wert = buchhaltung.betrag_zahl((db.holen(receipts.TABELLE, beleg_id)
+                                        or {}).get("amount"))
+        genau = ([z for z in ohne_ziel
+                  if wert is not None and abs(abs(z["betrag"]) - abs(wert)) < 0.005]
+                 if len(ohne_ziel) > 1 else [])
+        for z in (genau[:1] or ohne_ziel):
+            zuordnung.ziel_setzen(z["id"], zuordnung.BELEG, beleg_id)
+    return db.holen(TABELLE, bewegung_id)
+
+
+def beleg_loesen(bewegung_id, beleg_id):
+    """Nur diesen einen Beleg wieder loesen – die uebrigen Posten bleiben."""
+    for z in zuordnung.posten(bewegung_id):
+        if z["art"] == zuordnung.BELEG and z.get("ziel_id") == beleg_id:
+            zuordnung.entfernen(z["id"])
+    return db.holen(TABELLE, bewegung_id)
+
+
 def beleg_setzen(bewegung_id, beleg_id):
     """Einen Beleg an eine Bewegung haengen (oder mit '' alle wieder loesen).
 
+    ⚠ **Loest zuerst alle Posten.** Fuer den Alltag ist `beleg_anhaengen` das
+    richtige Werkzeug; diese Funktion bleibt fuer den bewussten Neuanfang an
+    einer Zeile und fuer den Aufruf mit '' (alles loesen).
+
     Seit B1 entsteht dabei ein **Posten** (`app/zuordnung.py`), kein Feld mehr.
-    Diese Funktion bleibt als bequemer Weg fuer den einfachen Fall – eine
-    Ausgabe, ein Beleg, voller Betrag. Alles Weitere geht ueber die Posten.
     """
     b = db.holen(TABELLE, bewegung_id)
     if b is None:

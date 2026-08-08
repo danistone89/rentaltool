@@ -1061,7 +1061,7 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B3** | Ausgangsrechnungen zuordnen | L | ✅ erledigt (8.8.2026) |
 | **B4** | Portalprovision gegenbuchen | M | ✅ erledigt (8.8.2026) |
 | **B4b** | Verrechnungskonto je Plattform | M | ✅ erledigt (8.8.2026) – ohne „offene Forderung", siehe Konzept |
-| **B5** | Eingangsbelege – beide Wege zusammenführen | L | offen |
+| **B5** | Eingangsbelege – beide Wege zusammenführen | L | ✅ erledigt (8.8.2026) |
 | **B6** | Kategorien an der Zuordnung | S | offen |
 | **B7** | Der Überblick | L | offen |
 | **B8** | Vollständigkeit | M | offen |

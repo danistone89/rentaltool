@@ -118,11 +118,26 @@ def ziele(bewegung_id, art):
             if z["art"] == art and z["ziel_id"]]
 
 
+def bewegungen_zu(art, ziel_id):
+    """Umgekehrter Weg: an welchen Bewegungen hängt diese Rechnung oder dieser
+    Beleg?
+
+    **Mehrzahl, weil ein Beleg auf mehrere Bewegungen zeigen darf** (B5): der
+    Provisionsbeleg von Booking kommt monatlich, die Auszahlungen kommen
+    einzeln – 44 im Halbjahr. Ohne diese Richtung ließe sich ein Monatsbeleg
+    gar nicht verbuchen.
+    """
+    return [z["bewegung_id"] for z in db.finden(TABELLE, zart=art, ziel=str(ziel_id))]
+
+
 def bewegung_zu(art, ziel_id):
-    """Umgekehrter Weg: an welcher Bewegung hängt diese Rechnung oder dieser
-    Beleg? Für die Frage „ist diese Rechnung bezahlt?"."""
-    treffer = db.finden(TABELLE, zart=art, ziel=str(ziel_id))
-    return treffer[0]["bewegung_id"] if treffer else ""
+    """Die erste Bewegung dazu – für die Frage „ist diese Rechnung bezahlt?".
+
+    Eine Rechnung gehört immer zu genau einer Zahlung; für Belege ist
+    `bewegungen_zu` das richtige Werkzeug.
+    """
+    treffer = bewegungen_zu(art, ziel_id)
+    return treffer[0] if treffer else ""
 
 
 def uebernehmen_aus_feldern(bewegungen):
@@ -144,3 +159,19 @@ def uebernehmen_aus_feldern(bewegungen):
                         notiz="übernommen aus der 1:1-Zuordnung")
             uebernommen += 1
     return uebernommen
+
+
+def ziel_setzen(zuordnung_id, art, ziel_id):
+    """Einem vorhandenen Posten sein Gegenstück geben (B5).
+
+    Aus „nur Kategorie" wird „Beleg": Betrag und Kategorie bleiben, es kommt
+    das Papier dazu. Nötig, weil ein nachgereichter Beleg **keinen zusätzlichen
+    Posten** erzeugen darf – die Zahlung wäre sonst doppelt gebucht. Der
+    Provisionsbeleg einer Plattform kommt regelmäßig erst nach der Buchung.
+    """
+    z = db.holen(TABELLE, zuordnung_id)
+    if z is None or art not in ARTEN or not str(ziel_id or "").strip():
+        return None
+    z["art"], z["ziel_id"] = art, str(ziel_id)
+    db.speichern(TABELLE, zuordnung_id, z)
+    return z

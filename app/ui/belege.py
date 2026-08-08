@@ -7,7 +7,8 @@ OpenCV.js traf Belege zu unzuverlaessig und lud 10 MB WebAssembly (siehe README)
 import os
 import base64
 from nicegui import ui
-from app import buchhaltung, housekeeping, mode, protokoll, receipts, rechte, stammdaten
+from app import (belegzuordnung, buchhaltung, housekeeping, mode, protokoll,
+                 receipts, rechte, stammdaten)
 from app.ui.basis import (CFG, _MONATE, _apts, _cur_user, _d, _darf, _esc_attr,
                           _photo_thumb, _read_upload, bereichskopf,
                           leer, stoerung, t)
@@ -223,6 +224,9 @@ def render_belege():
 
     apts = _apts()
     sc = {"apt": None, "dlg": None}
+    # Ueberlebt das Neuzeichnen – sonst springt die Liste nach jedem
+    # Handgriff auf „Alle" zurueck.
+    zustand = {"beleg_sicht": "alle"}
 
     def _process_and_add(data, ext, crop, corners=None):
         """Beleg-Bytes -> Dokument/PDF + OCR + Datensatz (blockierender Teil).
@@ -409,6 +413,26 @@ def render_belege():
                 leer("receipt_long", t("Noch keine Belege abgelegt."),
                      t("Oben fotografieren oder eine Datei hochladen."))
                 return
+            # ---- B5d: die beiden Wege sehen einander ---------------------
+            # Ein Beleg, der an keiner Bankbewegung haengt, ist fuer die
+            # Buchhaltung nicht vorhanden. Vorher liess sich das hier gar
+            # nicht sehen. Kein Zusammenlegen der Bereiche: Fotografieren
+            # unterwegs und Buchen am Schreibtisch sind zwei Situationen.
+            if bucht:
+                offene = belegzuordnung.ohne_bewegung()
+                if offene:
+                    with ui.row().classes("w-full items-center gap-2"):
+                        ui.label(t("{n} Belege hängen an keiner Bankbewegung.",
+                                   n=len(offene))).classes(f"text-xs {ton.AUF_HINWEIS}")
+                        ui.space()
+                        ui.toggle({"alle": t("Alle ({n})", n=len(items)),
+                                   "offen": t("Ohne Bewegung ({n})", n=len(offene))},
+                                  value=zustand["beleg_sicht"],
+                                  on_change=lambda e: (zustand.update(beleg_sicht=e.value),
+                                                       render_alles())) \
+                            .props("dense no-caps unelevated size=sm").mark("beleg-sicht")
+                    if zustand["beleg_sicht"] == "offen":
+                        items = offene
             # Gruppiert nach dem BELEGDATUM, nicht nach dem Upload: ein Beleg vom
             # 29. gehoert in den alten Monat, auch wenn er am 2. ankommt.
             items = sorted(items, key=buchhaltung.belegdatum, reverse=True)
@@ -504,6 +528,8 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
                     ui.label(_d(buchhaltung.belegdatum(r))).classes("text-xs text-slate-400")
                 ui.label(f"{t('erfasst')} {_d(r['ts'])} · {r.get('uploader', '')}") \
                     .classes("text-xs text-slate-400")
+                if bucht:
+                    _bewegungszeile(r, rerender)
                 note = ui.input(placeholder=t("Notiz (z. B. wofür)"),
                                 value=r.get("note", "")).props("dense borderless").classes("w-full")
                 note.on("blur", lambda e, i=r["id"], f=note:
@@ -524,6 +550,100 @@ def _beleg_card(r, apts, user, darf_loeschen, bucht, rerender):
         if r.get("ocr_text"):
             with ui.expansion(t("Erkannter Text (OCR)"), icon="document_scanner").classes("w-full"):
                 ui.label(r["ocr_text"]).classes("text-xs whitespace-pre-wrap text-slate-600")
+
+
+def _bewegungszeile(r, rerender):
+    """Zu welcher Bankbewegung gehört dieser Beleg – und wenn zu keiner: welche
+    käme in Frage? (B5a/B5d)
+
+    **Die Richtung aus dem Alltag.** Jemand fotografiert eine Quittung; die
+    Abbuchung steht längst im Auszug. Ohne diese Zeile blieb der Beleg für die
+    Buchhaltung unsichtbar und wanderte womöglich ein zweites Mal ins System.
+
+    Ein Beleg darf an **mehreren** Bewegungen hängen – der Monatsbeleg eines
+    Portals gehört an jede Auszahlung des Monats.
+    """
+    from app import konto, zuordnung
+    ids = zuordnung.bewegungen_zu(zuordnung.BELEG, r["id"])
+    if ids:
+        verteilt, soll, stimmt = belegzuordnung.belegprobe(r)
+        for bid in dict.fromkeys(ids):
+            b = konto.holen(bid)
+            if not b:
+                continue
+            with ui.row().classes("w-full items-center gap-1 no-wrap"):
+                ui.icon("account_balance").classes(f"text-sm shrink-0 {ton.ERFOLG}")
+                ui.label(f"{_d(b.get('datum'))} · {b.get('gegenpartei') or '—'} · "
+                         f"{buchhaltung.betrag_text(b.get('betrag', 0))} €") \
+                    .classes("text-xs truncate")
+                ui.button(icon="link_off",
+                          on_click=lambda i=bid: (konto.beleg_loesen(i, r["id"]),
+                                                  rerender())) \
+                    .props("flat dense round").classes(f"{ton.ZART} shrink-0") \
+                    .tooltip(t("Von dieser Bewegung lösen"))
+        if soll is not None and not stimmt:
+            # Nur beim verteilten Beleg eine Aussage: sonst wäre jede
+            # Rundungsdifferenz eine Warnung.
+            ui.label(t("Verteilt: {v} von {s} – der Rest fehlt noch.",
+                       v=f"{buchhaltung.betrag_text(verteilt)} €",
+                       s=f"{buchhaltung.betrag_text(soll)} €")) \
+                .classes(f"text-xs {ton.AUF_HINWEIS}")
+        return
+
+    alle_k = belegzuordnung.bewegungen_zu(r)
+    kandidaten = alle_k[:8]
+    if not kandidaten:
+        ui.label(t("Noch keiner Bankbewegung zugeordnet.")) \
+            .classes(f"text-xs {ton.AUF_HINWEIS}")
+        return
+
+    def zuordnen(bid, dlg):
+        erfolg = konto.beleg_anhaengen(bid, r["id"])
+        dlg.close()
+        if erfolg is None:
+            ui.notify(t("Dazu fehlt an der Bewegung noch die gegengebuchte "
+                        "Provision – erst im Konto gegenbuchen."),
+                      type="warning", timeout=8000)
+        else:
+            ui.notify(t("Beleg der Bewegung zugeordnet ✓"), type="positive")
+        rerender()
+
+    def oeffnen():
+        with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+            ui.label(t("Passende Bankbewegung wählen")).classes("font-medium")
+            ui.label(t("Wahrscheinlichste zuerst – sortiert nach Empfänger und "
+                       "Datum. Der Betrag ist nur ein Hinweis: von den vorhandenen "
+                       "Belegen trägt kaum einer einen.")) \
+                .classes(f"text-xs {ton.STILL}")
+            if all(k["grund"] == "offen" for k in kandidaten):
+                # Ohne diesen Satz liest man acht beliebige Zeilen als
+                # Vorschlag. Sie sind hier nur die zeitlich naechsten von 122 –
+                # kein Merkmal des Belegs trifft zu.
+                ui.label(t("Nichts passt eindeutig: dieser Beleg trägt weder "
+                           "einen Betrag noch einen Händler, der auf dem Auszug "
+                           "vorkommt. Oben ergänzen verbessert die Vorschläge. "
+                           "Gezeigt werden die {n} zeitlich nächsten von {g}.",
+                           n=len(kandidaten), g=len(alle_k))) \
+                    .classes(f"text-xs {ton.AUF_HINWEIS}")
+            for k in kandidaten:
+                b = k["bewegung"]
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                        ui.label(b.get("gegenpartei") or "—").classes("text-sm truncate")
+                        ui.label(f"{_d(b.get('datum'))} · {k['grund']}") \
+                            .classes(f"text-xs {ton.STILL} truncate")
+                    ui.label(f"{buchhaltung.betrag_text(b.get('betrag', 0))} €") \
+                        .classes("text-sm w-24 text-right shrink-0")
+                    ui.button(icon="add", on_click=lambda i=b["id"]: zuordnen(i, dlg)) \
+                        .props("flat dense round").mark(f"bz-add-{b['id']}")
+            ui.button(t("Schließen"), on_click=dlg.close).props("flat no-caps dense")
+        dlg.open()
+
+    with ui.row().classes("w-full items-center gap-1 no-wrap"):
+        ui.label(t("Noch keiner Bankbewegung zugeordnet.")) \
+            .classes(f"text-xs {ton.AUF_HINWEIS}")
+        ui.button(t("Bewegung wählen"), icon="account_balance", on_click=oeffnen) \
+            .props("flat dense no-caps size=sm").mark(f"bz-waehl-{r['id']}")
 
 
 def _del_beleg(receipt_id, rerender):

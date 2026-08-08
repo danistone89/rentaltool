@@ -87,7 +87,11 @@ def zeilen(schluessel, von="", bis=""):
                 raus.append({"datum": b["datum"], "art": art,
                              "text": z.get("kategorie") or z.get("notiz")
                              or ("Provision" if art == "provision" else "Erlös"),
-                             "betrag": z["betrag"], "bewegung": b["id"]})
+                             "betrag": z["betrag"], "bewegung": b["id"],
+                             # Seit B5 kann am Provisions-Posten der Monatsbeleg
+                             # hängen. Daran hängt die Monatsprobe.
+                             "beleg_id": (z.get("ziel_id") or ""
+                                          if z["art"] == zuordnung.BELEG else "")})
         raus.append({"datum": b["datum"], "art": "auszahlung",
                      "text": "Auszahlung", "betrag": -round(b["betrag"], 2),
                      "bewegung": b["id"]})
@@ -150,3 +154,44 @@ def monatsprobe(schluessel, monat, beleg_betrag):
     summe = round(sum(x["betrag"] for x in z), 2)
     beleg = -abs(round(float(beleg_betrag or 0), 2))
     return summe, beleg, abs(summe - beleg) < 0.02
+
+
+def monatsuebersicht(schluessel, von="", bis=""):
+    """Je Monat: gebuchte Provision und – falls vorhanden – der Monatsbeleg.
+
+    **Die Kontrolle, für die B4b noch die Zahl fehlte.** Booking und Airbnb
+    schicken monatlich einen Provisionsbeleg; seit B5 hängt er an den
+    Provisions-Posten der Auszahlungen. Deckt seine Summe die gebuchten Posten
+    nicht, fehlt eine Auszahlung des Monats – oder an einer fehlt die Rechnung.
+
+    Das ist die Prüfung, die vorher fälschlich gegen Smoobu lief. Diesmal gegen
+    die Quelle, die auch das Steuerbüro verwendet.
+
+    **Ohne Beleg wird nichts behauptet** (`beleg`/`stimmt` sind None). Ein
+    Monat, dessen Beleg noch nicht da ist, ist kein Fehler – nur unfertig.
+    """
+    from app import buchhaltung
+
+    je_monat = {}
+    for zeile in zeilen(schluessel, von, bis):
+        if zeile["art"] != "provision":
+            continue
+        m = (zeile["datum"] or "")[:7]
+        je_monat.setdefault(m, {"monat": m, "provision": 0.0, "belege": set()})
+        je_monat[m]["provision"] = round(je_monat[m]["provision"] + zeile["betrag"], 2)
+        if zeile.get("beleg_id"):
+            je_monat[m]["belege"].add(zeile["beleg_id"])
+
+    raus = []
+    for m in sorted(je_monat, reverse=True):
+        w = je_monat[m]
+        # Mehrere Belege in einem Monat sind möglich (Booking und ein Nachtrag);
+        # verglichen wird gegen ihre Summe.
+        betraege = [buchhaltung.betrag_zahl((db.holen("belege", i) or {}).get("amount"))
+                    for i in sorted(w["belege"])]
+        betraege = [x for x in betraege if x is not None]
+        soll = -abs(round(sum(betraege), 2)) if betraege else None
+        raus.append({"monat": m, "provision": w["provision"], "beleg": soll,
+                     "stimmt": None if soll is None
+                     else abs(w["provision"] - soll) < 0.02})
+    return raus

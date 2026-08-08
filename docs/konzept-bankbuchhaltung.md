@@ -258,13 +258,78 @@ Zur Gegenprobe kennt das Werkzeug die Provision schon aus Smoobu
 (`commission-included` je Buchung): Weicht die Summe der Einzelprovisionen vom
 Monatsbeleg ab, ist das ein Befund und kein Rundungsfehler. · *Größe:* M
 
-### B5 · Eingangsbelege zuordnen — und die beiden Wege zusammenführen
+### B5 · Eingangsbelege zuordnen — ✅ erledigt (8.8.2026)
 
 Heute laufen **Belege** (Mitarbeiter-Upload) und **Konto** nebeneinander: ein
 fotografierter Beleg bleibt für das Konto unsichtbar, und derselbe Beleg kann
 zweimal im System landen. Nötig: aus der Bewegung einen vorhandenen Beleg
 auswählen, aus dem Beleg die passende Bewegung, und eine Dublettenprüfung über
 beide Wege. · *Größe:* L
+
+**Am Bestand nachgemessen (8.8.2026)** — bevor gebaut wird, was der Fall
+gar nicht hergibt:
+
+| | |
+|---|---|
+| Belege im Werkzeug | **4** |
+| davon an einer Bewegung | **0** |
+| davon mit Betrag | **1** |
+| davon mit gepflegtem Belegdatum | **0** (alle über den Upload-Tag) |
+| Ausgaben-Bewegungen | 128, davon **42 ohne Beleg** |
+
+Zwei Folgerungen:
+
+1. **Ein Abgleich über den Betrag trägt nicht.** Der eine Beleg mit Betrag
+   (9,44 €) trifft **null** Bewegungen. Derselbe Befund wie bei den
+   Zahlungseingängen in B3: Beträge sind hier kein Schlüssel. Sortiert wird
+   nach **Händlername** und **Datumsnähe**; der Betrag ist ein Zusatzhinweis,
+   wenn er da ist, und nie ein Ausschlusskriterium.
+2. **Der Vorrat an freien Belegen ist heute leer.** „Aus der Bewegung einen
+   vorhandenen Beleg wählen" hat momentan fast nichts zu wählen — der Weg
+   bleibt trotzdem nötig, sonst ist jeder Handy-Upload für die Buchhaltung
+   verloren. Der Nutzen wächst mit dem Bestand.
+
+Aufgeteilt in vier Stücke:
+
+* **B5a · Beide Richtungen.** Aus der Bewegung einen vorhandenen Beleg wählen,
+  aus dem Beleg die Bewegung. Mit Grund an jedem Vorschlag, wie in B3.
+* **B5b · Ein Beleg auf mehrere Bewegungen.** Der Provisionsbeleg von Booking
+  kommt **monatlich**, die Auszahlungen kommen **einzeln** (44 im Halbjahr).
+  Ein Beleg muss deshalb an mehreren Bewegungen hängen können. Damit wird die
+  **Monatsprobe aus B4b** endlich anzeigbar: Summe der Provisions-Posten eines
+  Monats gegen den Betrag des Monatsbelegs.
+* **B5c · Dublettenprüfung.** Derselbe Beleg über beide Wege hochgeladen.
+  Erkannt an Händler + Betrag + naher Datumslage; **gewarnt, nicht verhindert**
+  — zwei Tankquittungen desselben Tages über denselben Betrag gibt es wirklich.
+* **B5d · Die Wege zusammenführen.** Der Belege-Bereich zeigt an jedem Beleg,
+  zu welcher Bewegung er gehört, und lässt nach „noch keiner Bewegung
+  zugeordnet" filtern. Kein Zusammenlegen der Bereiche: der Handy-Upload
+  unterwegs und die Buchhaltung am Schreibtisch sind zwei Situationen.
+
+**Zwei Fehler, die dabei gefunden wurden** — beide bestanden vor B5:
+
+1. **Ein Beleg löschte die Aufteilung.** `konto.beleg_setzen` löste zuerst
+   *alle* Posten. Wer 100 € auf Putzmittel (60) und Gastgeschenke (40)
+   aufgeteilt hatte und danach den Kassenbon anhängte, verlor die Aufteilung –
+   stillschweigend. Ersetzt durch `konto.beleg_anhaengen`, das vorhandene
+   Posten stehen lässt.
+2. **An einer Auszahlung buchte der Beleg den Umsatz.** Erst an den echten
+   Daten aufgefallen: der Provisionsbeleg über 265,87 € erzeugte an einer
+   Booking-Auszahlung einen Posten über **+1.348,42 €** — den offenen Rest der
+   Auszahlung. Ein Lieferantenbeleg kann diesen Rest nie decken; er gehört an
+   die gegengebuchte Provision. Gibt es die noch nicht, passiert nichts und die
+   Maske sagt es.
+
+**Was B5 für B4b nachliefert:** die **Monatsprobe** ist jetzt anzeigbar. Der
+Monatsbeleg hängt an den Provisions-Posten, `verrechnung.monatsuebersicht`
+stellt gebuchte Provision und Belegbetrag je Monat gegenüber. An den echten
+Daten durchgespielt: ein Beleg über 265,87 €, verteilt auf zwei
+Juni-Auszahlungen, Probe stimmt.
+
+*Umgesetzt:* `app/belegzuordnung.py`, `konto.beleg_anhaengen/beleg_loesen`,
+`zuordnung.ziel_setzen/bewegungen_zu`, `verrechnung.monatsuebersicht`, Masken in
+`app/ui/kontoblatt.py` und `app/ui/belege.py`, `tests/test_belegzuordnung.py`
+(34 Prüfungen).
 
 ### B6 · Kategorien an jeder Bewegung
 

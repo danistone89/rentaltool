@@ -51,6 +51,77 @@ def _kategorie_wahl(bewegung):
         .mark(f"kat-{bewegung['id']}")
 
 
+def _beleg_waehlen(bewegung, neu_zeichnen):
+    """Einen **vorhandenen** Beleg an diese Bewegung hängen (B5).
+
+    Der zweite Weg neben dem Hochladen: was jemand unterwegs fotografiert hat,
+    liegt schon im Werkzeug und war für die Buchhaltung bisher unsichtbar.
+
+    **Zwei Gruppen, und die zweite ist der eigentliche Punkt:** unten stehen
+    Belege, die schon woanders hängen, aber noch nicht ganz verteilt sind. Der
+    Provisionsbeleg von Booking kommt monatlich, die Auszahlungen kommen
+    einzeln – ohne diese Gruppe ließe er sich nach der ersten Auszahlung nicht
+    mehr auswählen.
+    """
+    from app import belegzuordnung as bz, buchhaltung
+
+    frei = bz.belege_zu(bewegung) if bewegung.get("betrag", 0) < 0 else []
+    offen = bz.teilweise_verteilt()
+    if not frei and not offen:
+        return
+
+    def anhaengen(beleg_id, dlg):
+        erfolg = konto.beleg_anhaengen(bewegung["id"], beleg_id)
+        dlg.close()
+        if erfolg is None:
+            # An einer Auszahlung braucht der Beleg einen negativen Posten, an
+            # den er gehoert. Lieber nichts tun und es sagen, als den Umsatz
+            # der Auszahlung als Ausgabe zu buchen.
+            ui.notify("Dazu fehlt noch die gegengebuchte Provision. Erst "
+                      "„Provision …“ drücken, dann den Beleg zuordnen.",
+                      type="warning", timeout=8000)
+        else:
+            ui.notify("Beleg zugeordnet ✓", type="positive")
+        neu_zeichnen()
+
+    def zeile(r, grund, dlg):
+        wert = buchhaltung.betrag_zahl(r.get("amount"))
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                ui.label(r.get("merchant") or "(ohne Händler)").classes("text-sm truncate")
+                ui.label(f"{_d(buchhaltung.belegdatum(r))} · {grund}") \
+                    .classes(f"text-xs {ton.STILL} truncate")
+            ui.label("—" if wert is None else _eur(-abs(wert))) \
+                .classes("text-sm w-24 text-right shrink-0")
+            ui.button(icon="add", on_click=lambda i=r["id"]: anhaengen(i, dlg)) \
+                .props("flat dense round").tooltip("Dieser Bewegung zuordnen") \
+                .mark(f"bw-add-{r['id']}")
+
+    def oeffnen():
+        with ui.dialog() as dlg, ui.card().classes("w-[520px] max-w-full gap-2"):
+            ui.label("Vorhandenen Beleg zuordnen").classes("font-medium")
+            if frei:
+                ui.label(f"Noch keiner Bewegung zugeordnet ({len(frei)}) – "
+                         "wahrscheinlichster zuerst").classes(f"text-xs {ton.STILL}")
+                for k in frei[:20]:
+                    zeile(k["beleg"], k["grund"], dlg)
+            if offen:
+                ui.separator()
+                ui.label("Noch nicht ganz verteilt – etwa der Monatsbeleg eines "
+                         "Portals").classes(f"text-xs {ton.STILL}")
+                for r in offen[:20]:
+                    verteilt, soll, _ = bz.belegprobe(r)
+                    zeile(r, f"davon {_eur(verteilt)} verteilt, "
+                             f"{_eur(round((soll or 0) - verteilt, 2))} offen", dlg)
+            ui.button("Schließen", on_click=dlg.close).props("flat no-caps dense")
+        dlg.open()
+
+    ui.button(icon="attach_file", on_click=oeffnen) \
+        .props("flat dense round").classes(f"{ton.ZART} shrink-0") \
+        .tooltip("Vorhandenen Beleg zuordnen") \
+        .mark(f"beleg-waehl-{bewegung['id']}")
+
+
 def _beleg_knopf(bewegung, neu_zeichnen):
     """Beleg zu dieser Buchung: hochladen, ansehen oder als nicht nötig abhaken.
 
@@ -62,20 +133,28 @@ def _beleg_knopf(bewegung, neu_zeichnen):
     from app import housekeeping, receipts
     from app.ui.basis import _read_upload
 
-    beleg_id = (konto.belege_von(bewegung) or [""])[0]
-    if beleg_id:
+    if bewegung.get("umbuchung"):
+        return
+
+    # Alle anhängenden Belege, jeder einzeln lösbar. Vorher stand hier nur der
+    # erste – und ein Klick darauf löste über `beleg_setzen` ALLE Posten der
+    # Bewegung, auch die Aufteilung auf Kategorien.
+    for bid in konto.belege_von(bewegung):
         ui.button(icon="description",
-                  on_click=lambda: konto.beleg_setzen(bewegung["id"], "") or neu_zeichnen()) \
+                  on_click=lambda i=bid: (konto.beleg_loesen(bewegung["id"], i),
+                                          neu_zeichnen())) \
             .props("flat dense round color=positive") \
             .tooltip("Beleg hängt dran – klicken löst ihn wieder").classes("shrink-0")
-        return
+
+    _beleg_waehlen(bewegung, neu_zeichnen)
+
     # Hochladen geht IMMER, solange es eine Ausgabe ist. `beleg_erwartet`
     # beantwortet eine andere Frage – ob die Buchung in der Liste „fehlt noch"
     # steht –, und die setzt eine Kategorie voraus. Hier wäre das falsch: wer
     # den Kassenbon in der Hand hat, soll ihn anhängen können, ohne vorher zu
     # kategorisieren. (Erst gemeldet an einer Netto-Buchung ohne Kategorie:
     # dort fehlte der Knopf ganz.)
-    if bewegung.get("umbuchung") or bewegung.get("betrag", 0) >= 0:
+    if bewegung.get("betrag", 0) >= 0:
         return
 
     async def hochladen(e):
@@ -92,11 +171,23 @@ def _beleg_knopf(bewegung, neu_zeichnen):
                 merchant=bewegung.get("gegenpartei", ""),
                 kategorie=bewegung.get("kategorie", ""))
             receipts.update_receipt(beleg["id"], datum=bewegung.get("datum", ""))
-            konto.beleg_setzen(bewegung["id"], beleg["id"])
+            # `beleg_anhaengen` statt `beleg_setzen`: der alte Weg loeste erst
+            # ALLE Posten – wer eine Zahlung auf zwei Kategorien aufgeteilt
+            # hatte und dann den Bon anhaengte, verlor die Aufteilung.
+            konto.beleg_anhaengen(bewegung["id"], beleg["id"])
         except Exception as fehler:
             ui.notify(f"Beleg konnte nicht gespeichert werden: {fehler}", type="negative")
             return
-        ui.notify("Beleg gespeichert und zugeordnet ✓", type="positive")
+        from app import belegzuordnung as bz
+        doppelt = bz.dubletten(dict(beleg, datum=bewegung.get("datum", "")))
+        if doppelt:
+            # Gewarnt, nicht verhindert: zwei Quittungen desselben Tages ueber
+            # denselben Betrag gibt es wirklich.
+            ui.notify(f"Zugeordnet ✓ – aber es gibt schon {len(doppelt)} Beleg(e) "
+                      "mit gleichem Betrag um dasselbe Datum. Bitte pruefen, ob "
+                      "es derselbe ist.", type="warning", timeout=9000)
+        else:
+            ui.notify("Beleg gespeichert und zugeordnet ✓", type="positive")
         neu_zeichnen()
 
     def dauerbeleg():
@@ -375,8 +466,44 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 "text-sm font-medium w-28 text-right "
                 + (ton.STILL if fertig else ton.AUF_HINWEIS)) \
                 .mark(f"zu-rest-{bewegung['id']}")
-            if bewegung.get("betrag", 0) < 0:
-                _beleg_knopf(bewegung, neu_zeichnen)
+            # Auch an Eingaengen: der Provisionsbeleg einer Plattform gehoert
+            # an die Auszahlung, nicht an eine Ausgabe.
+            _beleg_knopf(bewegung, neu_zeichnen)
+
+
+def _monatsprobe(schluessel):
+    """Je Monat: gebuchte Provision gegen den Monatsbeleg des Portals (B4b/B5b).
+
+    **Die Prüfung, die vorher fälschlich gegen Smoobu lief.** Booking und
+    Airbnb schicken monatlich einen Provisionsbeleg; seit B5 hängt er an den
+    Provisions-Posten. Deckt seine Summe die gebuchten Posten nicht, fehlt eine
+    Auszahlung des Monats – oder an einer davon die Rechnung.
+
+    Ohne Beleg steht hier nur die gebuchte Summe. Ein Monat, dessen Beleg noch
+    nicht da ist, ist kein Fehler, sondern unfertig.
+    """
+    monate = verrechnung.monatsuebersicht(schluessel)
+    if not monate:
+        return
+    with ui.element("div").classes(
+            "w-full grid grid-cols-[auto_auto_auto_1fr] gap-x-4 mb-2"):
+        for kopf in ("Monat", "gebucht", "Monatsbeleg", ""):
+            ui.label(kopf).classes(f"text-xs {ton.ZART} "
+                                   + ("" if kopf == "Monat" else "text-right"))
+        for m in monate:
+            ui.label(m["monat"]).classes("text-xs")
+            ui.label(_eur(m["provision"])).classes("text-xs text-right")
+            ui.label("—" if m["beleg"] is None else _eur(m["beleg"])) \
+                .classes(f"text-xs text-right {ton.STILL if m['beleg'] is None else ''}")
+            if m["stimmt"] is None:
+                ui.label("Beleg des Portals noch nicht zugeordnet") \
+                    .classes(f"text-xs {ton.STILL} pl-2")
+            elif m["stimmt"]:
+                ui.label("stimmt überein").classes(f"text-xs {ton.ERFOLG} pl-2")
+            else:
+                ui.label(f"{_eur(round(m['beleg'] - m['provision'], 2))} nicht "
+                         "gebucht – eine Auszahlung des Monats fehlt") \
+                    .classes(f"text-xs {ton.AUF_HINWEIS} pl-2")
 
 
 def _verrechnungskonten():
@@ -421,6 +548,7 @@ def _verrechnungskonten():
                              "Auszahlung noch keiner Rechnung zugeordnet, oder "
                              "der Provisionsbeleg der Plattform fehlt noch.") \
                         .classes(f"text-xs mb-1 {ton.AUF_HINWEIS}")
+                _monatsprobe(k["schluessel"])
                 lauf = 0.0
                 with ui.element("div").classes(
                         "w-full grid grid-cols-[auto_1fr_auto_auto] gap-x-4"):

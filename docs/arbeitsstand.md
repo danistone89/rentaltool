@@ -221,7 +221,15 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Plattform" (der Vertriebskanal steht nicht an der Rechnung) und die Anzeige
   der Monatsprobe (braucht den Betrag vom Monatsbeleg, kommt mit B5).
   Begründung jeweils in `docs/konzept-bankbuchhaltung.md`.
-* **Nächstes Paket: B5** — Eingangsbelege, beide Wege zusammenführen.
+* **B5 ist fertig (8.8.2026):** Belege und Bankbewegungen finden zueinander –
+  aus der Bewegung ein vorhandener Beleg, aus dem Beleg die Bewegung, ein Beleg
+  auf mehreren Bewegungen (Monatsbeleg der Portale), Dublettenwarnung beim
+  Hochladen, und im Belege-Bereich der Filter „ohne Bewegung". Dabei zwei
+  bestehende Fehler behoben: ein Beleg löschte die Aufteilung einer Zahlung,
+  und an einer Portal-Auszahlung buchte er den Umsatz statt der Provision (der
+  zweite fiel erst an den echten Daten auf). Die Monatsprobe aus B4b ist damit
+  anzeigbar.
+* **Nächstes Paket: B6** — Kategorien an der Zuordnung statt an der Bewegung.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
@@ -229,6 +237,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 871 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 912 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

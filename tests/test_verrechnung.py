@@ -161,3 +161,64 @@ def test_die_karte_laesst_sich_zeichnen():
     with Client(lambda: None):
         with ui.card():
             kontoblatt._verrechnungskonten()
+
+
+def test_die_monatsprobe_laesst_sich_zeichnen():
+    from nicegui import ui
+    from nicegui.client import Client
+    from app import db
+    from app.ui import kontoblatt
+    db.anlegen("belege", {"id": "prov", "uploader": "x", "ts": "2026-06-30T10:00:00",
+                          "photo": "p.jpg", "merchant": "Booking.com",
+                          "amount": "265,87", "datum": "2026-06-30"})
+    a = _bewegung(1014.13, "Booking.com BV", "bk30", datum="2026-06-05")
+    z.hinzufuegen(a["id"], z.BELEG, -145.87, "Portalprovision", ziel_id="prov")
+    b = _bewegung(500.0, "Airbnb", "bk31", datum="2026-05-05")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -50.0, "Portalprovision")
+    with Client(lambda: None):
+        with ui.card():
+            kontoblatt._monatsprobe("booking")
+            kontoblatt._monatsprobe("airbnb")
+
+
+# ------------------------------------- Die Monatsprobe, jetzt mit Beleg (B5b)
+def test_die_monatsuebersicht_findet_den_beleg_am_posten():
+    """Der Monatsbeleg haengt seit B5 an den Provisions-Posten. Damit laesst
+    sich die Probe endlich anzeigen – vorher fehlte der Betrag dafuer."""
+    from app import db
+    db.anlegen("belege", {"id": "prov", "uploader": "x", "ts": "2026-06-30T10:00:00",
+                          "photo": "p.jpg", "merchant": "Booking.com",
+                          "amount": "265,87", "datum": "2026-06-30"})
+    r1 = _rechnung(31, "Meier", 620.00)
+    a = _bewegung(1014.13, "Booking.com BV", "bk20", datum="2026-06-05")
+    b = _bewegung(820.00, "Booking.com BV", "bk21", datum="2026-06-19")
+    z.hinzufuegen(a["id"], z.RECHNUNG, 620.00, ziel_id=r1["id"])
+    z.hinzufuegen(a["id"], z.BELEG, -145.87, "Portalprovision", ziel_id="prov")
+    z.hinzufuegen(b["id"], z.BELEG, -120.00, "Portalprovision", ziel_id="prov")
+    m = v.monatsuebersicht("booking")
+    juni = [x for x in m if x["monat"] == "2026-06"][0]
+    assert juni["provision"] == -265.87
+    assert juni["beleg"] == -265.87 and juni["stimmt"] is True
+
+
+def test_ein_monat_ohne_beleg_behauptet_nichts():
+    r1 = _rechnung(31, "Meier", 620.00)
+    a = _bewegung(1014.13, "Booking.com BV", "bk20", datum="2026-06-05")
+    z.hinzufuegen(a["id"], z.RECHNUNG, 620.00, ziel_id=r1["id"])
+    z.hinzufuegen(a["id"], z.KATEGORIE, -145.87, "Portalprovision")
+    juni = v.monatsuebersicht("booking")[0]
+    assert juni["provision"] == -145.87
+    assert juni["beleg"] is None and juni["stimmt"] is None
+
+
+def test_eine_fehlende_auszahlung_faellt_gegen_den_monatsbeleg_auf():
+    """Der eigentliche Zweck: der Beleg sagt 265,87, gebucht sind nur 145,87 –
+    also fehlt eine Auszahlung des Monats."""
+    from app import db
+    db.anlegen("belege", {"id": "prov", "uploader": "x", "ts": "2026-06-30T10:00:00",
+                          "photo": "p.jpg", "merchant": "Booking.com",
+                          "amount": "265,87", "datum": "2026-06-30"})
+    a = _bewegung(1014.13, "Booking.com BV", "bk20", datum="2026-06-05")
+    z.hinzufuegen(a["id"], z.BELEG, -145.87, "Portalprovision", ziel_id="prov")
+    juni = v.monatsuebersicht("booking")[0]
+    assert juni["stimmt"] is False and juni["beleg"] == -265.87
