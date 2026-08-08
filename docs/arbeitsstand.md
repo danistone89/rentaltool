@@ -440,7 +440,11 @@ nicht, dort wäre sie Zufall. Dazu steht der **Vertriebskanal** in der Zeile —
 bei einer Booking-Auszahlung sind Airbnb-Rechnungen keine Kandidaten, und das
 sah man ihr vorher nicht an.
 
-**Filter in der Kontoliste, und die Zeile bleibt stehen.** Bei 238 Bewegungen
+**Filter in der Kontoliste, und die Zeile bleibt stehen.** *(Nachgebessert:
+der Filter wirkt erst auf Knopfdruck. Die erste Fassung suchte bei jedem
+Tastendruck – dabei wurde das Suchfeld mitsamt der Liste neu gebaut, und von
+„booking" blieb ein „b" stehen. Die Filterzeile liegt jetzt außerhalb des neu
+gezeichneten Bereichs und wird einmal aufgebaut.)* Bei 238 Bewegungen
 ist Suchen die halbe Arbeit: Textsuche über Empfänger, Verwendungszweck, Datum
 und Betrag (mehrere Wörter müssen alle vorkommen), dazu Kategorie und Zeitraum.
 Die Kategorienauswahl zeigt nur, was im Bestand **vorkommt** — alle 31 Vorgaben
@@ -457,6 +461,6 @@ beim Zuklappen bedingungslos leert, klappt alles zu.
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1221 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1222 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

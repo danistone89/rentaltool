@@ -701,6 +701,11 @@ def _offen_merken(bisher, bewegung_id, aufgeklappt):
     return "" if bisher == bewegung_id else bisher
 
 
+def _kategoriewahl():
+    return {"": "Alle Kategorien", konto.OHNE_KATEGORIE: "— ohne Kategorie —",
+            **{k: k for k in konto.vergebene_kategorien()}}
+
+
 def _filterzeile(zustand, neu_zeichnen):
     """Suchen, nach Kategorie und Zeitraum einengen (8.8.2026).
 
@@ -708,37 +713,51 @@ def _filterzeile(zustand, neu_zeichnen):
     was auf dem Auszug steht – Empfänger, Verwendungszweck, Datum, Betrag;
     mehrere Wörter müssen alle vorkommen („weg 2026-07").
 
+    **Erst auf Knopfdruck, nicht bei jedem Tastendruck.** Die erste Fassung
+    zeichnete bei jeder Eingabe die ganze Liste neu – dabei wurde das Suchfeld
+    selbst neu gebaut, und von „booking" blieb ein „b" stehen. Deshalb wird
+    diese Zeile **einmal** aufgebaut und liegt außerhalb des neu gezeichneten
+    Bereichs; die Eingaben wirken mit „Filtern" oder der Eingabetaste. Nebenbei
+    ist das auch das schnellere Verhalten – 238 Zeilen je Buchstabe neu
+    aufzubauen war Arbeit für nichts.
+
     Die Kategorienliste zeigt nur, was im Bestand **vorkommt**. Alle 31
-    Vorgaben plus eigene wären länger als die Liste selbst, und die meisten
-    Einträge führten ins Leere.
+    Vorgaben plus eigene wären länger als die Liste selbst.
     """
-    def setzen(**felder):
-        zustand.update(**felder)
+    felder = {}
+
+    def anwenden():
+        zustand.update(suche=felder["suche"].value or "",
+                       kategorie=felder["kategorie"].value or "",
+                       von=felder["von"].value or "",
+                       bis=felder["bis"].value or "")
+        # Beim Arbeiten entstehen neue Kategorien – die Auswahl nachziehen.
+        felder["kategorie"].set_options(_kategoriewahl(),
+                                        value=zustand["kategorie"])
         neu_zeichnen()
 
-    vergeben = konto.vergebene_kategorien()
+    def zuruecksetzen():
+        for name in ("suche", "kategorie", "von", "bis"):
+            felder[name].set_value("")
+        anwenden()
+
     with ui.row().classes("w-full items-center gap-2 flex-wrap"):
-        ui.input(placeholder="Suchen: Empfänger, Zweck, Datum, Betrag",
-                 value=zustand["suche"],
-                 on_change=lambda e: setzen(suche=e.value or "")) \
+        felder["suche"] = ui.input(
+            placeholder="Suchen: Empfänger, Zweck, Datum, Betrag") \
             .props("dense outlined clearable").classes("w-[280px]") \
             .mark("konto-suche")
-        ui.select({"": "Alle Kategorien", konto.OHNE_KATEGORIE: "— ohne Kategorie —",
-                   **{k: k for k in vergeben}},
-                  value=zustand["kategorie"],
-                  on_change=lambda e: setzen(kategorie=e.value or "")) \
+        felder["suche"].on("keydown.enter", lambda _e: anwenden())
+        felder["kategorie"] = ui.select(_kategoriewahl(), value="") \
             .props("dense outlined options-dense").classes("w-[240px]") \
             .mark("konto-kategoriefilter")
-        ui.input(label="von", value=zustand["von"],
-                 on_change=lambda e: setzen(von=e.value or "")) \
-            .props("type=date dense outlined").classes("w-[150px]").mark("konto-von")
-        ui.input(label="bis", value=zustand["bis"],
-                 on_change=lambda e: setzen(bis=e.value or "")) \
-            .props("type=date dense outlined").classes("w-[150px]").mark("konto-bis")
-        if any((zustand["suche"], zustand["kategorie"], zustand["von"], zustand["bis"])):
-            ui.button("Filter zurücksetzen", icon="close",
-                      on_click=lambda: setzen(suche="", kategorie="", von="", bis="")) \
-                .props("flat dense no-caps size=sm").mark("konto-filter-weg")
+        felder["von"] = ui.input(label="von").props("type=date dense outlined") \
+            .classes("w-[150px]").mark("konto-von")
+        felder["bis"] = ui.input(label="bis").props("type=date dense outlined") \
+            .classes("w-[150px]").mark("konto-bis")
+        ui.button("Filtern", icon="filter_alt", on_click=anwenden) \
+            .props("unelevated no-caps dense").mark("konto-filtern")
+        ui.button("Zurücksetzen", icon="close", on_click=zuruecksetzen) \
+            .props("flat no-caps dense").mark("konto-filter-weg")
 
 
 def _gelerntes_knopf(neu_zeichnen):
@@ -893,6 +912,8 @@ def render_konto():
              "Grundlage für den Überblick und für die Übergabe ans Steuerbüro.") \
         .classes("text-sm text-slate-500 mb-2")
 
+    # Der Filter steht ueber der Liste und wird NICHT mitgezeichnet.
+    filterplatz = ui.row().classes("w-full")
     inhalt = ui.column().classes("w-full gap-3")
     # Welche Sicht auf die Bewegungen gerade gilt. Ueberlebt das Neuzeichnen –
     # sonst springt die Liste nach jedem Posten auf „Alle" zurueck.
@@ -1014,7 +1035,6 @@ def render_konto():
             auto_ids = {x["id"] for x in konto.automatisch()}
             with ui.card().classes("w-full").mark("konto-liste"):
                 _gelerntes_knopf(zeichnen)
-                _filterzeile(zustand, zeichnen)
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.label("Bewegungen").classes("font-medium")
                     ui.space()
@@ -1106,4 +1126,8 @@ def render_konto():
                     ui.label(f"… und {len(bewegungen) - 200} weitere") \
                         .classes("text-xs text-slate-400 mt-1")
 
+    # Die Filterzeile wird EINMAL gebaut und liegt ausserhalb von `inhalt` –
+    # sonst verlöre das Suchfeld bei jedem Neuzeichnen seinen Inhalt.
+    with filterplatz:
+        _filterzeile(zustand, zeichnen)
     zeichnen()

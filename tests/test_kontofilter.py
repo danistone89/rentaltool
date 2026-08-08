@@ -141,18 +141,33 @@ def test_die_filterzeile_laesst_sich_zeichnen():
     _in_client(lambda: kontoblatt._filterzeile(zustand, lambda: None))
 
 
-def test_der_zuruecksetzen_knopf_erscheint_nur_bei_gesetztem_filter():
-    from nicegui import ui
-    from app.ui import kontoblatt
-    leer = _in_client(lambda: kontoblatt._filterzeile(
-        {"suche": "", "kategorie": "", "von": "", "bis": ""}, lambda: None))
-    gesetzt = _in_client(lambda: kontoblatt._filterzeile(
-        {"suche": "weg", "kategorie": "", "von": "", "bis": ""}, lambda: None))
+def test_der_filter_wirkt_erst_auf_knopfdruck():
+    """Die erste Fassung zeichnete bei JEDEM Tastendruck neu – dabei wurde das
+    Suchfeld selbst neu gebaut und von „booking" blieb ein „b" stehen.
 
-    def knoepfe(k):
-        return sum(1 for c in k.default_slot.children[0].default_slot.children
-                   if isinstance(c, ui.button))
-    assert knoepfe(leer) == 0 and knoepfe(gesetzt) == 1
+    Geprüft wird deshalb, dass am Suchfeld **kein** Änderungs-Handler hängt und
+    es stattdessen einen Knopf gibt.
+    """
+    from nicegui import ui
+    from nicegui.client import Client
+    from app.ui import kontoblatt
+    zustand = {"suche": "", "kategorie": "", "von": "", "bis": ""}
+    with Client(lambda: None):
+        with ui.card() as karte:
+            kontoblatt._filterzeile(zustand, lambda: None)
+    zeile = karte.default_slot.children[0].default_slot.children
+    suchfeld = zeile[0]
+    assert isinstance(suchfeld, ui.input)
+    assert suchfeld._change_handlers == [], "Tippen darf nichts ausloesen"
+    knoepfe = [c for c in zeile if isinstance(c, ui.button)]
+    assert len(knoepfe) == 2, "Filtern und Zuruecksetzen"
+
+
+def test_die_kategorienauswahl_kennt_das_ohne():
+    from app.ui import kontoblatt
+    _bewegung(-100.0, "Rena", "w1", kategorie="Wäscherei (Rena)")
+    wahl = kontoblatt._kategoriewahl()
+    assert konto.OHNE_KATEGORIE in wahl and "Wäscherei (Rena)" in wahl
 
 
 def test_die_kontoseite_laesst_sich_mit_filter_zeichnen():
