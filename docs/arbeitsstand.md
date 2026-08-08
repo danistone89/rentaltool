@@ -4,7 +4,7 @@ Wo wir gerade stehen. Der *Plan* steht in `docs/roadmap.md` — hier steht der
 *Tagesstand*: was gerade läuft, was geprüft wurde, was noch aussteht. Am Ende
 einer Arbeitssitzung nachziehen.
 
-**Stand: 7. August 2026**
+**Stand: 8. August 2026**
 
 ## Wofür die Buchhaltung im Werkzeug da ist (festgelegt 7.8.2026)
 
@@ -427,6 +427,44 @@ ausgeglichen, aber auf dem Girokonto stand keine Abrechnung dazu. Dafür gibt es
 jetzt `vollstaendigkeit.ausgleich_ohne_abrechnung`: die Gegenrichtung zu
 `sammelbuchungen_ohne_karte` und die gefährlichere, weil ein fehlender
 Bankauszug **alle** Einnahmen und Ausgaben eines Zeitraums verschwinden lässt.
+
+## B11 · Die Auszahlungsberichte der Portale (8.8.2026, ausgerollt)
+
+Der Auslöser war die Frage „woher soll ich denn jetzt wissen, welche Rechnung
+zu welchem Auszahlungsbetrag gehört?" — und davor die Sorge, überlappende
+Uploads könnten Dubletten erzeugen. Vier Stücke, alle fertig und live:
+
+* **B11a Fingerabdruck.** Überlappungen waren schon sicher (238 Bewegungen aus
+  drei überlappenden Dateien, 238 verschiedene Abdrücke). Die Lücke lag in der
+  Gegenrichtung: zwei in *jedem* Feld gleiche Zeilen verschmolzen zu einer.
+  Beinahe passiert — zweimal −14,57 € am 31.07. an denselben Empfänger.
+* **B11b Booking-Bericht** (XLSX, `openpyxl` neu). 46 Auszahlungen, alle gehen
+  auf den Cent auf, 75 Reservierungen; 46 der 48 Bank-Eingänge finden ihre
+  Auszahlung über das Kürzel `NO.…`.
+* **B11c Airbnb-Bericht** (CSV). Kein Bezug im Verwendungszweck — Zuordnung
+  über Betrag und Datum, 7 von 7 eindeutig.
+* **B11d Zuordnen.** 27 von 55 Portal-Eingängen sind ein Klick, 19 buchen ihre
+  Rechnungen und lassen die Provision offen, 4 sind gesperrt, 3 warten auf
+  ihre Rechnung.
+
+**Zwei Sperren kamen erst aus dem Lauf gegen die echten Daten** (beide hätten
+still falsch gebucht): Airbnb zahlt lange Aufenthalte **in Raten** aus — bei
+Monica Huang hätten 4.540 € unter „Provision" gestanden. Und bei 19
+Booking-Auszahlungen ist die Rechnung niedriger als das, was Booking dem Gast
+berechnet hat: bei den übernommenen Smoobu-Rechnungen fehlt dort die
+Beherbergungssteuer. Beides wird gezeigt statt geglättet.
+
+**Was der Betrieb tun muss:** die beiden Berichte in denselben Upload wie die
+Kontoauszüge legen (Konto → „Auszüge und Berichte wählen"). Was die Datei ist,
+wird an ihrem Inhalt erkannt. Danach steht an jeder Portal-Auszahlung die
+Vorschau; der Knopf bucht sie.
+
+**Offen aus B11:** eine Auszahlung, die eine Rechnung nur zum Teil bezahlt
+(Ratenzahlung), muss von Hand aufgeteilt werden — ein Teilbetrag je Rate. Ob
+das eine eigene Unterstützung braucht, entscheidet sich am Gebrauch.
+
+**Teil 2 (noch nicht begonnen):** ein Bereich „Unterlagen" als einzige
+Anlaufstelle für alle Dateien und eine Checkliste über den Stand der Kette.
 
 ## Beim ersten echten Durchgang (8.8.2026)
 
