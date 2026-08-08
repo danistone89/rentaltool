@@ -156,3 +156,44 @@ def test_namenserkennung_greift_nur_bei_echten_namen(text, erwartet):
     stünde jede Rechnung ganz oben."""
     _rechnung(74, "Gockel", 379.48)
     assert vs.kandidaten(_bewegung(379.48, text))[0]["namenstreffer"] is erwartet
+
+
+# ------------------------------------------------- Die Provisionsprobe (B4)
+def test_der_rest_ist_die_provision():
+    """Sobald alle Rechnungen zugeordnet sind, IST der Rest die einbehaltene
+    Provision – und Smoobu kennt sie, also laesst sie sich nachrechnen."""
+    r1 = _rechnung(41, "Meier", 620.00)
+    r2 = _rechnung(42, "Schulz", 540.00)
+    b = _bewegung(1080.70, bid="ab1")
+    buchungen = {941: {"commission-included": 45.30},
+                 942: {"commission-included": 34.00}}
+    # Gebucht wird der RECHNUNGSBETRAG, nicht die Auszahlung - sonst waere der
+    # Umsatz um die Provision zu niedrig und die Provision taeuchte nie auf.
+    for r in (r1, r2):
+        z.hinzufuegen(b["id"], z.RECHNUNG,
+                      r["summen"]["brutto"], ziel_id=r["id"])
+    rest, erwartet, stimmt = vs.provisionsprobe(b, buchungen)
+    assert rest == -79.30 and erwartet == -79.30 and stimmt
+
+
+def test_eine_fehlende_rechnung_faellt_bei_der_probe_auf():
+    """Der eigentliche Wert: ein Knopf, der den Rest stillschweigend glattzieht,
+    versteckt genau die Faelle, die man pruefen muesste."""
+    r1 = _rechnung(41, "Meier", 620.00)
+    _rechnung(42, "Schulz", 540.00)          # nicht zugeordnet
+    b = _bewegung(1080.70, bid="ab2")
+    buchungen = {941: {"commission-included": 45.30},
+                 942: {"commission-included": 34.00}}
+    z.hinzufuegen(b["id"], z.RECHNUNG, r1["summen"]["brutto"], ziel_id=r1["id"])
+    rest, erwartet, stimmt = vs.provisionsprobe(b, buchungen)
+    assert not stimmt, "der Rest ist groesser als die Provision der einen Rechnung"
+    assert erwartet == -45.30 and rest == 460.70
+
+
+def test_ohne_provisionsangabe_bleibt_die_probe_still():
+    """Direktzahler: keine Provision, kein Befund."""
+    r = _rechnung(74, "Gockel", 379.48)
+    b = _bewegung(379.48, bid="ab3")
+    z.hinzufuegen(b["id"], z.RECHNUNG, 379.48, ziel_id=r["id"])
+    rest, erwartet, stimmt = vs.provisionsprobe(b, {})
+    assert (rest, erwartet, stimmt) == (0.0, 0.0, True)

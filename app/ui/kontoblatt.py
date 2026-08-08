@@ -136,6 +136,89 @@ _ARTNAME = {zuordnung.RECHNUNG: "Ausgangsrechnung", zuordnung.BELEG: "Beleg",
             zuordnung.KATEGORIE: "nur Kategorie"}
 
 
+def _posten_text(satz):
+    """Was am Posten steht – die Rechnungsnummer, nicht die interne Kennung.
+
+    Vorher stand dort „ffed1df3f8c3". Eine Kennung, die nur die Datenbank
+    kennt, sagt dem Menschen nichts; er sucht die Rechnung dann von Hand.
+    """
+    from app import db
+    if satz["art"] == zuordnung.RECHNUNG and satz.get("ziel_id"):
+        r = db.holen("rechnungen", satz["ziel_id"]) or {}
+        teile = [f"Nr. {r['nummer']}" if r.get("nummer") else "", r.get("gast", "")]
+        klar = " · ".join(x for x in teile if x)
+        if klar:
+            return klar
+    if satz["art"] == zuordnung.BELEG and satz.get("ziel_id"):
+        b = db.holen("belege", satz["ziel_id"]) or {}
+        teile = [b.get("merchant", ""), b.get("datum", "")]
+        klar = " · ".join(x for x in teile if x)
+        if klar:
+            return klar
+    return (satz.get("kategorie") or satz.get("notiz")
+            or satz.get("ziel_id") or "—")
+
+
+def _provisionszeile(bewegung, rest, neu_zeichnen):
+    """Den Rest einer Portal-Auszahlung als Provision gegenbuchen (B4).
+
+    **Der Rest IST die Provision** – sobald alle zugehörigen Rechnungen
+    zugeordnet sind. Statt ihn von Hand einzutippen, steht hier ein Knopf.
+
+    Er kommt mit einer **Gegenprobe**: Smoobu kennt die Provision je Buchung,
+    also lässt sich nachrechnen, ob der Rest dazu passt. Weicht er ab, fehlt
+    entweder noch eine Rechnung, oder das Portal hat anders abgerechnet – beides
+    will man wissen, bevor man den Rest wegbucht. Ein Knopf, der stillschweigend
+    alles glattzieht, versteckt genau die Fälle, die man prüfen müsste.
+    """
+    from app import buchhaltung, data, zahlungsvorschlag as vs
+    from app.ui.basis import CFG
+
+    # Nur sinnvoll, wenn schon Rechnungen zugeordnet sind und weniger ankam,
+    # als sie zusammen ausmachen.
+    if not zuordnung.ziele(bewegung["id"], zuordnung.RECHNUNG) or rest >= 0:
+        return
+    tag = (bewegung.get("datum") or "")[:10]
+    buchungen = {}
+    if tag:
+        try:
+            for b in data._reservations(f"{int(tag[:4]) - 1}-07-01",
+                                        f"{int(tag[:4]) + 1}-06-30"):
+                buchungen[b.get("id")] = b
+        except Exception:
+            pass
+    _rest, erwartete, stimmt = vs.provisionsprobe(bewegung, buchungen)
+
+    kategorien = [k for k in buchhaltung.kategorien(CFG) if "provision" in k.lower()]
+    with ui.row().classes("w-full items-center gap-2 no-wrap mt-1"):
+        if erwartete and not stimmt:
+            ui.icon("info").classes(f"text-base {ton.AUF_HINWEIS} shrink-0")
+            ui.label(f"Laut Smoobu wären es {_eur(erwartete)} Provision – "
+                     f"es fehlt vermutlich noch eine Rechnung.") \
+                .classes(f"text-xs {ton.AUF_HINWEIS} flex-grow min-w-0") \
+                .mark(f"prov-hinweis-{bewegung['id']}")
+        else:
+            ui.label("Der Rest ist die einbehaltene Provision." if erwartete
+                     else "Rest als Provision des Portals buchen.") \
+                .classes(f"text-xs {ton.STILL} flex-grow min-w-0")
+
+        def buchen():
+            kategorie = kategorien[0] if kategorien else ""
+            satz, meldung = zuordnung.hinzufuegen(
+                bewegung["id"], zuordnung.KATEGORIE, rest, kategorie,
+                notiz="Provision des Portals")
+            if satz and not kategorie:
+                meldung += (" Lege unter Einstellungen eine Kategorie mit "
+                            "„Provision“ im Namen an, dann wird sie hier gesetzt.")
+            ui.notify(meldung, type="positive" if satz else "warning")
+            if satz:
+                neu_zeichnen()
+
+        ui.button(f"Provision {_eur(rest)}", icon="percent", on_click=buchen) \
+            .props("dense unelevated no-caps size=sm").classes("shrink-0") \
+            .mark(f"prov-{bewegung['id']}")
+
+
 def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
     """Offene Rechnungen zum Abhaken – die wahrscheinlichste zuerst.
 
@@ -185,15 +268,22 @@ def _rechnungsvorschlaege(bewegung, rest, neu_zeichnen):
                     ui.label(r.get("gast") or "—").classes("text-sm truncate")
                     ui.label(f"{_d(r.get('datum'))} · {r.get('wohnung_name', '')} · "
                              f"{k['grund']}").classes(f"text-xs {ton.STILL} truncate")
+                # Gebucht wird der RECHNUNGSBETRAG, nicht der Auszahlungsbetrag.
+                # Sonst waere der Umsatz um die Provision zu niedrig und die
+                # Provision taeuchte als Ausgabe nie auf – genau der Fehler, den
+                # das Konzept benennt. Der Auszahlungsbetrag steht daneben,
+                # damit man sieht, was davon ankommt.
+                brutto = round((k["rechnung"].get("summen") or {}).get("brutto", 0), 2)
                 if k["provision"]:
-                    ui.label(f"− {_eur(k['provision'])} Prov.") \
+                    ui.label(f"davon {_eur(k['erwartet'])} ausgezahlt") \
                         .classes(f"text-xs {ton.STILL} shrink-0")
-                ui.label(_eur(k["erwartet"])).classes("text-sm w-24 text-right shrink-0")
+                ui.label(_eur(brutto)).classes("text-sm w-24 text-right shrink-0")
 
                 def zuordnen(kk=k):
                     r_ = kk["rechnung"]
+                    voll = round((r_.get("summen") or {}).get("brutto", 0), 2)
                     satz, meldung = zuordnung.hinzufuegen(
-                        bewegung["id"], zuordnung.RECHNUNG, kk["erwartet"],
+                        bewegung["id"], zuordnung.RECHNUNG, voll,
                         kategorie=bewegung.get("kategorie", ""), ziel_id=r_["id"],
                         notiz=f"Rechnung {r_.get('nummer') or ''}".strip())
                     if satz:
@@ -244,8 +334,10 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 ui.label(_ARTNAME.get(satz["art"], satz["art"])) \
                     .classes("text-xs text-slate-400 w-32 shrink-0")
-                ui.label(satz.get("kategorie") or satz.get("ziel_id") or "—") \
-                    .classes("text-sm truncate flex-grow min-w-0")
+                with ui.column().classes("gap-0 min-w-0 flex-grow"):
+                    ui.label(_posten_text(satz)).classes("text-sm truncate")
+                    if satz.get("kategorie") and satz["art"] != zuordnung.KATEGORIE:
+                        ui.label(satz["kategorie"]).classes(f"text-xs {ton.STILL} truncate")
                 ui.label(_eur(satz["betrag"])).classes("text-sm w-28 text-right shrink-0")
                 ui.button(icon="close",
                           on_click=lambda s=satz: (zuordnung.entfernen(s["id"]),
@@ -292,6 +384,7 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
         # ---- Ausgangsrechnungen (B3) ----------------------------------------
         # Nur bei Eingängen, und nur solange etwas offen ist.
         if bewegung.get("betrag", 0) > 0 and abs(rest) > 0.005:
+            _provisionszeile(bewegung, rest, neu_zeichnen)
             _rechnungsvorschlaege(bewegung, rest, neu_zeichnen)
 
         # ---- Der Restbetrag --------------------------------------------------

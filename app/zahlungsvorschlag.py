@@ -127,6 +127,32 @@ def kandidaten(bewegung, cfg=None, buchungen=None, jahr=None):
     return raus
 
 
+def provisionsprobe(bewegung, buchungen=None):
+    """Passt der offene Rest zu den Provisionen der zugeordneten Rechnungen?
+
+    Der Rest einer Portal-Auszahlung **ist** die einbehaltene Provision – wenn
+    alle zugehörigen Rechnungen zugeordnet sind. Smoobu kennt sie je Buchung
+    (`commission-included`), also lässt sich das nachrechnen, statt es zu
+    glauben.
+
+    Gibt (rest, erwartete_provision, stimmt) zurück. Weichen die beiden ab, ist
+    das ein **Befund**: entweder fehlt noch eine Rechnung, oder das Portal hat
+    anders abgerechnet als angekündigt. Beides will man wissen, bevor man den
+    Rest blind wegbucht.
+    """
+    from app import db
+    rest = zuordnung.rest(bewegung)
+    summe = 0.0
+    for z in zuordnung.posten(bewegung["id"]):
+        if z["art"] != zuordnung.RECHNUNG or not z.get("ziel_id"):
+            continue
+        r = db.holen("rechnungen", z["ziel_id"]) or {}
+        _betrag, provision = erwartet(r, buchungen)
+        summe += provision
+    erwartete = round(-summe, 2)          # sie mindert die Auszahlung
+    return rest, erwartete, abs(rest - erwartete) < 0.02
+
+
 def _naehe(r, bewegung):
     """Wie weit liegt der **Aufenthalt** vom Zahltag entfernt (in Tagen)?
 
