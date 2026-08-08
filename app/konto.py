@@ -671,3 +671,63 @@ def ist_erledigt(bewegung):
     if zuordnung.hat_posten(bewegung["id"]):
         return zuordnung.ist_fertig(bewegung)
     return bool((bewegung.get("kategorie") or "").strip())
+
+
+def vergebene_kategorien(von="", bis=""):
+    """Die Kategorien, die im Bestand tatsaechlich vorkommen – fuer den Filter.
+
+    Nicht die Auswahlliste aller moeglichen: bei 31 Vorgaben plus eigenen waere
+    die Auswahl laenger als der Bestand, und die meisten Eintraege fuehrten ins
+    Leere.
+    """
+    raus = set()
+    for b in alle(von, bis):
+        k = (b.get("kategorie") or "").strip()
+        if k:
+            raus.add(k)
+        for z in zuordnung.posten(b["id"]):
+            if (z.get("kategorie") or "").strip():
+                raus.add(z["kategorie"].strip())
+    return sorted(raus)
+
+
+def filtern(bewegungen, suche="", kategorie="", von="", bis="", behalten=""):
+    """Die Kontoliste einengen – Text, Kategorie, Zeitraum.
+
+    Bei 238 Bewegungen ist Suchen die halbe Arbeit. Gesucht wird in allem, was
+    auf dem Auszug steht: Empfaenger, Verwendungszweck, Datum und Betrag;
+    mehrere Woerter muessen **alle** vorkommen („weg 2026-07").
+
+    `behalten` ist die Zeile, an der gerade gearbeitet wird. **Sie bleibt
+    stehen, auch wenn sie nicht mehr passt** – sonst faellt eine Bewegung im
+    Moment der Zuordnung aus der Liste, bevor man das Ergebnis sehen konnte
+    (so gemeldet am 8.8.2026).
+    """
+    worte = [w for w in str(suche or "").lower().split() if w]
+    raus = []
+    for b in bewegungen:
+        if behalten and b.get("id") == behalten:
+            raus.append(b)
+            continue
+        tag = (b.get("datum") or "")[:10]
+        if von and tag < von[:10]:
+            continue
+        if bis and tag > bis[:10]:
+            continue
+        if kategorie:
+            eigene = (b.get("kategorie") or "").strip()
+            posten = [(z.get("kategorie") or "").strip()
+                      for z in zuordnung.posten(b["id"])]
+            if kategorie == OHNE_KATEGORIE:
+                if eigene or any(posten):
+                    continue
+            elif kategorie not in ([eigene] + posten):
+                continue
+        if worte:
+            heu = " ".join([str(b.get("gegenpartei") or ""), str(b.get("text") or ""),
+                            tag, f"{b.get('betrag', 0)}".replace(".", ","),
+                            f"{b.get('betrag', 0)}"]).lower()
+            if not all(w in heu for w in worte):
+                continue
+        raus.append(b)
+    return raus

@@ -688,6 +688,59 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
             _beleg_knopf(bewegung, neu_zeichnen)
 
 
+def _offen_merken(bisher, bewegung_id, aufgeklappt):
+    """Welche Zeile gilt nach diesem Klick als offen?
+
+    Klingt trivial, ist es nicht: NiceGUI meldet beim Aufklappen einer Zeile
+    **auch** das Zuklappen der vorigen – und zwar in beliebiger Reihenfolge.
+    Wer beim Zuklappen bedingungslos leert, löscht damit die gerade geöffnete
+    Zeile wieder, und alles klappt zu.
+    """
+    if aufgeklappt:
+        return bewegung_id
+    return "" if bisher == bewegung_id else bisher
+
+
+def _filterzeile(zustand, neu_zeichnen):
+    """Suchen, nach Kategorie und Zeitraum einengen (8.8.2026).
+
+    **Bei 238 Bewegungen ist Suchen die halbe Arbeit.** Gesucht wird in allem,
+    was auf dem Auszug steht – Empfänger, Verwendungszweck, Datum, Betrag;
+    mehrere Wörter müssen alle vorkommen („weg 2026-07").
+
+    Die Kategorienliste zeigt nur, was im Bestand **vorkommt**. Alle 31
+    Vorgaben plus eigene wären länger als die Liste selbst, und die meisten
+    Einträge führten ins Leere.
+    """
+    def setzen(**felder):
+        zustand.update(**felder)
+        neu_zeichnen()
+
+    vergeben = konto.vergebene_kategorien()
+    with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+        ui.input(placeholder="Suchen: Empfänger, Zweck, Datum, Betrag",
+                 value=zustand["suche"],
+                 on_change=lambda e: setzen(suche=e.value or "")) \
+            .props("dense outlined clearable").classes("w-[280px]") \
+            .mark("konto-suche")
+        ui.select({"": "Alle Kategorien", konto.OHNE_KATEGORIE: "— ohne Kategorie —",
+                   **{k: k for k in vergeben}},
+                  value=zustand["kategorie"],
+                  on_change=lambda e: setzen(kategorie=e.value or "")) \
+            .props("dense outlined options-dense").classes("w-[240px]") \
+            .mark("konto-kategoriefilter")
+        ui.input(label="von", value=zustand["von"],
+                 on_change=lambda e: setzen(von=e.value or "")) \
+            .props("type=date dense outlined").classes("w-[150px]").mark("konto-von")
+        ui.input(label="bis", value=zustand["bis"],
+                 on_change=lambda e: setzen(bis=e.value or "")) \
+            .props("type=date dense outlined").classes("w-[150px]").mark("konto-bis")
+        if any((zustand["suche"], zustand["kategorie"], zustand["von"], zustand["bis"])):
+            ui.button("Filter zurücksetzen", icon="close",
+                      on_click=lambda: setzen(suche="", kategorie="", von="", bis="")) \
+                .props("flat dense no-caps size=sm").mark("konto-filter-weg")
+
+
 def _gelerntes_knopf(neu_zeichnen):
     """„Gelerntes anwenden" – die Erkennung auf vorhandene Bewegungen (8.8.2026).
 
@@ -843,7 +896,11 @@ def render_konto():
     inhalt = ui.column().classes("w-full gap-3")
     # Welche Sicht auf die Bewegungen gerade gilt. Ueberlebt das Neuzeichnen –
     # sonst springt die Liste nach jedem Posten auf „Alle" zurueck.
-    zustand = {"sicht": "alle"}
+    # Ueberlebt das Neuzeichnen. `offen_id` ist die Zeile, an der gerade
+    # gearbeitet wird: sie bleibt aufgeklappt und im Filter stehen, damit man
+    # das Ergebnis der Zuordnung sieht (so gemeldet am 8.8.2026).
+    zustand = {"sicht": "alle", "suche": "", "kategorie": "", "von": "", "bis": "",
+               "offen_id": ""}
 
     async def _ein_auszug(datei):
         """Einen Auszug einlesen. Gibt (bericht, fehlertext) zurück."""
@@ -957,6 +1014,7 @@ def render_konto():
             auto_ids = {x["id"] for x in konto.automatisch()}
             with ui.card().classes("w-full").mark("konto-liste"):
                 _gelerntes_knopf(zeichnen)
+                _filterzeile(zustand, zeichnen)
                 with ui.row().classes("w-full items-center gap-2"):
                     ui.label("Bewegungen").classes("font-medium")
                     ui.space()
@@ -968,6 +1026,9 @@ def render_konto():
                               on_change=lambda e: (zustand.update(sicht=e.value),
                                                    zeichnen())) \
                         .props("dense no-caps unelevated size=sm").mark("konto-sicht")
+                bewegungen = konto.filtern(
+                    bewegungen, zustand["suche"], zustand["kategorie"],
+                    zustand["von"], zustand["bis"], behalten=zustand["offen_id"])
                 if zustand["sicht"] == "offen":
                     bewegungen = [b for b in bewegungen if b["id"] in offen_ids]
                     ui.label("Ausgänge ohne Kategorie. Erst zuordnen – vorher "
@@ -991,8 +1052,14 @@ def render_konto():
                 # Klick entfernt – ohne Wechsel auf eine andere Seite.
                 for b in bewegungen[:200]:
                     fertig = konto.ist_erledigt(b)
-                    zeile = ui.expansion().classes("w-full").props("dense") \
+                    zeile = ui.expansion(value=b["id"] == zustand["offen_id"]) \
+                        .classes("w-full").props("dense") \
                         .mark(f"bew-{b['id']}")
+                    # Merken, welche Zeile offen ist – sonst klappt sie beim
+                    # naechsten Neuzeichnen zu und der Vorgang verschwindet.
+                    zeile.on_value_change(
+                        lambda e, i=b["id"]: zustand.update(
+                            offen_id=_offen_merken(zustand["offen_id"], i, e.value)))
                     with zeile.add_slot("header"):
                         with ui.row().classes("w-full items-center gap-2 no-wrap"):
                             ui.label(_d(b["datum"])) \

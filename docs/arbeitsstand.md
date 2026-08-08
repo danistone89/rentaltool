@@ -440,9 +440,23 @@ nicht, dort wäre sie Zufall. Dazu steht der **Vertriebskanal** in der Zeile —
 bei einer Booking-Auszahlung sind Airbnb-Rechnungen keine Kandidaten, und das
 sah man ihr vorher nicht an.
 
+**Filter in der Kontoliste, und die Zeile bleibt stehen.** Bei 238 Bewegungen
+ist Suchen die halbe Arbeit: Textsuche über Empfänger, Verwendungszweck, Datum
+und Betrag (mehrere Wörter müssen alle vorkommen), dazu Kategorie und Zeitraum.
+Die Kategorienauswahl zeigt nur, was im Bestand **vorkommt** — alle 31 Vorgaben
+wären länger als die Liste selbst.
+
+Wichtiger noch: **nach einer Zuordnung sprang der Vorgang aus dem Blickfeld**.
+Die Liste zeichnet sich neu, die Zeile klappte zu, und bei aktivem Filter fiel
+sie auch noch heraus — man konnte das Ergebnis nicht prüfen. Jetzt bleibt die
+bearbeitete Zeile offen **und** im Filter stehen, bis man selbst weiterklickt.
+Der knifflige Teil steckt in `_offen_merken`: NiceGUI meldet beim Aufklappen
+einer Zeile auch das Zuklappen der vorigen, in beliebiger Reihenfolge — wer
+beim Zuklappen bedingungslos leert, klappt alles zu.
+
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1201 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1221 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```
