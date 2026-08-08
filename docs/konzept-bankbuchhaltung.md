@@ -490,9 +490,38 @@ vor B8 eingelesen, Kopfdaten gibt es dafür keine. Die Anzeige sagt das
 ausdrücklich, statt „keine Saldosprünge" zu melden — was wie „geprüft und in
 Ordnung" aussähe. Ab dem nächsten Import greift die Probe.
 
+#### Die Kreditkarte — was der Bankimport mit dem Kartenauszug zu tun hat
+
+Gefragt am 8.8.2026: *auf dem Bankimport müsste es eine Sammelbuchung zu einem
+Kreditkartenbelegmonat geben.* Genau so ist es, und der Aufbau ist sauberer
+als befürchtet:
+
+```
+Girokonto   26.01.  −185,68   KREDITKARTENABRECHNUNG VISA     ← Umbuchung
+VISA 8136   22.01.  +185,68   Ausgleich Kreditkarte            ← Umbuchung
+VISA 8136   05.01.   −30,00   Rossmann                         ← die Ausgabe
+VISA 8136   08.01.   −26,93   dm                               ← die Ausgabe
+```
+
+**Beide Sammelbuchungen sind neutral gestellt** (`kontoauszug.ist_umbuchung`),
+die **Einzelkäufe tragen die Ausgabe**. Nichts zählt doppelt — das war schon
+seit AP16 richtig.
+
+Die Gefahr liegt woanders: **fehlt der Kartenauszug, fehlen alle Einzelkäufe
+im Ergebnis, und nichts fällt auf**, weil die Sammelbuchung ja neutral ist.
+Zwei Proben dagegen:
+
+* `kartenproben()` — deckt jeder Ausgleich genau die Käufe seit dem letzten?
+  An den echten Daten stimmten **5 von 6** auf den Cent; der erste wich um
+  22,00 € ab, weil seine Käufe vor dem Importzeitraum lagen. Deshalb gilt der
+  erste Zyklus je Karte ausdrücklich als **nicht prüfbar**.
+* `sammelbuchungen_ohne_karte()` — eine Abrechnung auf dem Girokonto, zu der
+  kein Ausgleich in gleicher Höhe auf einem Kartenkonto steht. Das ist die
+  Aufforderung: *diesen Kartenauszug noch hochladen.*
+
 *Umgesetzt:* `kontoauszug.kopfdaten`, `app/vollstaendigkeit.py`, Tabelle
 `auszuege`, Karte im Bereich Überblick, `tests/test_vollstaendigkeit.py`
-(24 Prüfungen)
+(32 Prüfungen)
 
 ### B9 · Übergabe ans Steuerbüro
 

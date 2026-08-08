@@ -292,8 +292,15 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   an einer Stelle. Kein Ampel-Urteil.
   **Für den vorhandenen Bestand greift die Saldoprobe noch nicht** — die 193
   Bewegungen kamen vor B8 herein. Die Anzeige sagt das ausdrücklich.
-  Offene Arbeiten am Probe-Bestand: 62 Ausgaben ohne Kategorie, 46 ohne Beleg,
-  1 Posten ohne Kategorie.
+  Dazu die **Kreditkarten-Probe**: die Sammelbuchung auf dem Girokonto und der
+  Ausgleich im Kartenauszug sind beide neutral, die Einzelkäufe tragen die
+  Ausgabe — das war richtig. Gefährlich ist der fehlende Kartenauszug: dann
+  fehlen alle Einzelkäufe und nichts fällt auf. Zwei Proben dagegen (Ausgleich
+  gegen Käufe des Zyklus, Sammelbuchung ohne passenden Ausgleich); an den alten
+  echten Daten stimmten 5 von 6 Zyklen auf den Cent.
+* **Probe-Bestand am 8.8.2026 geleert** (Bewegungen, Belege, Zuordnungen,
+  Auszüge) — die 48 Rechnungen stehen noch. Sicherung unter
+  `/tmp/livaro-sicherung-20260808-130027`.
 * **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
@@ -304,6 +311,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1063 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1071 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

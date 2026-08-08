@@ -112,6 +112,23 @@ def _vollstaendigkeit():
                      "kein Auszug vor.").classes(f"text-xs {ton.AUF_HINWEIS}") \
                 .mark("ub-luecke")
 
+        # Die Kreditkarte: EINE Sammelbuchung auf dem Girokonto, dieselben
+        # Betraege einzeln im Kartenauszug. Fehlt der Kartenauszug, fehlen alle
+        # Einzelausgaben – und nichts faellt auf, weil die Sammelbuchung
+        # neutral gestellt ist.
+        for s in b["karte_ohne_auszug"]:
+            ui.label(f"Kreditkartenabrechnung vom {_d(s.get('datum'))} über "
+                     f"{_eur(abs(s.get('betrag', 0)))}: dazu liegt kein "
+                     "Kartenauszug vor. Solange er fehlt, stehen die "
+                     "Einzelausgaben dieses Monats nirgends.") \
+                .classes(f"text-xs {ton.AUF_HINWEIS}").mark("ub-karte-fehlt")
+        for p in b["kartenproben"]:
+            ui.label(f"Kartenabrechnung {_d(p['datum'])}: ausgeglichen wurden "
+                     f"{_eur(p['ausgleich'])}, erfasst sind aber nur "
+                     f"{_eur(abs(p['kaeufe']))} an Käufen "
+                     f"({_eur(abs(p['differenz']))} fehlen).") \
+                .classes(f"text-xs {ton.AUF_HINWEIS}").mark("ub-kartenprobe")
+
         o = b["offene_arbeiten"]
         posten = [("Bewegungen mit offenem Rest", o["rest"]),
                   ("Ausgaben ohne Kategorie", o["ohne_kategorie"]),

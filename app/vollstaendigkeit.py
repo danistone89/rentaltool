@@ -180,4 +180,85 @@ def befund():
             "saldo_pruefbar": any(n > 1 for n in je_konto.values()),
             "saldospruenge": saldospruenge(),
             "luecken": luecken(),
+            "kartenproben": [p for p in kartenproben()
+                             if p["pruefbar"] and abs(p["differenz"]) >= 0.005],
+            "karte_ohne_auszug": sammelbuchungen_ohne_karte(),
             "offene_arbeiten": offene_arbeiten()}
+
+
+# Woran die beiden Seiten einer Kreditkartenabrechnung zu erkennen sind. Auf
+# dem Girokonto heisst sie „Kreditkartenabrechnung", auf der Karte selbst
+# „Ausgleich Kreditkarte" – zwei Namen fuer dieselbe Zahlung.
+_AUSGLEICH = "ausgleich kreditkarte"
+_ABRECHNUNG = "kreditkartenabrechnung"
+
+
+def _ist(bewegung, marke):
+    return marke in ((bewegung.get("text") or "")
+                     + " " + (bewegung.get("gegenpartei") or "")).lower()
+
+
+def kartenproben():
+    """Deckt jeder Ausgleich genau die Kartenkäufe seit dem letzten? (B8)
+
+    **Warum das die wichtigste Probe der Kreditkarte ist.** Auf dem Girokonto
+    steht *eine* Sammelbuchung; im Kartenauszug stehen dieselben Beträge
+    einzeln. Beide Umbuchungen sind neutral gestellt, die **Einzelkäufe tragen
+    die Ausgabe**. Fehlt der Kartenauszug oder ist er unvollständig, fehlen
+    genau diese Ausgaben im Ergebnis – ohne dass irgendwo etwas nicht aufgeht.
+
+    Diese Probe macht es sichtbar:
+
+        Ausgleich  ==  − Σ Käufe seit dem letzten Ausgleich
+
+    **Der erste Zyklus ist nicht prüfbar.** Vor dem ersten Ausgleich fehlt der
+    Anfangspunkt: seine Käufe können vor dem Importzeitraum liegen. An den
+    echten Daten wich genau dieser eine um 22,00 € ab, die übrigen fünf trafen
+    auf den Cent.
+    """
+    raus = []
+    je_konto = {}
+    for b in konto.alle():
+        je_konto.setdefault(b.get("konto", ""), []).append(b)
+    for konto_name, liste in je_konto.items():
+        liste = sorted(liste, key=lambda b: b.get("datum", ""))
+        ausgleiche = [b for b in liste
+                      if b.get("umbuchung") and _ist(b, _AUSGLEICH)]
+        if not ausgleiche:
+            continue
+        vorher = None
+        for a in ausgleiche:
+            kaeufe = [b for b in liste if not b.get("umbuchung")
+                      and (vorher is None or b.get("datum", "") > vorher)
+                      and b.get("datum", "") <= a.get("datum", "")]
+            summe = round(sum(b.get("betrag", 0.0) for b in kaeufe), 2)
+            raus.append({"konto": konto_name, "datum": a.get("datum", ""),
+                         "ausgleich": round(a.get("betrag", 0.0), 2),
+                         "kaeufe": summe, "anzahl": len(kaeufe),
+                         "differenz": round(a.get("betrag", 0.0) + summe, 2),
+                         "pruefbar": vorher is not None})
+            vorher = a.get("datum", "")
+    return raus
+
+
+def sammelbuchungen_ohne_karte():
+    """Abrechnungen auf dem Girokonto, zu denen kein Kartenauszug vorliegt.
+
+    Die Frage aus dem Betrieb (8.8.2026): *auf dem Bankimport müsste es eine
+    Sammelbuchung zu einem Kreditkartenbelegmonat geben.* Ist sie da und der
+    Kartenauszug nicht, dann fehlen **alle Einzelausgaben dieses Monats** im
+    Ergebnis – und nichts fällt auf, weil die Sammelbuchung neutral ist.
+
+    Erkannt über den Betrag: zu jeder Abrechnung muss auf einem Kartenkonto ein
+    Ausgleich in gleicher Höhe stehen.
+    """
+    ausgleiche = [round(abs(b.get("betrag", 0.0)), 2) for b in konto.alle()
+                  if b.get("umbuchung") and _ist(b, _AUSGLEICH)]
+    raus = []
+    for b in konto.alle():
+        if not b.get("umbuchung") or not _ist(b, _ABRECHNUNG):
+            continue
+        if round(abs(b.get("betrag", 0.0)), 2) in ausgleiche:
+            continue
+        raus.append(b)
+    return raus

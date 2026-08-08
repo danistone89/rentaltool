@@ -236,3 +236,101 @@ def test_der_befund_laesst_sich_zeichnen():
 def test_der_befund_haelt_auch_einen_leeren_bestand_aus():
     from app.ui import ueberblick as ui_ub
     _in_client(ui_ub._vollstaendigkeit)
+
+
+# --------------------------------------------------- Die Kreditkarten-Probe
+# Auf dem Girokonto steht EINE Sammelbuchung „Kreditkartenabrechnung"; im
+# VISA-Auszug stehen dieselben Betraege einzeln plus ein „Ausgleich
+# Kreditkarte" in gleicher Hoehe. Beide Umbuchungen sind neutral, die
+# Einzelkaeufe tragen die Ausgabe. Die Probe: deckt der Ausgleich genau die
+# Kaeufe seit dem letzten Ausgleich?
+#
+# An den echten Daten (8.8.2026) traf das in 5 von 6 Abrechnungen auf den
+# Cent; die erste wich um 22,00 EUR ab, weil die Kaeufe davor vor dem
+# Importzeitraum lagen. Genau deshalb ist der erste Zyklus nicht pruefbar.
+def _karte(betrag, text, bid, datum, umbuchung=False, konto_name="VISA 8136"):
+    from app import db
+    satz = {"id": bid, "datum": datum, "betrag": betrag, "gegenpartei": text,
+            "text": text, "konto": konto_name, "umbuchung": umbuchung,
+            "kategorie": ""}
+    db.anlegen(konto.TABELLE, satz)
+    return satz
+
+
+def test_ein_stimmiger_abrechnungszyklus_meldet_nichts():
+    _karte(100.0, "Ausgleich Kreditkarte gem", "a0", "2026-01-22", umbuchung=True)
+    _karte(-30.0, "Rossmann", "k1", "2026-02-05")
+    _karte(-26.93, "dm", "k2", "2026-02-10")
+    _karte(56.93, "Ausgleich Kreditkarte gem", "a1", "2026-02-20", umbuchung=True)
+    proben = [p for p in vs.kartenproben() if p["pruefbar"]]
+    assert len(proben) == 1 and proben[0]["differenz"] == 0.0
+
+
+def test_eine_fehlende_kartenbuchung_faellt_auf():
+    """Der Fall aus dem Alltag: die Sammelbuchung ist da, der Kartenauszug
+    unvollstaendig – dann fehlt eine Ausgabe im Ergebnis."""
+    _karte(100.0, "Ausgleich Kreditkarte gem", "a0", "2026-01-22", umbuchung=True)
+    _karte(-30.0, "Rossmann", "k1", "2026-02-05")
+    _karte(56.93, "Ausgleich Kreditkarte gem", "a1", "2026-02-20", umbuchung=True)
+    p = [x for x in vs.kartenproben() if x["pruefbar"]][0]
+    assert p["kaeufe"] == -30.0 and p["ausgleich"] == 56.93
+    assert p["differenz"] == 26.93
+
+
+def test_der_erste_zyklus_ist_nicht_pruefbar():
+    """Vor dem ersten Ausgleich fehlt der Anfangspunkt – an den echten Daten
+    wich er um 22,00 EUR ab, weil die Dezemberkaeufe davor lagen."""
+    _karte(-30.0, "Rossmann", "k1", "2026-01-05")
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    proben = vs.kartenproben()
+    assert len(proben) == 1 and proben[0]["pruefbar"] is False
+
+
+def test_ohne_karte_gibt_es_keine_probe():
+    _bewegung(-100.0, "Baumarkt", "w1")
+    assert vs.kartenproben() == []
+
+
+# ---------------------------------- Sammelbuchung ohne Kartenauszug
+def test_eine_sammelbuchung_ohne_kartenauszug_faellt_auf():
+    """Genau die Frage vom 8.8.2026: „auf dem Bankimport muesste es eine
+    Sammelbuchung zu einem Kreditkartenbelegmonat geben." Ist sie da, der
+    Kartenauszug aber nicht, fehlen alle Einzelausgaben im Ergebnis."""
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "Deutsche Kreditbank Berlin",
+                               "text": "KREDITKARTENABRECHNUNG VISA -ABR. 4998",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    offen = vs.sammelbuchungen_ohne_karte()
+    assert len(offen) == 1 and offen[0]["betrag"] == -185.68
+
+
+def test_mit_passendem_ausgleich_ist_alles_gut():
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "Deutsche Kreditbank Berlin",
+                               "text": "KREDITKARTENABRECHNUNG VISA -ABR. 4998",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    _karte(185.68, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    assert vs.sammelbuchungen_ohne_karte() == []
+
+
+def test_ein_anderer_betrag_gilt_nicht_als_passend():
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "DKB", "text": "KREDITKARTENABRECHNUNG",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    _karte(56.93, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    assert len(vs.sammelbuchungen_ohne_karte()) == 1
+
+
+def test_zwei_zyklen_werden_nicht_vermischt():
+    """Ohne untere Grenze zaehlten die Kaeufe des ersten Zyklus im zweiten
+    nochmal mit – jede zweite Abrechnung saehe nach Fehlbetrag aus."""
+    _karte(-40.0, "Rossmann", "k1", "2026-01-05")
+    _karte(40.0, "Ausgleich Kreditkarte gem", "a1", "2026-01-22", umbuchung=True)
+    _karte(-25.0, "dm", "k2", "2026-02-05")
+    _karte(25.0, "Ausgleich Kreditkarte gem", "a2", "2026-02-20", umbuchung=True)
+    zweiter = [p for p in vs.kartenproben() if p["pruefbar"]][0]
+    assert zweiter["kaeufe"] == -25.0 and zweiter["anzahl"] == 1
+    assert zweiter["differenz"] == 0.0
