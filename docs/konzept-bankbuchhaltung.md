@@ -112,32 +112,52 @@ Aus 193 eingelesenen Bewegungen (Januar bis Juli 2026):
 
 | Fall | Anzahl | Erkennungsmerkmal |
 |---|---:|---|
-| **Booking**, je Reservierung | 44 Eingänge | `ID.14005823` im Verwendungszweck |
+| **Booking**, Sammelauszahlung je Wohnung | 44 Eingänge | nur die Wohnung, **nicht** die Buchung |
 | **Airbnb**, Sammelauszahlung | 7 Eingänge | Verwendungszweck nutzlos („AWV-MELDEPFLICHT") |
 | **Direktzahler** | 8 Eingänge | Gastname im Verwendungszweck („Buchung Katarina Gockel") |
 | **Ausgaben mit Beleg** | 122 Ausgänge | Empfänger → Kreditor (steht schon) |
 
-### Der Befund, der die automatische Erkennung entscheidet
+### Nachgeprüft am 8.8.2026 — und eine Annahme war falsch
 
-> **Von 65 Zahlungseingängen entspricht genau EINER exakt einem
-> Rechnungsbetrag.**
+Die erste Fassung dieses Konzepts nahm an, im Verwendungszweck von Booking
+stünde die Reservierungsnummer. **Sie steht dort nicht.**
 
-Der naheliegende Weg — „gleicher Betrag, also dieselbe Rechnung" — trifft in
-**1,5 %** der Fälle. Grund: Booking und Airbnb zahlen **netto nach Provision**
-aus, der Betrag kann gar nicht stimmen.
+`NO.bbqETYstLU6QDo85/ID.14005823` — über alle 44 Zahlungen kommen genau **zwei
+verschiedene** `ID.`-Nummern vor: `14005823` und `15049295`. Das sind die
+beiden **Wohnungen** bei Booking, nicht die Buchungen. Die Smoobu-Buchungen
+tragen ihre Booking-Nummer in `reference-id` (z. B. `5882430387`) — sie taucht
+im Bankauszug **nirgends** auf.
 
-Brauchbar ist stattdessen:
+Und die Beträge helfen auch nicht:
 
-* **Booking:** die Reservierungsnummer aus dem Verwendungszweck. *Zu prüfen:
-  steht sie so auch in den Smoobu-Daten?* — das ist der erste Rechercheschritt.
-* **Direktzahler:** der Gastname im Verwendungszweck gegen den Gast der
-  Rechnung. Bei „Buchung Katarina Gockel Cottaer Straße" eindeutig.
-* **Airbnb:** aus der Bewegung heraus gar nicht. Nötig ist die
-  **Auszahlungsübersicht** (earnings-PDF) oder die Auswahl von Hand.
+| Vergleich | Treffer |
+|---|---:|
+| Zahlungseingang == Rechnungsbetrag | **1 von 65** |
+| Booking-Zahlung == `price` einer Buchung | **0 von 44** |
+| Booking-Zahlung == `price − commission` einer Buchung | **0 von 44** |
 
-**Konsequenz fürs Konzept:** Die Zuordnung ist in erster Linie **bedient**, in
-zweiter automatisch. Ein Vorschlag darf nie still buchen — was nicht eindeutig
-ist, bleibt offen.
+> **Auch Booking zahlt gesammelt aus** — nicht je Reservierung, wie zuerst
+> angenommen, sondern **je Wohnung und Auszahlungslauf**. Damit ist der
+> n:m-Fall nicht die Ausnahme für Airbnb, sondern der **Normalfall für beide
+> Portale**: 51 von 65 Zahlungseingängen.
+
+### Was stattdessen trägt
+
+**Smoobu liefert die Provision je Buchung.** Das Feld `commission-included`
+steht an jeder Booking-Buchung (z. B. 31,13 € bei 277,59 € Preis). Damit kennt
+das Werkzeug zu jeder Rechnung den **erwarteten Auszahlungsbetrag** — und das
+macht das Abhaken schnell und selbstprüfend: man wählt Rechnungen aus, der
+Restbetrag zählt herunter, und was übrig bleibt, ist die Provision.
+
+Dazu kommen die **monatlichen Provisionsbelege** von Booking und Airbnb
+(bestätigt am 8.8.2026) sowie die monatliche Airbnb-Auszahlungsübersicht. Sie
+sind die Belege, gegen die gebucht wird.
+
+**Konsequenz fürs Konzept:** Die Zuordnung ist **bedient**, nicht automatisch.
+Das Werkzeug schlägt eine **Kandidatenliste** vor — offene Rechnungen dieser
+Wohnung im passenden Zeitraum, mit erwartetem Nettobetrag — und man hakt ab,
+bis der Rest null ist. Genau so arbeitet lexoffice. Eine Automatik, die aus
+Beträgen Kombinationen rät, würde falsch buchen und es nicht sagen.
 
 ---
 
@@ -161,15 +181,27 @@ an dem die tägliche Arbeit stattfindet. · *Größe:* L
 
 ### B3 · Ausgangsrechnungen zuordnen
 
-Rechnungen suchen und auswählen; Vorschläge über Gastname und
-Reservierungsnummer (**nicht** über den Betrag, siehe oben). Die Rechnung wird
-damit **bezahlt** und trägt ein Zahlungsdatum. · *Größe:* L
+Eine **Kandidatenliste** statt einer Automatik: offene Rechnungen der Wohnung
+im passenden Zeitraum, jede mit ihrem **erwarteten Auszahlungsbetrag**
+(`price − commission-included` aus Smoobu). Abhaken, bis der Rest null ist.
+
+Die Wohnung kommt aus der `ID.`-Nummer im Verwendungszweck — sie ist zwar nicht
+die Buchung, aber sie halbiert die Kandidatenliste. Welche Nummer zu welcher
+Wohnung gehört, lernt das Werkzeug bei der ersten Zuordnung.
+
+Für Direktzahler zusätzlich der **Gastname** aus dem Verwendungszweck. Die
+zugeordnete Rechnung gilt damit als **bezahlt** und trägt ein Zahlungsdatum.
+· *Größe:* L
 
 ### B4 · Portalprovision gegenbuchen
 
-Provisionsbeleg als Gegenposten auf dieselbe Zahlung. Erst damit stimmen Umsatz
-und Ausgaben. Einschließlich der Frage, woher der Provisionsbeleg kommt
-(Booking-Rechnung, Airbnb-Auszahlungsübersicht). · *Größe:* M
+Booking und Airbnb schicken **monatlich einen Provisionsbeleg**; Airbnb dazu
+die Auszahlungsübersicht. Der Beleg wird als Gegenposten auf dieselbe Zahlung
+gebucht — erst damit stimmen Umsatz und Ausgaben.
+
+Zur Gegenprobe kennt das Werkzeug die Provision schon aus Smoobu
+(`commission-included` je Buchung): Weicht die Summe der Einzelprovisionen vom
+Monatsbeleg ab, ist das ein Befund und kein Rundungsfehler. · *Größe:* M
 
 ### B5 · Eingangsbelege zuordnen — und die beiden Wege zusammenführen
 
@@ -225,13 +257,15 @@ lexoffice; B3–B6 füllen die Fälle, B7–B9 sind Ernte und Übergabe.
 * **AP19/AP28** (Vorsteuer, E-Rechnung) bleiben liegen, bis die Zuordnung
   steht — sie betreffen den Beleg, nicht die Zahlung.
 
-## 7. Offene Fragen vor dem Bau
+## 7. Geklärt am 8.8.2026
 
-1. **Steht die Booking-Reservierungsnummer aus dem Verwendungszweck auch in
-   den Smoobu-Daten?** Davon hängt ab, ob 44 der 65 Eingänge automatisch
-   vorgeschlagen werden können oder von Hand laufen.
-2. **Woher kommt der Provisionsbeleg?** Stellt Booking eine monatliche
-   Rechnung, oder muss die Provision je Reservierung aus der Differenz
-   errechnet werden?
-3. **Airbnb-Auszahlungsübersicht:** liegen die earnings-PDFs regelmäßig vor,
-   oder wird Airbnb von Hand aufgeteilt?
+1. **Die Booking-Reservierungsnummer steht NICHT im Verwendungszweck** —
+   nachgeprüft. Dort steht die Wohnung. Auch Booking zahlt gesammelt aus.
+   *(Abschnitt 4)*
+2. **Die Provisionsbelege kommen monatlich** von Booking und Airbnb.
+3. **Die Airbnb-Auszahlungsübersicht liegt monatlich vor.**
+4. **Smoobu liefert die Provision je Buchung** (`commission-included`) — damit
+   ist der erwartete Auszahlungsbetrag je Rechnung bekannt.
+
+Damit ist nichts mehr offen, was den Zuschnitt ändern würde. **B1 kann
+beginnen.**
