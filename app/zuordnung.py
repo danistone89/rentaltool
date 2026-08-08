@@ -57,7 +57,8 @@ def posten(bewegung_id):
                   key=lambda z: z.get("angelegt", ""))
 
 
-def hinzufuegen(bewegung_id, art, betrag, kategorie="", ziel_id="", notiz=""):
+def hinzufuegen(bewegung_id, art, betrag, kategorie="", ziel_id="", notiz="",
+                bewegung=None):
     """Einen Posten anlegen. Gibt (satz, meldung) zurück – `satz` ist None,
     wenn nichts angelegt wurde.
 
@@ -77,8 +78,21 @@ def hinzufuegen(bewegung_id, art, betrag, kategorie="", ziel_id="", notiz=""):
         return None, "Ein Posten über 0,00 € sagt nichts."
     if art in (RECHNUNG, BELEG) and not str(ziel_id or "").strip():
         return None, "Ohne Rechnung oder Beleg fehlt das Gegenstück."
+    kategorie = (kategorie or "").strip()
+    if not kategorie:
+        # Was sich aus der Lage ergibt, muss niemand tippen: ein
+        # Rechnungs-Posten an einer Booking-Auszahlung ist ein
+        # Beherbergungserlös Booking (B6c).
+        b = bewegung if bewegung is not None else db.holen("bewegungen", bewegung_id)
+        kategorie = kategorie_vorschlag(b or {}, art)
+    if art == KATEGORIE and not kategorie:
+        # Ein Posten dieser Art hat kein Gegenstueck – ohne Kategorie traegt er
+        # nur einen Betrag und sagt nichts. Genau so entstand am 8.8.2026ein
+        # Posten ueber 790,27 EUR, der in keiner Auswertung auftaucht.
+        return None, ("Zu diesem Posten fehlt die Kategorie – ohne sie steht er "
+                      "in keiner Auswertung.")
     satz = {"id": uuid.uuid4().hex[:12], "bewegung_id": bewegung_id, "art": art,
-            "ziel_id": str(ziel_id or ""), "kategorie": kategorie or "",
+            "ziel_id": str(ziel_id or ""), "kategorie": kategorie,
             "betrag": betrag, "notiz": notiz or "", "angelegt": _jetzt()}
     db.anlegen(TABELLE, satz)
     return satz, "Zugeordnet."
@@ -175,3 +189,44 @@ def ziel_setzen(zuordnung_id, art, ziel_id):
     z["art"], z["ziel_id"] = art, str(ziel_id)
     db.speichern(TABELLE, zuordnung_id, z)
     return z
+
+
+def kategorie_setzen(zuordnung_id, kategorie):
+    """Die Kategorie eines vorhandenen Postens ändern (B6a).
+
+    Bei einer Sammelzahlung kann jeder Posten eine andere tragen – und wer sich
+    vertut, muss sie ändern können, ohne den Posten zu löschen und neu
+    anzulegen. Eine leere Eingabe ändert nichts: sie wäre ein Rückschritt
+    hinter das, was schon dasteht.
+    """
+    kategorie = (kategorie or "").strip()
+    if not kategorie:
+        return None
+    z = db.holen(TABELLE, zuordnung_id)
+    if z is None:
+        return None
+    z["kategorie"] = kategorie
+    db.speichern(TABELLE, zuordnung_id, z)
+    return z
+
+
+def kategorie_vorschlag(bewegung, art):
+    """Welche Kategorie ergibt sich aus der Lage von selbst? (B6c)
+
+    Ein Rechnungs-Posten an einer Booking-Auszahlung **ist** ein
+    Beherbergungserlös Booking – das muss niemand tippen. Bei einer Ausgabe
+    gilt, was an der Bewegung schon erkannt wurde.
+
+    **Ohne Anhaltspunkt bleibt es leer.** Raten wäre hier schlimmer als
+    schweigen: eine falsche Kategorie läuft still ins Ergebnis.
+    """
+    from app import buchhaltung, verrechnung
+    if art == RECHNUNG or (bewegung or {}).get("betrag", 0) > 0:
+        plattform = verrechnung.plattform_von(bewegung or {})
+        name = {"booking": "Booking", "airbnb": "Airbnb"}.get(plattform, "")
+        gesucht = (f"Beherbergungserlöse ({name}, netto Auszahlung)" if name
+                   else "Beherbergungserlöse (Direktbuchung, brutto)")
+        if art == RECHNUNG and gesucht in buchhaltung.VORGABE_KATEGORIEN:
+            return gesucht
+        return ""
+    return ((bewegung or {}).get("kategorie") or "").strip()

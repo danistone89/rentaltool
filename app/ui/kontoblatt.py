@@ -274,6 +274,95 @@ def _posten_text(satz):
             or satz.get("ziel_id") or "—")
 
 
+def _provision_buchen(bewegung, rest, kategorie, neu_zeichnen):
+    satz, meldung = zuordnung.hinzufuegen(
+        bewegung["id"], zuordnung.KATEGORIE, rest, kategorie,
+        notiz="Provision des Portals")
+    ui.notify(meldung, type="positive" if satz else "warning")
+    if satz:
+        neu_zeichnen()
+
+
+def _kategorie_anlegen_dialog(vorschlag, danach):
+    """Eine Kategorie anlegen und danach weiterarbeiten.
+
+    Der Bedarf entsteht mitten in der Zuordnung – etwa bei der Portalprovision,
+    für die es keine Vorgabe gibt. Wer dafür die Bewegung verlassen muss,
+    ordnet sie „irgendwie" zu oder gar nicht.
+    """
+    from app import buchhaltung, data
+    from app.ui.basis import CFG
+    with ui.dialog() as dlg, ui.card().classes("w-[440px] max-w-full gap-2"):
+        ui.label("Neue Kategorie").classes("font-medium")
+        ui.label("Dafür gibt es noch keine Kategorie. Sie erscheint danach "
+                 "überall zur Auswahl und in der Auswertung als eigene Zeile.") \
+            .classes(f"text-xs {ton.STILL}")
+        feld = ui.input(value=vorschlag).props("dense outlined autofocus") \
+            .classes("w-full").mark("neue-kategorie-feld")
+
+        def anlegen():
+            name = " ".join((feld.value or "").split())
+            ok, meldung = buchhaltung.kategorie_anlegen(CFG, name)
+            if not ok and meldung.endswith("gibt es schon."):
+                ok = True                      # dann nehmen wir eben die da
+            ui.notify(meldung, type="positive" if ok else "warning")
+            if ok:
+                data.save_config()
+                dlg.close()
+                danach(name)
+
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Abbrechen", on_click=dlg.close).props("flat no-caps dense")
+            ui.button("Anlegen und zuordnen", on_click=anlegen) \
+                .props("unelevated no-caps dense").mark("neue-kategorie-ok")
+    dlg.open()
+
+
+def _posten_kategorie(satz, neu_zeichnen):
+    """Die Kategorie eines einzelnen Postens – änderbar (B6a).
+
+    Bei einer Sammelzahlung trägt jeder Posten eine andere: 60 € Wäscherei,
+    40 € Ausstattung. Vorher stand die Kategorie an der **Bewegung** und ließ
+    sich nach dem Anlegen nicht mehr ändern – wer sich vertat, musste den
+    Posten löschen und neu anlegen.
+    """
+    from app import buchhaltung
+    from app.ui.basis import CFG
+
+    def gesetzt(e):
+        if zuordnung.kategorie_setzen(satz["id"], e.value or ""):
+            ui.notify("Kategorie geändert.", type="positive", timeout=1500)
+            neu_zeichnen()
+
+    jetzige = (satz.get("kategorie") or "").strip()
+    fehlt = not jetzige
+    auswahl = {"": "— Kategorie —", **{x: x for x in buchhaltung.kategorien(CFG)}}
+    if jetzige and jetzige not in auswahl:
+        # Eine geloeschte oder umbenannte Kategorie steht noch am Posten. Ohne
+        # diesen Eintrag lehnt die Auswahl den Wert ab und die ganze Maske
+        # bricht ab – der Posten waere nicht mehr erreichbar.
+        auswahl[jetzige] = f"{jetzige} (nicht mehr in der Liste)"
+    ui.select(auswahl, value=jetzige, on_change=gesetzt) \
+        .props("dense borderless options-dense") \
+        .classes("text-xs w-full min-w-0 " + (ton.AUF_HINWEIS if fehlt else ton.STILL)) \
+        .mark(f"pk-{satz['id']}")
+
+
+def _neue_kategorie_knopf(auswahl, neu_zeichnen):
+    """Das „+" neben der Kategorieauswahl (B6b).
+
+    **Warum hier und nicht nur in den Einstellungen.** Der Bedarf entsteht in
+    dem Moment, in dem eine Zahlung zugeordnet wird und nichts passt. Angelegt
+    wird nur, was der Betrieb selbst benennt – die Vorgaben sind wörtlich die
+    Kriterien des Workbooks, die Vorkontierung macht der Betrieb.
+    """
+    ui.button(icon="add",
+              on_click=lambda: _kategorie_anlegen_dialog(
+                  "", lambda name: (auswahl.set_value(name), neu_zeichnen()))) \
+        .props("flat dense round").classes(f"{ton.ZART} shrink-0") \
+        .tooltip("Neue Kategorie anlegen").mark("kategorie-neu")
+
+
 def _provisionszeile(bewegung, rest, neu_zeichnen):
     """Den Rest einer Portal-Auszahlung als Provision gegenbuchen (B4).
 
@@ -301,16 +390,18 @@ def _provisionszeile(bewegung, rest, neu_zeichnen):
                  "gebucht.").classes(f"text-xs {ton.STILL} flex-grow min-w-0")
 
         def buchen():
-            kategorie = kategorien[0] if kategorien else ""
-            satz, meldung = zuordnung.hinzufuegen(
-                bewegung["id"], zuordnung.KATEGORIE, rest, kategorie,
-                notiz="Provision des Portals")
-            if satz and not kategorie:
-                meldung += (" Lege unter Einstellungen eine Kategorie mit "
-                            "„Provision“ im Namen an, dann wird sie hier gesetzt.")
-            ui.notify(meldung, type="positive" if satz else "warning")
-            if satz:
-                neu_zeichnen()
+            if not kategorien:
+                # Fuer die Portalprovision gibt es keine Vorgabe – die
+                # Kategorien sind woertlich die des Workbooks, und dort kommt
+                # sie nicht vor. Statt sie zu erfinden oder mit leerer
+                # Kategorie zu buchen (so entstand ein Posten ueber 790,27 EUR,
+                # der in keiner Auswertung auftaucht): hier anlegen lassen.
+                _kategorie_anlegen_dialog(
+                    "Portalprovision (Booking/Airbnb)",
+                    lambda name: _provision_buchen(bewegung, rest, name,
+                                                   neu_zeichnen))
+                return
+            _provision_buchen(bewegung, rest, kategorien[0], neu_zeichnen)
 
         ui.button(f"Provision {_eur(rest)}", icon="percent", on_click=buchen) \
             .props("dense unelevated no-caps size=sm").classes("shrink-0") \
@@ -431,8 +522,10 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                     .classes("text-xs text-slate-400 w-32 shrink-0")
                 with ui.column().classes("gap-0 min-w-0 flex-grow"):
                     ui.label(_posten_text(satz)).classes("text-sm truncate")
-                    if satz.get("kategorie") and satz["art"] != zuordnung.KATEGORIE:
-                        ui.label(satz["kategorie"]).classes(f"text-xs {ton.STILL} truncate")
+                    # Die Kategorie gehoert an den POSTEN (B6): bei einer
+                    # Sammelzahlung traegt jeder eine andere. Vorher liess sie
+                    # sich nach dem Anlegen nicht mehr aendern.
+                    _posten_kategorie(satz, neu_zeichnen)
                 ui.label(_eur(satz["betrag"])).classes("text-sm w-28 text-right shrink-0")
                 ui.button(icon="close",
                           on_click=lambda s=satz: (zuordnung.entfernen(s["id"]),
@@ -467,6 +560,8 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 ui.notify(meldung, type="positive" if satz else "warning")
                 if satz:
                     neu_zeichnen()
+
+            _neue_kategorie_knopf(kat, neu_zeichnen)
 
             # Beschriftung nach Lage: der erste Posten ist eine Zuordnung,
             # jeder weitere teilt die Zahlung auf.

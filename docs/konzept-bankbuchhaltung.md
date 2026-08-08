@@ -344,12 +344,56 @@ Juni-Auszahlungen, Probe stimmt.
 `app/ui/kontoblatt.py` und `app/ui/belege.py`, `tests/test_belegzuordnung.py`
 (34 Prüfungen).
 
-### B6 · Kategorien an jeder Bewegung
+### B6 · Kategorien an jeder Zuordnung — ✅ erledigt (8.8.2026)
 
-Anlegen und pflegen steht (AP27a). Es fehlen die **Einnahmen-Kategorien**
-(„Einnahmen Booking", „Einnahmen Airbnb", „Einnahmen Direktbuchung") und die
-Kategorie an der **Zuordnung** statt an der Bewegung — bei einer Sammelzahlung
-kann jeder Posten eine andere haben. · *Größe:* S
+Anlegen und pflegen steht (AP27a). **Die Einnahmen-Kategorien fehlen nicht
+mehr** — sie kamen mit den 31 wörtlichen Workbook-Kategorien
+(„Beherbergungserlöse (Booking, netto Auszahlung)" usw.). Der frühere Text
+hier war überholt.
+
+**Am Bestand nachgesehen (8.8.2026), was wirklich fehlt:**
+
+| Befund | |
+|---|---|
+| Posten ohne Kategorie | **2 von 10** |
+| davon ein *Kategorie*-Posten ganz ohne Kategorie | 790,27 € |
+| Kategorie für die **Portalprovision** | **existiert nicht** |
+| Auswertung rechnet nach | `bewegung.klasse`, nicht nach Posten |
+
+Drei Lücken, die zusammengehören:
+
+* **B6a · Kategorie am Posten pflegbar.** Ein Posten trägt schon ein Feld
+  `kategorie`, aber es lässt sich nach dem Anlegen nicht mehr ändern. Bei einer
+  Sammelzahlung braucht jeder Posten seine eigene.
+* **B6b · Ein Kategorie-Posten ohne Kategorie sagt nichts.** Genau so entstand
+  der Posten über 790,27 €: die Maske ließ „— Kategorie —" stehen und buchte.
+  Das Werkzeug soll das nicht annehmen — und, weil für die **Portalprovision
+  keine Kategorie existiert**, an Ort und Stelle eine anlegen lassen. *Keine
+  erfundene Vorgabe*: die Kategorien sind wörtlich die des Workbooks, und die
+  Vorkontierung macht der Betrieb selbst (Ansage vom 8.8.2026).
+* **B6c · Vorbelegung, wo sie sich ergibt.** Ein Rechnungs-Posten an einer
+  Booking-Auszahlung ist ein Beherbergungserlös Booking; ein Beleg-Posten trägt
+  die Kategorie seines Belegs. Beides steht schon fest und muss nicht getippt
+  werden.
+
+Die **Auswertung je Kategorie über die Posten** (statt über die Bewegung)
+gehört zu B7 — hier entsteht nur die Funktion, auf der sie aufsetzt:
+`konto.je_kategorie`. Drei Regeln, damit die Zahl ehrlich bleibt: wo Posten
+sind, zählen sie; wo keine sind, zählt die Kategorie der Bewegung (sonst
+verschwände jede noch nicht aufgeteilte Zahlung); und was an einer teilweise
+aufgeteilten Bewegung offen ist, steht unter „— noch ohne Kategorie —" statt
+bei der Bewegungskategorie mitzulaufen.
+
+**Dabei gefunden:** trug ein Posten eine Kategorie, die es nicht mehr gibt
+(gelöscht oder umbenannt), lehnte die Auswahl den Wert ab und die **ganze
+Zuordnungsmaske brach ab** — der Posten war dann nicht einmal mehr erreichbar,
+um ihn zu berichtigen. Solche Kategorien stehen jetzt mit dem Zusatz „nicht
+mehr in der Liste" zur Wahl.
+
+*Größe:* S · *Umgesetzt:* `zuordnung.kategorie_setzen/kategorie_vorschlag`,
+Pflicht zur Kategorie in `zuordnung.hinzufuegen`, `konto.je_kategorie`,
+Auswahl je Posten und „+ Neue Kategorie" in `app/ui/kontoblatt.py`,
+`tests/test_postenkategorie.py` (21 Prüfungen)
 
 ### B7 · Der Überblick
 

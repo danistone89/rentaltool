@@ -362,3 +362,46 @@ def monatssummen(konto=""):
             e["unklar"] += 1
     return {m: {k: (v if k == "unklar" else round(v, 2)) for k, v in w.items()}
             for m, w in sorted(summen.items())}
+
+
+# Wohin der noch nicht zugeordnete Teil einer Bewegung zaehlt. Er als „ohne
+# Kategorie" auszuweisen ist ehrlicher, als ihn wegzulassen: sonst sieht eine
+# halb bearbeitete Auswertung vollstaendig aus.
+OHNE_KATEGORIE = "— noch ohne Kategorie —"
+
+
+def je_kategorie(von="", bis="", konto=""):
+    """Summe je Kategorie – **ueber die Posten**, nicht ueber die Bewegung (B6).
+
+    Der Unterschied ist der ganze Sinn von B1: eine Zahlung von 100 EUR kann zu
+    60 EUR Waescherei und 40 EUR Ausstattung gehoeren. Nach der Bewegung
+    gerechnet stuende alles unter einer Kategorie.
+
+    Drei Regeln:
+
+    * Wo **Posten** da sind, zaehlen sie.
+    * Wo **keine** da sind, zaehlt die Kategorie der Bewegung – sonst
+      verschwaende jede noch nicht aufgeteilte Zahlung aus der Auswertung.
+    * Was an einer teilweise aufgeteilten Bewegung **offen** ist, steht unter
+      `OHNE_KATEGORIE`. Es der Bewegungskategorie zuzuschlagen waere zu hoch
+      gerechnet, es wegzulassen liesse die Auswertung fertig aussehen.
+    """
+    summen = {}
+
+    def dazu(name, betrag):
+        if abs(betrag) < zuordnung.GENAU:
+            return
+        summen[name] = round(summen.get(name, 0.0) + betrag, 2)
+
+    for b in alle(von, bis, konto):
+        if b.get("umbuchung"):
+            continue
+        p = zuordnung.posten(b["id"])
+        if not p:
+            dazu((b.get("kategorie") or "").strip() or OHNE_KATEGORIE,
+                 round(b.get("betrag", 0.0), 2))
+            continue
+        for z in p:
+            dazu((z.get("kategorie") or "").strip() or OHNE_KATEGORIE, z["betrag"])
+        dazu(OHNE_KATEGORIE, zuordnung.rest(b))
+    return summen

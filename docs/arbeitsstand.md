@@ -244,7 +244,18 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   **6 → 14 von 31**. Für die bereits hochgeladenen Belege gibt es im
   Belege-Bereich den Knopf „*n* Belege neu auslesen" mit Vorschau; von Hand
   gepflegte Angaben bleiben unangetastet.
-* **Nächstes Paket: B6** — Kategorien an der Zuordnung statt an der Bewegung.
+* **B6 ist fertig (8.8.2026):** die Kategorie hängt am **Posten**, nicht an der
+  Bewegung – bei einer Sammelzahlung trägt jeder eine andere, und sie lässt
+  sich nachträglich ändern. Ein Kategorie-Posten ohne Kategorie wird nicht mehr
+  angenommen (so entstand ein Posten über 790,27 €, der in keiner Auswertung
+  auftauchte). Für die **Portalprovision gibt es keine Vorgabe-Kategorie** –
+  die Maske lässt sie jetzt an Ort und Stelle anlegen, statt in die
+  Einstellungen zu schicken. Rechnungs-Posten bekommen die Erlöskategorie der
+  Plattform automatisch.
+  Zwei Altposten (790,27 € Provision, 400,07 € Rechnung) tragen noch keine
+  Kategorie – im Konto stehen sie gelb markiert und lassen sich dort setzen.
+* **Nächstes Paket: B7** — der Überblick: Einnahmen, Ausgaben, Ergebnis je
+  Monat, Wohnung und Kategorie.
 * **Ältere Arbeitspakete:** AP15 (Eingangsrechnungen mit Kreditor und
   Kostenstelle), AP16 (Kontoauszug einlesen), AP17 (EÜR im Werkzeug), AP18
   (Ablage in der Nextcloud) — Beschreibung in `docs/roadmap.md`.
@@ -252,6 +263,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 956 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 977 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```
