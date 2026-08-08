@@ -1123,9 +1123,22 @@ ausdrücklich als unzuverlässig bezeichnet hat).
   `tools/deploy.sh` zieht seit hier die Abhängigkeiten auf dem Server nach.
   ✅ erledigt (8.8.2026)
 * **B11c · Airbnb-Bericht einlesen.** CSV, Zeilenart `Payout` mit den
-  folgenden `Buchung`-Zeilen. Verknüpfung über Betrag + Datum (±7 Tage).
-  **Mehrdeutiges wird gezeigt, nicht geraten** — zahlt Airbnb zweimal denselben
-  Betrag in einer Woche, entscheidet der Mensch.
+  folgenden `Buchung`-Zeilen. Verknüpfung über Betrag + Datum: der Geldeingang
+  liegt am Tag der Auszahlung oder bis zu sieben Tage danach — gemessen null
+  bis drei. **Mehrdeutiges wird gezeigt, nicht geraten** — zahlt Airbnb zweimal
+  denselben Betrag in einer Woche, entscheidet der Mensch.
+
+  Drei Stolpersteine beim Bauen: Airbnb schreibt Zahlen **gemischt**
+  („1562.65" und „353,42" in derselben Zeile), es trägt also nur die Stellung
+  des letzten Trennzeichens — ein Parser, der Deutsch annimmt, macht aus
+  „1,916.06" die Zahl 1,92. Das Datum steht amerikanisch (Monat zuerst). Und
+  die Servicegebühr steht positiv da, im Tool ist ein Abzug negativ wie bei
+  Booking. Die von Airbnb selbst abgeführte Beherbergungssteuer wird
+  mitgelesen, aber nicht gebucht — sie hat den Betrieb nie erreicht.
+
+  An den echten Daten: 19 Auszahlungen, alle 19 gehen auf, 7 von 7
+  Bankbewegungen eindeutig zugeordnet, keine mehrdeutig.
+  ✅ erledigt (8.8.2026)
 * **B11d · Zuordnen.** Je Auszahlung die Rechnungen mit ihrem **Bruttobetrag**
   und die Provision aus der Quelle des Portals. Vorschau vor dem Schreiben.
 

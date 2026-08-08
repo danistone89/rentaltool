@@ -1032,10 +1032,10 @@ def render_konto():
                   label="Auszüge und Berichte wählen") \
             .props('accept=".csv,text/csv,.xlsx"').classes("hk-upload w-[240px]") \
             .mark("konto-upload")
-        ui.label("DKB-Business und DKB-VISA als CSV, dazu der "
-                 "Auszahlungsbericht von Booking (XLSX) – alles zusammen "
-                 "auswählbar. Was die Datei ist, wird an ihrem Inhalt "
-                 "erkannt.").classes("text-xs text-slate-400")
+        ui.label("DKB-Business und DKB-VISA als CSV, dazu die "
+                 "Auszahlungsberichte von Booking (XLSX) und Airbnb (CSV) – "
+                 "alles zusammen auswählbar. Was die Datei ist, wird an ihrem "
+                 "Inhalt erkannt.").classes("text-xs text-slate-400")
 
     def zeichnen():
         inhalt.clear()

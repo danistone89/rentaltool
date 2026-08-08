@@ -182,3 +182,170 @@ def test_eine_unstimmige_auszahlung_wird_gemeldet():
     Reservierung fehlt – und der Rest der Auszahlung bliebe unerklärt."""
     b = pb.einlesen(_booking_xlsx([AUSZAHLUNG, RES_A]))
     assert b["schief"] == ["vQmQNcef5aDAINyZ"]
+
+
+# =============================================================== Airbnb (B11c)
+_A_KOPF = ("Datum,Voraussichtliches Datum des Geldeingangs,Typ,Bestätigungs-Code,"
+           "Buchungsdatum,Startdatum,Enddatum,Nächte,Gast,Inserat,Details,"
+           "Referenzcode,Währung,Betrag,Ausgezahlt,Servicegebühr,"
+           "Gebühr für schnelle Zahlung,Reinigungsgebühr,Bruttoeinkünfte,"
+           "Von Airbnb abgeführte Steuer,Ertragsjahr")
+
+A_PAYOUT = ('03/10/2026,03/17/2026,Payout,,,,,,,,"Zahlen an Daniel Steinhauss",'
+            'G-3Y5N6OUMZRXYRMJVNCLE2ZBKZ43OHDNQ,EUR,,1562.65,,,,,,')
+A_BUCHUNG = ('03/10/2026,,Buchung,HM5F9P3HAT,12/24/2025,01/09/2026,04/05/2026,86,'
+             'Monica Huang,"Stilvolles Apartment mit Balkon",,,EUR,1562.65,,'
+             '"353,42",,29.83,1916.06,114.96,2026')
+
+
+def _airbnb_csv(*zeilen):
+    return ("﻿" + _A_KOPF + "\n" + "\n".join(zeilen) + "\n").encode("utf-8")
+
+
+def test_der_airbnb_bericht_wird_erkannt():
+    assert pb.art(_airbnb_csv(A_PAYOUT, A_BUCHUNG)) == pb.AIRBNB
+
+
+def test_ein_kontoauszug_ist_kein_airbnb_bericht():
+    assert pb.art(b"Buchungsdatum;Betrag;Typ\n01.01.26;5,00;x\n") == ""
+
+
+def test_die_airbnb_auszahlung_kommt_mit_ihrer_buchung():
+    a = pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG))
+    assert len(a) == 1
+    z = a[0]
+    assert z["portal"] == pb.AIRBNB and z["betrag"] == 1562.65
+    # 03/10/2026 ist der 10. März – Monat zuerst, wie im amerikanischen Format.
+    assert z["datum"] == "2026-03-10"
+    assert z["reservierungen"][0]["nummer"] == "HM5F9P3HAT"
+    assert z["reservierungen"][0]["gast"] == "Monica Huang"
+    assert z["stimmt"] is True
+
+
+def test_die_servicegebuehr_wird_zum_abzug():
+    """Airbnb nennt sie positiv. Im Tool ist ein Abzug negativ – wie bei
+    Booking, sonst addierten sich die Portale im Verrechnungskonto gegeneinander."""
+    r = pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG))[0]["reservierungen"][0]
+    assert r["provision"] == -353.42
+    assert r["brutto"] == 1916.06 and r["auszahlbar"] == 1562.65
+
+
+def test_die_abgefuehrte_steuer_steht_dabei():
+    """Airbnb zieht die Beherbergungssteuer selbst ein und führt sie ab. Sie
+    hat den Betrieb nie erreicht – deshalb steht sie da, wird aber nicht gebucht."""
+    r = pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG))[0]["reservierungen"][0]
+    assert r["steuer"] == 114.96
+
+
+def test_gemischte_schreibweisen_werden_richtig_gelesen():
+    """In derselben Zeile steht „1562.65" und „353,42". Es gibt also keine
+    feste Schreibweise – es trägt nur die Stellung des letzten Trennzeichens."""
+    assert pb._a_zahl("1562.65") == 1562.65
+    assert pb._a_zahl("353,42") == 353.42
+    assert pb._a_zahl("1.234,56") == 1234.56
+    assert pb._a_zahl("1,916.06") == 1916.06
+
+
+def test_die_mediations_auszahlung_gehoert_dazu():
+    """Sie ist eine Zahlung an den Betrieb wie jede andere – ohne sie ginge die
+    Auszahlung nicht auf."""
+    payout = ('04/14/2026,04/21/2026,Payout,,,,,,,,"Zahlen an",'
+              'G-WN7V6YSORQL32YS45MFDFKW3N5OT7VO3,EUR,,95.00,,,,,,')
+    med = ('04/14/2026,,Mediations-Auszahlung,HM5F9P3HAT,,01/09/2026,04/05/2026,86,'
+           'Monica Huang,"Stilvolles Apartment",Auszahlung für Mediation,,EUR,'
+           '95.00,,,,,95.00,,2026')
+    z = pb.lesen(_airbnb_csv(payout, med))[0]
+    assert len(z["reservierungen"]) == 1 and z["stimmt"] is True
+
+
+def test_zwei_airbnb_auszahlungen_bleiben_getrennt():
+    zweiter = A_PAYOUT.replace("03/10/2026", "03/05/2026") \
+                      .replace("1562.65", "295.23").replace("G-3Y5N", "G-VFV4")
+    buchung2 = A_BUCHUNG.replace("03/10/2026", "03/05/2026") \
+                        .replace("1562.65", "295.23").replace("HM5F9P3HAT", "HM4WARMWBX")
+    a = pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG, zweiter, buchung2))
+    assert [len(x["reservierungen"]) for x in a] == [1, 1]
+    assert [x["betrag"] for x in a] == [1562.65, 295.23]
+
+
+# ------------------------------------------- Ohne Kürzel: Betrag und Datum
+def _airbnb_bewegung(datum, betrag=1562.65):
+    return {"id": "w1", "datum": datum, "betrag": betrag,
+            "gegenpartei": "AIRBNB PAYMENTS LUXEMBOURG",
+            "text": "Airbnb AWV-MELDEPFLICHT BEACHTEN"}
+
+
+def test_airbnb_wird_ueber_betrag_und_datum_gefunden():
+    """Der Referenzcode G-… steht im Verwendungszweck nicht. Airbnb überweist
+    am Tag der Auszahlung oder wenige Tage danach."""
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    assert pb.zu_bewegung(_airbnb_bewegung("2026-03-11"))["betrag"] == 1562.65
+
+
+def test_am_tag_der_auszahlung_zaehlt_auch():
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    assert pb.zu_bewegung(_airbnb_bewegung("2026-03-10")) is not None
+
+
+def test_vor_der_auszahlung_zaehlt_nicht():
+    """Geld kann nicht ankommen, bevor es losgeschickt wurde – ein Treffer
+    davor wäre eine andere Auszahlung mit zufällig gleichem Betrag."""
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    assert pb.zu_bewegung(_airbnb_bewegung("2026-03-09")) is None
+
+
+def test_zu_lange_danach_zaehlt_nicht():
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    assert pb.zu_bewegung(_airbnb_bewegung("2026-03-20")) is None
+
+
+def test_ein_anderer_betrag_zaehlt_nicht():
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    assert pb.zu_bewegung(_airbnb_bewegung("2026-03-11", 1562.66)) is None
+
+
+def test_zwei_moegliche_auszahlungen_werden_nicht_geraten():
+    """Derselbe Betrag zweimal in derselben Woche: dann zeigt das Tool beide,
+    statt eine zu wählen. Eine falsch zugeordnete Auszahlung erzeugt eine
+    Rechnungszuordnung, die hinterher niemand mehr in Frage stellt."""
+    zwilling = A_PAYOUT.replace("03/10/2026", "03/09/2026").replace("G-3Y5N", "G-XXXX")
+    buchung2 = A_BUCHUNG.replace("03/10/2026", "03/09/2026") \
+                        .replace("HM5F9P3HAT", "HMANDERS")
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG, zwilling, buchung2)))
+    b = _airbnb_bewegung("2026-03-11")
+    assert len(pb.kandidaten(b)) == 2
+    assert pb.zu_bewegung(b) is None
+
+
+def test_eine_lastschrift_mit_kuerzel_ist_keine_auszahlung():
+    """Ein Kuerzel im Verwendungszweck reicht nicht – bei einer Belastung von
+    Booking waere eine Zuordnung zur Auszahlung schlicht falschherum. Bisher
+    hat Booking hier nie belastet; falls doch, darf es nicht durchrutschen."""
+    pb.merken(pb.lesen(_booking_xlsx([AUSZAHLUNG, RES_A, RES_B])))
+    rueck = {"id": "w8", "datum": "2026-01-05", "betrag": -859.89,
+             "gegenpartei": "Booking.com BV",
+             "text": "NO.vQmQNcef5aDAINyZ/ID.15049295 RUECKBELASTUNG"}
+    assert pb.kandidaten(rueck) == []
+
+
+def test_eine_fremde_bewegung_faengt_keine_airbnb_auszahlung_ein():
+    """Sonst zöge jede Erstattung über 1562,65 € eine Airbnb-Auszahlung an sich."""
+    pb.merken(pb.lesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG)))
+    fremd = {"id": "w9", "datum": "2026-03-11", "betrag": 1562.65,
+             "gegenpartei": "Targobank", "text": "Gutschrift"}
+    assert pb.kandidaten(fremd) == []
+
+
+def test_der_airbnb_bericht_meldet_was_angekommen_ist():
+    b = pb.einlesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG))
+    assert b["portal"] == pb.AIRBNB and b["konto"] == "Airbnb"
+    assert b["neu"] == 1 and b["reservierungen"] == 1
+
+
+def test_booking_und_airbnb_kommen_sich_nicht_ins_gehege():
+    """Beide liegen im selben Bestand – der Schlüssel trägt deshalb das Portal."""
+    pb.einlesen(_booking_xlsx([AUSZAHLUNG, RES_A, RES_B]))
+    pb.einlesen(_airbnb_csv(A_PAYOUT, A_BUCHUNG))
+    assert len(pb.auszahlungen()) == 2
+    assert len(pb.auszahlungen(pb.AIRBNB)) == 1
+    assert len(pb.auszahlungen(pb.BOOKING)) == 1

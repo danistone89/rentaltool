@@ -25,6 +25,14 @@ Rechnung. Damit ist die Kette vollständig:
 An den echten Daten (Januar bis Juli 2026) gemessen: 46 Auszahlungen, alle 46
 gehen auf den Cent auf, 75 von 75 Reservierungen in Smoobu wiedergefunden.
 
+**Airbnb ist derselbe Gedanke mit einer schwächeren Klammer.** Der Bericht ist
+gleich gebaut – eine Auszahlungszeile, darunter ihre Buchungen –, aber im
+Verwendungszweck der Bank steht nichts als „Airbnb". Der Referenzcode `G-…` aus
+dem Bericht taucht dort nicht auf. Es bleibt der Betrag und das Datum: Airbnb
+überweist am Tag der Auszahlung oder ein bis drei Tage danach. Sieben von
+sieben Bewegungen ließen sich so eindeutig zuordnen. **Bleiben zwei
+Auszahlungen möglich, wird nicht geraten** – dann zeigt das Tool beide.
+
 **Die Provision kommt aus dieser Quelle**, nicht aus Smoobu – dessen Zahl hat
 der Betrieb als unzuverlässig bezeichnet. Und sie besteht aus **zwei** Posten:
 der Provision und der Zahlungsgebühr (`Payments Service Fee`). Wer nur die
@@ -33,12 +41,21 @@ Provision abzieht, sucht hinterher ein paar Euro je Reservierung.
 Nichts hier bucht. Das Modul liest und legt ab; die Zuordnung ist B11d und
 zeigt vorher, was sie tun würde.
 """
+import csv
 import io
 import re
+from datetime import date
 
 from app import db
 
 BOOKING = "booking"
+AIRBNB = "airbnb"
+
+# So viele Tage darf zwischen Auszahlung und Geldeingang liegen. Gemessen: 0
+# bis 3 Tage. Sieben Tage lassen Luft, ohne die naechste Auszahlung
+# einzufangen – Airbnb zahlt hier nie zweimal in derselben Woche denselben
+# Betrag aus.
+LAUFZEIT_TAGE = 7
 
 # Das Kürzel im Verwendungszweck: `NO.vQmQNcef5aDAINyZ/ID.15049295`.
 _KUERZEL = re.compile(r"\bNO\.([A-Za-z0-9]{6,})", re.I)
@@ -93,18 +110,31 @@ def _blatt(rohdaten):
 def art(rohdaten):
     """Welcher Bericht ist das? '' wenn keiner – dann fasst das Tool ihn nicht an."""
     ws = _blatt(rohdaten)
-    if ws is None:
+    if ws is not None:
+        for zeile in ws.iter_rows(values_only=True):
+            kopf = [_text(z) for z in zeile]
+            if _SPALTEN["schluessel"] in kopf and _SPALTEN["art"] in kopf:
+                return BOOKING
+            break       # nur die erste Zeile; danach ist es kein Kopf mehr
         return ""
-    for zeile in ws.iter_rows(values_only=True):
-        kopf = [_text(z) for z in zeile]
-        if _SPALTEN["schluessel"] in kopf and _SPALTEN["art"] in kopf:
-            return BOOKING
-        return ""       # nur die erste Zeile; danach ist es kein Kopf mehr
+    kopf = _erste_zeile(rohdaten)
+    if all(name in kopf for name in (_A["art"], _A["nummer"], _A["betrag"])):
+        return AIRBNB
     return ""
 
 
 def lesen(rohdaten):
-    """Die Auszahlungen des Berichts, in der Reihenfolge der Datei.
+    """Die Auszahlungen des Berichts, in der Reihenfolge der Datei."""
+    welche = art(rohdaten)
+    if welche == BOOKING:
+        return _booking_lesen(rohdaten)
+    if welche == AIRBNB:
+        return _airbnb_lesen(rohdaten)
+    return []
+
+
+def _booking_lesen(rohdaten):
+    """Die Auszahlungen aus dem Booking-Bericht, in der Reihenfolge der Datei.
 
     Eine Auszahlung ohne Reservierungen wird übergangen – sie sagt nichts, und
     es gäbe nichts zuzuordnen. Umgekehrt gilt: geht die Summe der
@@ -166,6 +196,113 @@ def lesen(rohdaten):
     return raus
 
 
+# --------------------------------------------------------------------- Airbnb
+# Spalten des Airbnb-Berichts (deutsche Oberfläche).
+_A = {"datum": "Datum", "art": "Typ", "nummer": "Bestätigungs-Code",
+      "von": "Startdatum", "bis": "Enddatum", "gast": "Gast",
+      "wohnung": "Inserat", "schluessel": "Referenzcode",
+      "betrag": "Betrag", "auszahlung": "Ausgezahlt",
+      "provision": "Servicegebühr", "gebuehr": "Gebühr für schnelle Zahlung",
+      "reinigung": "Reinigungsgebühr", "brutto": "Bruttoeinkünfte",
+      "steuer": "Von Airbnb abgeführte Steuer"}
+
+
+def _erste_zeile(rohdaten):
+    try:
+        text = rohdaten.decode("utf-8-sig")
+    except (AttributeError, UnicodeDecodeError):
+        return []
+    zeile = text.splitlines()[0] if text.splitlines() else ""
+    return [s.strip().strip('"') for s in zeile.split(",")]
+
+
+def _a_zahl(text):
+    """Airbnb schreibt gemischt: „1562.65" und „353,42" in derselben Zeile.
+
+    Es gibt also keine feste Schreibweise, an der man sich festhalten könnte.
+    Was trägt, ist die Stellung: **das letzte Trennzeichen ist das
+    Dezimaltrennzeichen**, alles davor gruppiert nur. Damit sind sowohl
+    „1.234,56" als auch „1,234.56" richtig gelesen – ein Parser, der Deutsch
+    annimmt, macht aus „1,916.06" die Zahl 1,92.
+    """
+    if text is None or str(text).strip() == "":
+        return None
+    s = re.sub(r"[^\d,.\-]", "", str(text).strip())
+    if not s:
+        return None
+    letztes = max(s.rfind(","), s.rfind("."))
+    if letztes >= 0:
+        s = re.sub(r"[,.]", "", s[:letztes]) + "." + s[letztes + 1:]
+    try:
+        return round(float(s), 2)
+    except ValueError:
+        return None
+
+
+def _a_datum(text):
+    """`04/14/2026` – Monat zuerst, wie in der amerikanischen Schreibweise."""
+    teile = (text or "").strip().split("/")
+    if len(teile) != 3:
+        return ""
+    m, t, j = teile
+    return f"{j}-{m.zfill(2)}-{t.zfill(2)}" if len(j) == 4 else ""
+
+
+def _airbnb_lesen(rohdaten):
+    """Die Auszahlungen aus dem Airbnb-Bericht.
+
+    Aufbau wie bei Booking: eine Zeile `Payout`, darunter die Buchungen, die
+    darin stecken – zugeordnet über die Reihenfolge, denn die Buchungszeilen
+    tragen den Referenzcode ihrer Auszahlung **nicht**.
+    """
+    try:
+        text = rohdaten.decode("utf-8-sig")
+    except (AttributeError, UnicodeDecodeError):
+        return []
+    auszahlungen, laufend = [], None
+    for z in csv.DictReader(io.StringIO(text)):
+        typ = (z.get(_A["art"]) or "").strip()
+        if typ == "Payout":
+            laufend = {
+                "portal": AIRBNB, "schluessel": (z.get(_A["schluessel"]) or "").strip(),
+                "datum": _a_datum(z.get(_A["datum"])),
+                "betrag": _a_zahl(z.get(_A["auszahlung"])) or 0.0,
+                "wohnung_id": "", "wohnung": "", "reservierungen": []}
+            auszahlungen.append(laufend)
+        elif typ and laufend is not None:
+            # Alles andere unter einer Auszahlung ist eine Buchung – auch eine
+            # „Mediations-Auszahlung". Sie ist eine Zahlung an den Betrieb wie
+            # jede andere und gehört in dieselbe Auszahlung.
+            brutto = _a_zahl(z.get(_A["brutto"]))
+            provision = _a_zahl(z.get(_A["provision"])) or 0.0
+            gebuehr = _a_zahl(z.get(_A["gebuehr"])) or 0.0
+            zahlbar = _a_zahl(z.get(_A["betrag"])) or 0.0
+            laufend["reservierungen"].append({
+                "nummer": (z.get(_A["nummer"]) or "").strip(),
+                "gast": (z.get(_A["gast"]) or "").strip(),
+                "von": _a_datum(z.get(_A["von"])), "bis": _a_datum(z.get(_A["bis"])),
+                # Airbnb nennt die Servicegebühr positiv; im Tool ist ein Abzug
+                # negativ – wie bei Booking, sonst addierten sich die beiden
+                # Portale im Verrechnungskonto gegeneinander.
+                "brutto": brutto if brutto is not None else zahlbar,
+                "provision": -abs(provision), "gebuehr": -abs(gebuehr),
+                "auszahlbar": zahlbar,
+                # Airbnb führt die Beherbergungssteuer selbst ab. Sie steht hier
+                # nur zur Kenntnis – gebucht wird sie nicht, sie hat den Betrieb
+                # nie erreicht.
+                "steuer": _a_zahl(z.get(_A["steuer"])) or 0.0,
+                "reinigung": _a_zahl(z.get(_A["reinigung"])) or 0.0,
+                "wohnung_id": "", "wohnung": (z.get(_A["wohnung"]) or "").strip(),
+                "art": typ})
+            if not laufend["wohnung"]:
+                laufend["wohnung"] = laufend["reservierungen"][-1]["wohnung"]
+
+    raus = [a for a in auszahlungen if a["reservierungen"]]
+    for a in raus:
+        a["stimmt"] = _geht_auf(a)
+    return raus
+
+
 def _geht_auf(a):
     summe = round(sum(r["auszahlbar"] for r in a["reservierungen"]), 2)
     return abs(summe - a["betrag"]) < 0.02
@@ -219,15 +356,61 @@ def kuerzel(bewegung):
     return treffer.group(1) if treffer else ""
 
 
+def _tage(a, b):
+    """Tage zwischen zwei Datumsangaben – None, wenn eine unlesbar ist."""
+    try:
+        x = date(*[int(t) for t in a.split("-")])
+        y = date(*[int(t) for t in b.split("-")])
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return (x - y).days
+
+
+def kandidaten(bewegung):
+    """Welche Auszahlungen zu dieser Bankbewegung passen könnten.
+
+    Zwei Wege, weil die Portale zwei verschiedene Klammern liefern:
+
+    * **Booking** nennt sein Kürzel im Verwendungszweck. Das ist eindeutig; wo
+      es fehlt, gehört die Bewegung eben nicht zu einer Auszahlung.
+    * **Airbnb** nennt nichts. Dort passt eine Auszahlung, wenn der Betrag
+      stimmt und der Geldeingang am Tag der Auszahlung oder bis zu einer Woche
+      danach liegt.
+
+    Die Liste hat in aller Regel null oder einen Eintrag. Hat sie zwei, ist der
+    Fall mehrdeutig – und das ist eine Antwort, kein Fehler.
+    """
+    betrag = round(bewegung.get("betrag", 0) or 0, 2)
+    if betrag <= 0:
+        return []
+    k = kuerzel(bewegung)
+    if k:
+        treffer = db.holen("portalauszahlungen", f"{BOOKING}-{k}")
+        return [treffer] if treffer else []
+    from app import verrechnung
+    if verrechnung.plattform_von(bewegung) != AIRBNB:
+        return []
+    raus = []
+    for a in auszahlungen(AIRBNB):
+        abstand = _tage(bewegung.get("datum") or "", a.get("datum") or "")
+        # Auf den Cent genau: die Betraege sind Cent-Zahlen, keine Schaetzungen.
+        # Eine Toleranz von einem Cent liesse zwei verschiedene Auszahlungen
+        # als denselben Treffer durchgehen.
+        if abstand is not None and 0 <= abstand <= LAUFZEIT_TAGE \
+                and round(a.get("betrag", 0) - betrag, 2) == 0:
+            raus.append(a)
+    return raus
+
+
 def zu_bewegung(bewegung):
     """Die Auszahlung zu dieser Bankbewegung – oder None.
 
-    Nur über das Kürzel. Über den Betrag zu raten wäre hier falsch: bei Booking
-    ist das Kürzel eindeutig, und wo es fehlt, gehört die Bewegung eben nicht zu
-    einer Auszahlung dieses Berichts.
+    None heißt „keine gefunden" **oder** „mehr als eine möglich". Geraten wird
+    nicht: eine falsch zugeordnete Auszahlung erzeugt eine Rechnungszuordnung,
+    die niemand mehr in Frage stellt.
     """
-    k = kuerzel(bewegung)
-    return db.holen("portalauszahlungen", f"{BOOKING}-{k}") if k else None
+    treffer = kandidaten(bewegung)
+    return treffer[0] if len(treffer) == 1 else None
 
 
 def einlesen(rohdaten):
@@ -238,12 +421,14 @@ def einlesen(rohdaten):
     fehleranfällig benannt; eine eigene Hochladestelle je Dateiart wäre einer
     mehr. Was die Datei ist, erkennt das Tool an ihrem Inhalt.
     """
-    if art(rohdaten) != BOOKING:
+    welche = art(rohdaten)
+    if not welche:
         return None
     gelesen = lesen(rohdaten)
     neu, doppelt = merken(gelesen)
     tage = sorted(a["datum"] for a in gelesen if a.get("datum"))
-    return {"art": "portal", "portal": BOOKING, "konto": "Booking.com",
+    from app import verrechnung
+    return {"art": "portal", "portal": welche, "konto": verrechnung.name_von(welche),
             "neu": neu, "doppelt": doppelt,
             "auszahlungen": len(gelesen),
             "reservierungen": sum(len(a["reservierungen"]) for a in gelesen),
