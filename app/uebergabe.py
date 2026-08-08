@@ -234,3 +234,44 @@ def paket(von="", bis=""):
             with open(quelle, "rb") as f:
                 zf.writestr(f"{ordner}/{_dateiname(r, endung)}", f.read())
     return puffer.getvalue()
+
+
+def ablegen(ziel, von="", bis=""):
+    """Das Paket **entpackt** in einen Ordner schreiben – etwa den
+    Nextcloud-Sync.
+
+    **Warum nicht nur der Download.** Das Ziel aus dem Betrieb war von Anfang
+    an: *sammeln über das Werkzeug, speichern in der Nextcloud.* Eine ZIP im
+    Browser-Ordner ist keine Ablage; sie muss noch von Hand entpackt und
+    kopiert werden, und genau dabei bleibt sie liegen.
+
+    Geschrieben wird in einen Ordner, den der Betrieb wählt. Zeigt der auf den
+    Nextcloud-Sync, liegt die Übergabe dort, sobald der Client durchgelaufen
+    ist – **ohne Zugangsdaten im Werkzeug und ohne zweiten Übertragungsweg.**
+
+    Drei Vorsichtsmaßnahmen:
+
+    * **Nichts wird gelöscht oder überschrieben.** Ein zweiter Lauf legt einen
+      neuen Ordner an; sonst wäre eine bereits weitergegebene Übergabe
+      plötzlich eine andere.
+    * **Ein fehlendes Ziel wird gemeldet, nicht angelegt.** Ein vertippter Pfad
+      soll auffallen – ein Ordner im Nirgendwo wird nie gefunden.
+    * Der Ordnername nennt den Zeitraum, damit im Ziel erkennbar bleibt, was
+      drin ist.
+    """
+    if not ziel or not os.path.isdir(ziel):
+        raise ValueError(f"Den Ordner „{ziel or '—'}“ gibt es nicht. Bitte in "
+                         "den Einstellungen einen vorhandenen Ordner wählen.")
+    name = (f"Uebergabe_{von}_bis_{bis}" if von and bis
+            else f"Uebergabe_{date.today().isoformat()}")
+    pfad = os.path.join(ziel, name)
+    lauf = 2
+    while os.path.exists(pfad):
+        pfad = os.path.join(ziel, f"{name}_{lauf}")
+        lauf += 1
+    os.makedirs(pfad)
+    daten = paket(von, bis)
+    with zipfile.ZipFile(io.BytesIO(daten)) as zf:
+        zf.extractall(pfad)
+        anzahl = len(zf.namelist())
+    return {"ordner": os.path.basename(pfad), "pfad": pfad, "dateien": anzahl}

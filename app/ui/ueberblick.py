@@ -165,9 +165,11 @@ def _uebergabe(zustand):
     """
     with ui.card().classes("w-full").mark("ub-uebergabe"):
         ui.label("Übergabe ans Steuerbüro").classes("font-medium")
-        ui.label("Eine Datei mit allen Belegen nach Jahr und Monat, dem "
-                 "Kontenjournal als CSV und einem Deckblatt, das auch nennt, "
-                 "was noch offen ist.").classes(f"text-xs {ton.STILL}")
+        ui.label("Alle Belege nach Jahr und Monat, das Kontenjournal als CSV "
+                 "und ein Deckblatt, das auch nennt, was noch offen ist – "
+                 "entweder als Datei zum Herunterladen oder direkt in den "
+                 "Übergabe-Ordner (Einstellungen → Ablage), etwa den "
+                 "Nextcloud-Ordner.").classes(f"text-xs {ton.STILL}")
         zeilen = len(uebergabe.journal(zustand["von"], zustand["bis"]))
         ohne_nummer = sum(1 for r in uebergabe.receipts.list_receipts(100000)
                           if not (r.get("nummer") or "").strip())
@@ -182,9 +184,23 @@ def _uebergabe(zustand):
             ui.notify("Paket erstellt ✓ – die Belegnummern sind vergeben.",
                       type="positive")
 
+        def ablegen():
+            from app.ui.basis import CFG
+            try:
+                bericht = uebergabe.ablegen(CFG.get("uebergabe_ordner", ""),
+                                            zustand["von"], zustand["bis"])
+            except ValueError as fehler:
+                ui.notify(str(fehler), type="warning", timeout=9000)
+                return
+            ui.notify(f"{bericht['dateien']} Dateien abgelegt unter "
+                      f"„{bericht['ordner']}“ ✓", type="positive", timeout=8000)
+
         with ui.row().classes("w-full items-center gap-2"):
             ui.button("Paket herunterladen", icon="download", on_click=laden) \
                 .props("unelevated no-caps").mark("uebergabe-laden")
+            ui.button("In den Übergabe-Ordner legen", icon="drive_file_move",
+                      on_click=ablegen) \
+                .props("outline no-caps").mark("uebergabe-ablegen")
             ui.button("Nur das Journal (CSV)", icon="table_view",
                       on_click=lambda: ui.download(
                           uebergabe.journal_csv(zustand["von"], zustand["bis"]),

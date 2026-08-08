@@ -243,3 +243,59 @@ def test_das_deckblatt_nennt_die_belege_ohne_datum():
     _beleg("q1", datum="")
     db.speichern("belege", "q1", dict(db.holen("belege", "q1"), datum=""))
     assert "ohne gepflegtes Belegdatum" in ue.deckblatt()
+
+
+# ------------------------------------- In einen Ordner ablegen (Nextcloud)
+# Gefragt am 8.8.2026: „wie speichere ich denn alles? was mache ich dann, um es
+# dem Steuerberater zu geben?" Ein Download in den Browser-Ordner ist keine
+# Ablage – das Ziel war von Anfang an: sammeln im Werkzeug, speichern in der
+# Nextcloud. Geschrieben wird in einen Ordner, den der Betrieb waehlt; ist das
+# der Nextcloud-Sync, ist es dort, sobald der Client durchgelaufen ist.
+def test_die_ablage_legt_die_struktur_an(tmp_path):
+    _beleg("q1", merchant="Rossmann", amount="27,81", datum="2026-03-14")
+    _bewegung(-27.81, "Rossmann", "w1", kategorie="Drogerie/Verbrauch (Rossmann)")
+    bericht = ue.ablegen(str(tmp_path))
+    ordner = tmp_path / bericht["ordner"]
+    assert (ordner / "Deckblatt.txt").exists()
+    assert (ordner / "Kontenjournal.csv").exists()
+    assert (ordner / "2026" / "03").is_dir()
+    assert bericht["dateien"] >= 3
+
+
+def test_der_ordnername_nennt_den_zeitraum(tmp_path):
+    _bewegung(-10.0, "A", "w1", datum="2026-02-01", kategorie="Wäscherei (Rena)")
+    bericht = ue.ablegen(str(tmp_path), "2026-01-01", "2026-06-30")
+    assert bericht["ordner"] == "Uebergabe_2026-01-01_bis_2026-06-30"
+
+
+def test_ohne_zeitraum_traegt_der_ordner_das_tagesdatum(tmp_path):
+    from datetime import date
+    _bewegung(-10.0, "A", "w1", kategorie="Wäscherei (Rena)")
+    bericht = ue.ablegen(str(tmp_path))
+    assert bericht["ordner"] == f"Uebergabe_{date.today().isoformat()}"
+
+
+def test_ein_zweiter_lauf_ueberschreibt_nichts_stillschweigend(tmp_path):
+    """Sonst waere eine bereits weitergegebene Uebergabe plötzlich eine andere.
+    Der zweite Lauf legt einen neuen Ordner an."""
+    _bewegung(-10.0, "A", "w1", kategorie="Wäscherei (Rena)")
+    erster = ue.ablegen(str(tmp_path))["ordner"]
+    zweiter = ue.ablegen(str(tmp_path))["ordner"]
+    assert zweiter != erster
+    assert (tmp_path / erster).is_dir() and (tmp_path / zweiter).is_dir()
+
+
+def test_ein_fehlendes_ziel_wird_gemeldet_statt_angelegt(tmp_path):
+    """Ein vertippter Pfad soll auffallen, nicht stillschweigend einen Ordner
+    im Nirgendwo erzeugen – dort sucht ihn nie jemand."""
+    import pytest
+    with pytest.raises(ValueError, match="gibt es nicht"):
+        ue.ablegen(str(tmp_path / "gibtsnicht"))
+
+
+def test_die_ablage_loescht_nichts(tmp_path):
+    fremd = tmp_path / "wichtig.txt"
+    fremd.write_text("nicht anfassen")
+    _bewegung(-10.0, "A", "w1", kategorie="Wäscherei (Rena)")
+    ue.ablegen(str(tmp_path))
+    assert fremd.read_text() == "nicht anfassen"

@@ -560,10 +560,26 @@ geben, das vollständig aussieht.
   Kategorie, ohne Beleg, welcher Zeitraum, welche Konten. Ohne dieses Blatt
   liest das Steuerbüro einen Zwischenstand als Abschluss.
 
-**Kein automatisches Hochladen in die Nextcloud.** Der Ordner wird gespiegelt
-(`belege_ordner`), das genügt; ein zweiter Weg dorthin wäre ein zweiter
-Mechanismus für dieselbe Frage. Das Paket entsteht als Datei, die der Betrieb
-ablegt oder weitergibt.
+**Zwei Wege aus dem Werkzeug heraus:** herunterladen, oder direkt in einen
+**Übergabe-Ordner** schreiben (Einstellungen → Ablage). Zeigt der auf den
+Nextcloud-Sync, liegt die Übergabe dort, sobald der Client durchgelaufen ist –
+ohne Zugangsdaten im Werkzeug und ohne zweiten Übertragungsweg.
+
+Der Übergabe-Ordner ist bewusst **nicht** der Beleg-Ordner: der ist ein
+laufender Spiegel, die Übergabe ein abgeschlossener Stapel. In denselben Ordner
+geschrieben wäre nicht mehr zu erkennen, was zu welcher Übergabe gehört.
+
+Drei Vorsichtsmaßnahmen beim Schreiben: nichts wird gelöscht oder
+überschrieben (ein zweiter Lauf legt einen neuen Ordner an – sonst wäre eine
+bereits weitergegebene Übergabe plötzlich eine andere), ein fehlendes Ziel wird
+gemeldet statt angelegt (ein vertippter Pfad soll auffallen), und der
+Ordnername nennt den Zeitraum.
+
+*Anmerkung:* Beim ersten Bauen hatte ich daraus nur einen Download gemacht und
+notiert „kein automatisches Hochladen". Auf die Frage *„wie speichere ich denn
+alles, um es dem Steuerberater zu geben?"* zeigte sich, dass damit das
+eigentliche Ziel fehlte – **sammeln im Werkzeug, speichern in der Nextcloud**
+stand seit dem 8.8.2026 im Konzept.
 
 **Beim ersten Paket aus den echten Daten fiel auf:** alle 30 Belege lagen im
 Ordner `2026/08` — dem Monat des Uploads —, weil **keiner** ein Belegdatum

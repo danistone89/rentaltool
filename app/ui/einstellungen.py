@@ -219,6 +219,29 @@ def render_einstellungen(schliessen=None):
                     ui.button("Durchsuchen", icon="folder_open",
                               on_click=browse_belege).props("outline no-caps")
 
+                # Die Uebergabe ans Steuerbuero geht in einen EIGENEN Ordner:
+                # der Beleg-Ordner ist ein laufender Spiegel, die Uebergabe ein
+                # abgeschlossener Stapel. In denselben Ordner geschrieben waere
+                # nicht mehr zu erkennen, was zu welcher Uebergabe gehoert.
+                ui.label("Übergaben ans Steuerbüro werden hier abgelegt – je "
+                         "Übergabe ein Ordner mit Belegen, Journal und "
+                         "Deckblatt.").classes("text-sm text-slate-500 mt-3")
+                with ui.row().classes("w-full items-end gap-2 mt-1"):
+                    uebergabe_ordner = ui.input(
+                        "Übergabe-Ordner",
+                        value=CFG.get("uebergabe_ordner", "")) \
+                        .props("outlined dense").classes("flex-grow") \
+                        .tooltip("Ordner (z. B. Nextcloud-Mount) für die Übergabe "
+                                 "ans Steuerbüro. Leer = nur Herunterladen.")
+
+                    def browse_uebergabe():
+                        detected = data.detect_cloud_folders()
+                        start = uebergabe_ordner.value or (detected[0] if detected else "")
+                        open_folder_picker(start,
+                                           lambda p: uebergabe_ordner.set_value(p))
+                    ui.button("Durchsuchen", icon="folder_open",
+                              on_click=browse_uebergabe).props("outline no-caps")
+
             with ui.tab_panel(t_rein):
                 cl_on = ui.switch("Checklisten & Fotonachweis verwenden",
                                   value=_checklisten_an()).props("dense")
@@ -446,6 +469,7 @@ def render_einstellungen(schliessen=None):
             CFG["archiv_spiegel"] = spiegel.value or ""
             CFG["reinigung_ordner"] = reinigung_ordner.value or ""
             CFG["belege_ordner"] = belege_ordner.value or ""
+            CFG["uebergabe_ordner"] = uebergabe_ordner.value or ""
             CFG["archiv_webdav"] = {}   # Ablage über Ordner, nicht Nextcloud/WebDAV
             if (channel.value or "").strip():
                 CFG["airbnb_channel_name"] = channel.value.strip()

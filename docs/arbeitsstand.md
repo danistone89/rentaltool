@@ -370,6 +370,11 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   **Beim ersten echten Paket aufgefallen:** alle 30 Belege lagen unter
   `2026/08`, weil keiner ein Belegdatum trug. Jetzt liest `guess_datum` es aus
   dem Text (24 von 30), der Rest kommt in `_ohne Belegdatum`.
+  **Nachgetragen:** neben dem Download schreibt das Werkzeug die Übergabe auch
+  direkt in einen **Übergabe-Ordner** (Einstellungen → Ablage) – zeigt der auf
+  den Nextcloud-Sync, ist sie dort. Ein Download in den Browser-Ordner war
+  keine Ablage; das eigentliche Ziel („sammeln im Werkzeug, speichern in
+  Nextcloud") hatte ich beim ersten Bauen weggelassen.
 * **Alle Pakete B1–B9 sind erledigt.** Offen bleiben: der Echtbetrieb (35+
   Commits auf dem Zweig, live läuft der Stand von gestern) und die offene Frage
   zur E-Rechnung im Fahrplan. — Übergabe ans Steuerbüro: Ablage in der Nextcloud
@@ -382,6 +387,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1152 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1158 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```
