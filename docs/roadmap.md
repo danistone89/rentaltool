@@ -1067,6 +1067,58 @@ Zahlungseingängen sind n:m, nicht die Ausnahme.
 | **B8** | Vollständigkeit | M | ✅ erledigt (8.8.2026) |
 | **B9** | Übergabe ans Steuerbüro | L | ✅ erledigt (8.8.2026) |
 | **B10** | Altrechnungen übernehmen (vor dem Ausrollen) | M | ✅ erledigt (8.8.2026) – 78 übernommen, Kreis ab 2026-0079 |
+| **B11** | Portal-Auszahlungen aus dem Bericht zuordnen | L | in Arbeit (B11a–d) |
+
+### B11 · Die Auszahlungsberichte der Portale
+
+**Der Anlass (8.8.2026).** 55 Zahlungseingänge über 33.923 € warten auf ihre
+Rechnung, und aus den Bankdaten allein ist nicht zu erkennen, welche Rechnung
+zu welcher Auszahlung gehört — die Reservierungsnummer steht nicht im
+Verwendungszweck. Gefragt: *„woher soll ich denn jetzt wissen, welche Rechnung
+zu welchem Auszahlungsbetrag gehört?"*
+
+**Die Antwort liegt in den Berichten der Portale.** Beide wurden geprüft:
+
+| | Booking (`Payout_from_…xlsx`) | Airbnb (`airbnb_.csv`) |
+|---|---|---|
+| Bank → Auszahlung | `NO.vQmQNcef5aDAINyZ` im Verwendungszweck — **exakt** | kein Bezug; über **Betrag + Datum** |
+| an den echten Daten | 46 von 48 (2 nach dem Berichtsende) | **7 von 7 eindeutig** |
+| Auszahlung → Buchung | `Reference number` 6180071938 | `Bestätigungs-Code` HM5F9P3HAT |
+| Buchung → Smoobu | **75 von 75** über `reference-id` | dasselbe Format |
+| Provision | `Commission` je Reservierung | `Servicegebühr` je Buchung |
+| zusätzlich | — | Bruttoeinkünfte, Reinigungsgebühr, **von Airbnb abgeführte Steuer** |
+
+Damit ist die Zuordnung kein Schätzen mehr, und die Provision kommt aus der
+Quelle des Portals statt aus Smoobu (dessen Zahl der Betrieb am 8.8.2026
+ausdrücklich als unzuverlässig bezeichnet hat).
+
+* **B11a · Fingerabdruck härten.** Vorher gefragt: *„wie verhindern wir
+  generell, dass Überschneidungen hochgeladen werden?"* Für Bankauszüge ist es
+  gelöst (Konto + Datum + Betrag + Zweck + Empfänger; 238 Bewegungen aus drei
+  überlappenden Dateien ergaben 238 verschiedene Abdrücke). **Die Restlücke:**
+  zwei in *jedem* Feld gleiche Zeilen verschmelzen zu einer. Am Bestand gibt es
+  genau einen Beinahe-Fall — 2 × −14,57 € am 31.07. an denselben Empfänger, nur
+  der Zweck trennt sie. Deshalb kommt die laufende Nummer innerhalb des Tages
+  dazu; weil die DKB ganze Tage exportiert, bleibt sie über Überlappungen
+  stabil.
+* **B11b · Booking-Bericht einlesen.** XLSX (`openpyxl` als neue Abhängigkeit —
+  auf dem Server noch nicht vorhanden). Schlüssel ist die Auszahlungsnummer:
+  ein zweiter Import derselben Auszahlung ändert nichts, egal welcher Zeitraum
+  gewählt wurde.
+* **B11c · Airbnb-Bericht einlesen.** CSV, Zeilenart `Payout` mit den
+  folgenden `Buchung`-Zeilen. Verknüpfung über Betrag + Datum (±7 Tage).
+  **Mehrdeutiges wird gezeigt, nicht geraten** — zahlt Airbnb zweimal denselben
+  Betrag in einer Woche, entscheidet der Mensch.
+* **B11d · Zuordnen.** Je Auszahlung die Rechnungen mit ihrem **Bruttobetrag**
+  und die Provision aus der Quelle des Portals. Vorschau vor dem Schreiben.
+
+Beide Dateien gehen in denselben Upload wie die Kontoauszüge; das Werkzeug
+erkennt am Inhalt, was es ist.
+
+**Danach offen (Teil 2, noch nicht begonnen):** ein Bereich „Unterlagen" als
+einzige Anlaufstelle für alle Dateien, und eine Checkliste, die den Stand der
+Kette zeigt (Auszüge lückenlos? Portal-Berichte da? Zuordnung offen? Belege?),
+damit keine Reihenfolge im Kopf zu behalten ist.
 
 ### B10 · Die Rechnungen aus dem alten Weg übernehmen
 
