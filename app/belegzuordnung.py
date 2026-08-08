@@ -111,7 +111,9 @@ def belege_zu(bewegung, limit=500):
     Nur für **Ausgaben**: zu einer Auszahlung von Booking gibt es keinen
     Lieferantenbeleg, und ein Vorschlag an dieser Stelle wäre nur Rauschen.
     """
-    if bewegung.get("betrag", 0.0) >= 0 or bewegung.get("umbuchung"):
+    # Eine Umbuchung braucht keine Zuordnung, darf aber ein Dokument tragen –
+    # die Kreditkartenabrechnung gehoert an ihre Sammelbuchung.
+    if bewegung.get("betrag", 0.0) >= 0:
         return []
     raus = []
     for r in ohne_bewegung(limit):

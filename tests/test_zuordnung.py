@@ -218,12 +218,14 @@ async def test_die_maske_hat_kategorie_betrag_und_plus(user: User, app_bereit):
 
 
 async def test_eine_umbuchung_hat_nichts_zuzuordnen(user: User, app_bereit):
+    """Zuzuordnen gibt es nichts – zu dokumentieren schon (seit 8.8.2026):
+    die Kreditkartenabrechnung gehoert an ihre Sammelbuchung."""
     b = _bewegung(-3.41, bid="umb1", gegenpartei="Kreditkartenabrechnung",
                   umbuchung=True)
     await _anmelden(user)
     user.find(marker="nav-konto").click()
     user.find(marker=f"bew-{b['id']}").click()
-    await user.should_see("nichts zuzuordnen")
+    await user.should_see("zählt in keiner Auswertung mit")
 
 
 async def test_eine_liste_mit_drei_sichten_statt_zwei_listen(user: User, app_bereit):

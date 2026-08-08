@@ -301,6 +301,29 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 * **Probe-Bestand am 8.8.2026 geleert** (Bewegungen, Belege, Zuordnungen,
   Auszüge) — die 48 Rechnungen stehen noch. Sicherung unter
   `/tmp/livaro-sicherung-20260808-130027`.
+* **An den echten Exporten geprüft (8.8.2026)** — drei Fehler gefunden, alle
+  in der Vollständigkeitsprüfung selbst:
+  1. **Der Kontostand gehört nicht zum Zeitraum.** Die DKB schreibt immer den
+     *heutigen* Stand: beide Bank-Exporte (Jan–Feb und Mär–Aug) trugen
+     „Kontostand vom 08.08.2026: 2.428,44 €". Ich hatte ihn dem Zeitraumende
+     zugeordnet — die Saldoprobe hätte eine erfundene Differenz gemeldet. Jetzt
+     ist der **Stichtag** ein eigenes Feld, der Schlüssel ist Konto + Stichtag,
+     und die Probe braucht **zwei Downloads an verschiedenen Tagen**.
+  2. **`betrag()` kannte „€", aber nicht „EUR".** Der VISA-Vorspann schreibt
+     „-548,86 EUR" — der Kartensaldo blieb still leer.
+  3. Zwei Ausschnitte desselben Downloads überschrieben einander; jetzt werden
+     die Zeiträume zusammengeführt.
+  Danach: 238 Bewegungen aus drei Dateien, keine Dubletten, keine Lücken,
+  **alle 7 prüfbaren Kartenzyklen auf den Cent** (der erste ist per Regel nicht
+  prüfbar).
+* **Die Kreditkartenabrechnung (PDF) kann an ihrer Sammelbuchung hängen.** An
+  eine Umbuchung ließ sich bisher nichts anhängen. Sie ändert keine Zahl —
+  Umbuchungen sind aus jeder Auswertung heraus —, ist aber das Dokument fürs
+  Steuerbüro. Die Belegerkennung wurde daran nachgeschärft: „Neuer Saldo" steht
+  im PDF *vor* seiner Beschriftung (185,68 statt des Vorsaldos 352,21), und
+  Anrede, Servicenummer, Kartennummer und ausgeschriebene Daten sind keine
+  Händler. Für dieses Dokument bleibt der Händler **leer** — der Absender steht
+  dort nirgends maschinenlesbar. Lieber leer als erfunden.
 * **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
@@ -311,6 +334,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1071 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1095 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

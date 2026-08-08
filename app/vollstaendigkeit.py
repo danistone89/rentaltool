@@ -37,20 +37,44 @@ def _tag(text):
         return None
 
 
-def merken(konto_name, kopf):
-    """Die Kopfdaten eines Imports ablegen. Ohne Stichtag passiert nichts.
+def merken(konto_name, kopf, von_bewegung=""):
+    """Die Kopfdaten eines Imports ablegen.
 
-    Derselbe Auszug zweimal eingelesen ergibt **einen** Satz: der Schlüssel ist
-    Konto plus Stichtag. Sonst stünde jede Wiederholung als weiterer Prüfpunkt
-    da und der Saldovergleich vergliche einen Auszug mit sich selbst.
+    **Zwei verschiedene Daten, und die Verwechslung war ein Fehler.** Der
+    `stichtag` ist der Tag, für den der Kontostand gilt – bei der DKB immer der
+    **Downloadtag**, egal welchen Zeitraum man exportiert hat. `von`/`bis` ist
+    der Zeitraum der Umsätze. Am echten Export vom 8.8.2026 trugen zwei
+    Dateien (Jan–Feb und Mär–Aug) denselben Stand vom 8.8.; wer ihn dem
+    Zeitraumende zuordnet, behauptet einen Kontostand, den es nie gab.
+
+    Der Schlüssel ist deshalb **Konto + Stichtag**: zwei Exporte desselben
+    Tages sind ein Prüfpunkt, nicht zwei.
+
+    `von_bewegung` füllt den Zeitraumbeginn, wo der Vorspann keinen nennt – der
+    Kartenauszug hat keine „Zeitraum"-Zeile. Der früheste Umsatz ist dort die
+    ehrlichste Angabe: alles davor steht nicht in der Datei.
     """
-    if not kopf or not kopf.get("bis") or kopf.get("stand") is None:
+    if not kopf or not kopf.get("stichtag") or kopf.get("stand") is None:
         return None
-    sid = f"{konto_name}|{kopf['bis']}"
-    satz = {"id": sid, "konto": konto_name, "von": kopf.get("von", ""),
-            "bis": kopf["bis"], "stand": round(float(kopf["stand"]), 2),
+    sid = f"{konto_name}|{kopf['stichtag']}"
+    satz = {"id": sid, "konto": konto_name,
+            "von": kopf.get("von", "") or von_bewegung,
+            "bis": kopf.get("bis", "") or kopf["stichtag"],
+            "stichtag": kopf["stichtag"],
+            "stand": round(float(kopf["stand"]), 2),
             "erfasst": konto._jetzt()}
-    db.speichern(TABELLE, sid, satz) if db.holen(TABELLE, sid) else \
+    vorhanden = db.holen(TABELLE, sid)
+    if vorhanden:
+        # Zwei Ausschnitte desselben Downloads (Jan–Feb und Mär–Aug) tragen
+        # denselben Stichtag. Der zweite darf den Zeitraum des ersten nicht
+        # ueberschreiben – sonst gilt Januar spaeter als ungedeckt und die
+        # Lueckenpruefung meldet eine Luecke, die es nie gab.
+        satz["von"] = min(x for x in (satz["von"], vorhanden.get("von")) if x) \
+            if (satz["von"] or vorhanden.get("von")) else ""
+        satz["bis"] = max(x for x in (satz["bis"], vorhanden.get("bis")) if x) \
+            if (satz["bis"] or vorhanden.get("bis")) else ""
+        db.speichern(TABELLE, sid, satz)
+    else:
         db.anlegen(TABELLE, satz, sid=sid)
     return satz
 
@@ -60,18 +84,24 @@ def auszuege(konto_name=""):
     alle = db.alle(TABELLE)
     if konto_name:
         alle = [a for a in alle if a.get("konto") == konto_name]
-    return sorted(alle, key=lambda a: (a.get("konto", ""), a.get("bis", "")))
+    return sorted(alle, key=lambda a: (a.get("konto", ""), a.get("stichtag", "")))
 
 
 def saldospruenge():
     """Wo die Summe der Bewegungen nicht zur Differenz der Kontostände passt.
 
-    Je Konto werden aufeinanderfolgende Auszüge verglichen:
+    Je Konto werden aufeinanderfolgende **Stichtage** verglichen:
 
-        Stand(neu) − Stand(alt)  ==  Σ Bewegungen im Zeitraum dazwischen
+        Stand(neu) − Stand(alt)  ==  Σ Bewegungen zwischen den Stichtagen
 
     Der Zeitraum beginnt am Tag **nach** dem alten Stichtag: dessen Bewegungen
     stecken bereits im alten Kontostand.
+
+    **Zwei Exporte desselben Tages ergeben keinen Vergleich.** Die DKB schreibt
+    immer den heutigen Stand; zwei Dateien vom selben Tag tragen denselben.
+    Sie zu vergleichen ergäbe eine erfundene Differenz in Höhe aller Umsätze
+    dazwischen. Die Probe braucht deshalb **zwei Downloads an verschiedenen
+    Tagen** – nicht zwei Zeitraum-Ausschnitte.
     """
     raus = []
     nach_konto = {}
@@ -79,16 +109,22 @@ def saldospruenge():
         nach_konto.setdefault(a.get("konto", ""), []).append(a)
     for konto_name, liste in nach_konto.items():
         for alt, neu in zip(liste, liste[1:]):
-            start = _tag(alt["bis"])
+            # Verglichen werden die STICHTAGE der Kontostände, nicht die
+            # Zeiträume der Umsätze – siehe `merken`.
+            # Zwei Saetze mit gleichem Stichtag kann es nicht geben – der
+            # Schluessel ist Konto + Stichtag (siehe `merken`). Deshalb hier
+            # keine zusaetzliche Pruefung darauf.
+            start = _tag(alt.get("stichtag") or alt.get("bis"))
             if start is None:
                 continue
             von = (start + timedelta(days=1)).isoformat()
+            bis = neu.get("stichtag") or neu.get("bis")
             summe = round(sum(b.get("betrag", 0.0)
-                              for b in konto.alle(von, neu["bis"], konto_name)), 2)
+                              for b in konto.alle(von, bis, konto_name)), 2)
             erwartet = round(alt["stand"] + summe, 2)
             if abs(erwartet - neu["stand"]) < 0.005:
                 continue
-            raus.append({"konto": konto_name, "von": von, "bis": neu["bis"],
+            raus.append({"konto": konto_name, "von": von, "bis": bis,
                          "vorher": alt["stand"], "bewegungen": summe,
                          "erwartet": erwartet, "gemeldet": neu["stand"],
                          "differenz": round(neu["stand"] - erwartet, 2)})
@@ -172,12 +208,15 @@ def befund():
     """
     a = auszuege()
     je_konto = {}
+    stichtage = set()
     for x in a:
         je_konto.setdefault(x.get("konto", ""), 0)
         je_konto[x["konto"]] += 1
+        stichtage.add((x.get("konto", ""), x.get("stichtag", "")))
     return {"auszuege": len(a),
             "konten": sorted(je_konto),
-            "saldo_pruefbar": any(n > 1 for n in je_konto.values()),
+            "saldo_pruefbar": any(len(set(t for k2, t in stichtage if k2 == k)) > 1
+                                  for k in je_konto),
             "saldospruenge": saldospruenge(),
             "luecken": luecken(),
             "kartenproben": [p for p in kartenproben()

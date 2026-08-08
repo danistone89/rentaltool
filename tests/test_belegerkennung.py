@@ -272,3 +272,72 @@ def test_der_blosse_vorname_ist_kein_ausschluss():
     namen = receipts.eigene_namen(cfg)
     assert "Daniel" not in namen
     assert "Steinhauß" in namen and "Daniel Steinhauß" in namen
+
+
+# ------- Die Kreditkartenabrechnung als PDF (echtes Dokument, 8.8.2026)
+def test_die_anrede_ist_kein_haendler():
+    """Die DKB-Abrechnung beginnt mit „Herrn" – das stand als Händler da."""
+    text = "Herrn\nDaniel Steinhauß\nMozartstr. 10\n01219 Dresden\n14460 Potsdam\n"
+    assert receipts.guess_merchant(text) != "Herrn"
+
+
+def test_der_neue_saldo_schlaegt_den_alten():
+    """Im PDF steht der Wert VOR seiner Beschriftung:
+
+        185,68 -
+        Neuer Saldo
+
+    Und weiter oben „Saldo letzte Abrechnung / 352,21". Ohne Regel gewann der
+    groessere – also der Vorsaldo."""
+    text = ("Saldo letzte Abrechnung\n22.12.25\n-\n352,21\n"
+            "Rossmann 2540, Dresden\n27,81\n15.01.26\n14.01.26\n-\n"
+            "185,68 -\nNeuer Saldo\n")
+    assert receipts.guess_amount(text) == "185,68"
+
+
+def test_eine_beschriftung_darf_auch_ueber_dem_wert_stehen():
+    """Der uebliche Fall bleibt richtig."""
+    assert receipts.guess_amount("Neuer Saldo\n185,68\n") == "185,68"
+
+
+def test_telefonnummern_und_seitenangaben_sind_keine_haendler():
+    """Im Briefkopf der DKB-Abrechnung stand „Tel.: 030 120 300 00" als
+    Händler – die naechstbeste Zeile nach der eigenen Anschrift."""
+    text = ("Herrn\nDaniel Steinhauß\n01219 Dresden\nKontakt & Notfallservice:\n"
+            "Tel.: 030 120 300 00\nwww.DKB.de\nSeite 1 von 2\n"
+            "Beispiel Handels GmbH\n")
+    assert receipts.guess_merchant(text, eigene=["Daniel Steinhauß"]) \
+        == "Beispiel Handels GmbH"
+
+
+def test_lieber_kein_haendler_als_ein_falscher():
+    """Findet sich im Kopf nichts Brauchbares, bleibt das Feld leer. Ein
+    erfundener Name waere schlimmer: er wandert in die Vorschlaege und ins
+    Kontenjournal."""
+    text = ("Herrn\nDaniel Steinhauß\n01219 Dresden\nKontakt & Notfallservice:\n"
+            "Tel.: 030 120 300 00\nwww.DKB.de\nSeite 1 von 2\n")
+    assert receipts.guess_merchant(text, eigene=["Daniel Steinhauß"]) == ""
+
+
+def test_eine_maskierte_kartennummer_ist_kein_haendler():
+    text = ("Karteninhaber:\n4998 98XX XXXX 8136\nBeispiel Handels GmbH\n")
+    assert receipts.guess_merchant(text) == "Beispiel Handels GmbH"
+
+
+def test_ein_ausgeschriebenes_datum_ist_kein_haendler():
+    text = "Abrechnungsdatum:\n22. Januar 2026\nAbrechnung:\nJanuar 2026\nBetrag\n"
+    assert receipts.guess_merchant(text) == ""
+
+
+def test_die_echte_dkb_abrechnung_liefert_keinen_haendler():
+    """Nachgemessen am Dokument vom 24.1.2026: der Absender steht dort
+    nirgends maschinenlesbar – nur „www.DKB.de". Leer ist die richtige
+    Antwort; den Namen tippt der Mensch."""
+    text = ("Herrn\nDaniel Steinhauß\n01219 Dresden\n14460 Potsdam\n"
+            "Kontakt & Notfallservice:\nTel.: 030 120 300 00\nwww.DKB.de\n"
+            "Seite 1 von 2\nIhre Abrechnung vom 22.12.2025 bis 22.01.2026\n"
+            "Karteninhaber:\n4998 98XX XXXX 8136\nDKB-VISA-Card:\n"
+            "Abrechnungsdatum:\n22. Januar 2026\nAbrechnung:\nJanuar 2026\nBetrag\n")
+    assert receipts.guess_merchant(text, eigene=["Daniel Steinhauß"]) == ""
+    # Der Betrag stimmt trotzdem – und er ist es, der die Zuordnung traegt.
+    assert receipts.guess_amount(text + "185,68 -\nNeuer Saldo\n") == "185,68"

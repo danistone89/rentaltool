@@ -213,9 +213,6 @@ def _beleg_knopf(bewegung, neu_zeichnen):
     from app import housekeeping, receipts
     from app.ui.basis import _read_upload
 
-    if bewegung.get("umbuchung"):
-        return
-
     # Alle anhängenden Belege, jeder einzeln lösbar. Vorher stand hier nur der
     # erste – und ein Klick darauf löste über `beleg_setzen` ALLE Posten der
     # Bewegung, auch die Aufteilung auf Kategorien.
@@ -291,6 +288,8 @@ def _beleg_knopf(bewegung, neu_zeichnen):
             .props('accept="image/*,application/pdf" flat dense') \
             .classes("hk-upload w-[34px]").tooltip("Beleg hochladen") \
             .mark(f"beleg-up-{bewegung['id']}")
+        if bewegung.get("umbuchung"):
+            return              # Dokument ja, Dauerbeleg/„kein Beleg" nein
         ui.button(icon="event_repeat", on_click=dauerbeleg) \
             .props("flat dense round").classes(ton.ZART) \
             .tooltip("Dauerbeleg: Vertrag liegt vor, keine Monatsbelege nötig – "
@@ -970,9 +969,18 @@ def render_konto():
                                 + ("" if b["betrag"] > 0 else "text-slate-600"))
                     with zeile:
                         if b.get("umbuchung"):
-                            ui.label("Umbuchung zwischen eigenen Konten – hier "
-                                     "gibt es nichts zuzuordnen.") \
-                                .classes("text-xs text-slate-400")
+                            with ui.row().classes("w-full items-center gap-2"):
+                                # Zuzuordnen gibt es nichts – zu dokumentieren
+                                # schon: die Kreditkartenabrechnung gehoert an
+                                # ihre Sammelbuchung, damit das Steuerbuero sie
+                                # dort findet. An den Zahlen aendert das nichts.
+                                ui.label("Umbuchung zwischen eigenen Konten – "
+                                         "zählt in keiner Auswertung mit. Ein "
+                                         "Dokument dazu (z. B. die "
+                                         "Kreditkartenabrechnung) kann trotzdem "
+                                         "hier hängen.") \
+                                    .classes("text-xs text-slate-400 flex-grow")
+                                _beleg_knopf(b, zeichnen)
                         else:
                             _zuordnungsmaske(b, zeichnen)
                 if len(bewegungen) > 200:

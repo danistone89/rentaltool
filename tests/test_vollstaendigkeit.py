@@ -380,3 +380,173 @@ def test_die_kontoseite_laesst_sich_nach_dem_umbau_zeichnen():
     konto.importieren(_auszug("01.02.2026", "28.02.2026", "1.000,00 €",
                               [("24.02.26", "-56,93")]))
     _in_client(kontoblatt.render_konto)
+
+
+def test_der_kartensaldo_steht_in_eur_nicht_in_euro_zeichen():
+    """Am echten VISA-Auszug vom 8.8.2026 aufgefallen: der Vorspann schreibt
+    „-548,86 EUR". `betrag` kannte nur „€" – der Kartensaldo blieb still leer
+    und die Saldoprobe lief fuer die Karte nie."""
+    assert ka.betrag("-548,86 EUR") == -548.86
+    assert ka.betrag("-0 EUR") == 0.0
+    assert ka.betrag("5.765,34 €") == 5765.34
+
+
+def test_der_kartenauszug_wird_als_pruefpunkt_gemerkt():
+    konto.importieren(KARTE_CSV)
+    a = [x for x in vs.auszuege() if x["konto"] == "VISA 8136"]
+    assert len(a) == 1 and a[0]["stand"] == 0.0 and a[0]["bis"] == "2026-02-20"
+
+
+# --------- Der Fehler, den erst die echten Exporte zeigten (8.8.2026)
+GIRO_MIT_STICHTAG = '''"DKB-Business";"DE62120300001310062102"
+"Zeitraum:";"{von} - {bis}"
+"Kontostand vom {stichtag}:";"{stand}"
+""
+"Buchungsdatum";"Wertstellung";"Status";"Zahlungspflichtige*r";"Zahlungsempfänger*in";"Verwendungszweck";"Umsatztyp";"IBAN";"Betrag (€)";"Gläubiger-ID";"Mandatsreferenz";"Kundenreferenz"
+'''
+
+
+def _export(von, bis, stichtag, stand, zeilen=()):
+    text = GIRO_MIT_STICHTAG.format(von=von, bis=bis, stichtag=stichtag, stand=stand)
+    for i, (tag, betrag) in enumerate(zeilen):
+        text += ZEILE.format(tag=tag, nr=i, betrag=betrag,
+                             typ="Eingang" if not betrag.startswith("-") else "Ausgang")
+    return text
+
+
+def test_der_kontostand_gehoert_zum_stichtag_nicht_zum_zeitraum():
+    """Die DKB schreibt IMMER den heutigen Stand, egal welchen Zeitraum man
+    exportiert. Am 8.8.2026 trugen beide Dateien (Jan–Feb und Mär–Aug)
+    denselben Stand vom 08.08."""
+    kopf = ka.kopfdaten(ka._zeilen(_export("01.01.2026", "28.02.2026",
+                                           "08.08.2026", "2.428,44 €")),
+                        ka.GESCHAEFT)
+    assert kopf["bis"] == "2026-02-28"
+    assert kopf["stichtag"] == "2026-08-08"
+
+
+def test_zwei_ausschnitte_desselben_downloads_werden_nicht_verglichen():
+    """DER Fehler: beide tragen denselben Stand vom selben Tag. Sie zu
+    vergleichen ergaebe eine erfundene Differenz in Hoehe aller Umsaetze
+    dazwischen – genau die falsche, plausibel aussehende Zahl, gegen die B8
+    gebaut ist."""
+    konto.importieren(_export("01.01.2026", "28.02.2026", "08.08.2026",
+                              "2.428,44 €", [("15.01.26", "500")]))
+    konto.importieren(_export("01.03.2026", "08.08.2026", "08.08.2026",
+                              "2.428,44 €", [("15.04.26", "300")]))
+    assert len(vs.auszuege()) == 1        # ein Stichtag, ein Pruefpunkt
+    assert vs.saldospruenge() == []
+    assert vs.befund()["saldo_pruefbar"] is False
+
+
+def test_zwei_downloads_an_verschiedenen_tagen_werden_verglichen():
+    """So funktioniert die Probe wirklich: beim naechsten Download."""
+    konto.importieren(_export("01.01.2026", "31.01.2026", "31.01.2026",
+                              "1.000,00 €", [("15.01.26", "500")]))
+    konto.importieren(_export("01.02.2026", "28.02.2026", "28.02.2026",
+                              "1.100,00 €", [("15.02.26", "100")]))
+    assert vs.befund()["saldo_pruefbar"] is True
+    assert vs.saldospruenge() == []
+
+
+def test_und_meldet_dann_auch_eine_luecke():
+    konto.importieren(_export("01.01.2026", "31.01.2026", "31.01.2026",
+                              "1.000,00 €", [("15.01.26", "500")]))
+    konto.importieren(_export("01.02.2026", "28.02.2026", "28.02.2026",
+                              "1.500,00 €", [("15.02.26", "100")]))
+    assert vs.saldospruenge()[0]["differenz"] == 400.0
+
+
+def test_der_kartenauszug_bekommt_seinen_zeitraumbeginn_aus_den_umsaetzen():
+    """Der VISA-Auszug hat keine „Zeitraum"-Zeile. Der frueheste Umsatz ist die
+    ehrlichste Angabe – alles davor steht nicht in der Datei."""
+    konto.importieren(KARTE_CSV)
+    a = [x for x in vs.auszuege() if x["konto"] == "VISA 8136"][0]
+    assert a["von"] == "2026-02-05"
+
+
+def test_zwei_ausschnitte_desselben_tages_decken_zusammen_den_zeitraum():
+    """Am echten Export: Jan–Feb und Mär–Aug, beide mit Stichtag 08.08. Wuerde
+    der zweite den ersten ueberschreiben, gaelte Januar als ungedeckt."""
+    konto.importieren(_export("01.01.2026", "28.02.2026", "08.08.2026",
+                              "2.428,44 €", [("15.01.26", "500")]))
+    konto.importieren(_export("01.03.2026", "08.08.2026", "08.08.2026",
+                              "2.428,44 €", [("15.04.26", "300")]))
+    a = vs.auszuege()[0]
+    assert a["von"] == "2026-01-01" and a["bis"] == "2026-08-08"
+    assert vs.luecken() == []
+
+
+# ------------------ Die Kreditkartenabrechnung als Beleg (8.8.2026)
+def test_an_eine_umbuchung_laesst_sich_ein_beleg_haengen():
+    """Die Kreditkartenabrechnung (PDF) dokumentiert die Sammelbuchung: „Neuer
+    Saldo -185,68" ist genau die Abbuchung auf dem Konto. Fuers Steuerbuero
+    gehoert sie dort hin – bisher liess sich an eine Umbuchung nichts haengen.
+    """
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "Deutsche Kreditbank Berlin",
+                               "text": "KREDITKARTENABRECHNUNG VISA", "konto": "DE62",
+                               "umbuchung": True, "kategorie": ""})
+    db.anlegen("belege", {"id": "abr", "uploader": "x", "ts": "2026-01-24T10:00:00",
+                          "photo": "p.pdf", "merchant": "DKB", "amount": "185,68",
+                          "datum": "2026-01-24"})
+    assert konto.beleg_anhaengen("g1", "abr") is not None
+    assert konto.belege_von(konto.holen("g1")) == ["abr"]
+
+
+def test_der_beleg_an_der_umbuchung_aendert_keine_zahl():
+    """Die Sammelbuchung ist neutral – sie darf durch ein angehaengtes Dokument
+    nicht ploetzlich im Ergebnis auftauchen."""
+    from app import db, ueberblick as ub
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "DKB", "text": "KREDITKARTENABRECHNUNG",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    db.anlegen("belege", {"id": "abr", "uploader": "x", "ts": "2026-01-24T10:00:00",
+                          "photo": "p.pdf", "merchant": "DKB", "amount": "185,68",
+                          "datum": "2026-01-24"})
+    vorher = ub.monate()
+    konto.beleg_anhaengen("g1", "abr")
+    assert ub.monate() == vorher == {}
+    assert konto.je_kategorie() == {}
+
+
+def test_an_der_umbuchung_wird_ein_beleg_vorgeschlagen():
+    """Damit die schon hochgeladene Abrechnung dort waehlbar ist."""
+    from app import belegzuordnung as bz, db
+    b = {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+         "gegenpartei": "Deutsche Kreditbank Berlin",
+         "text": "KREDITKARTENABRECHNUNG VISA", "konto": "DE62",
+         "umbuchung": True, "kategorie": ""}
+    db.anlegen(konto.TABELLE, b)
+    db.anlegen("belege", {"id": "abr", "uploader": "x", "ts": "2026-01-24T10:00:00",
+                          "photo": "p.pdf", "merchant": "DKB", "amount": "185,68",
+                          "datum": "2026-01-24"})
+    k = bz.belege_zu(b)
+    assert [x["beleg"]["id"] for x in k] == ["abr"]
+    assert k[0]["grund"] == "Betrag stimmt"
+
+
+def test_nur_ein_dokument_je_umbuchung():
+    """Ein zweites waere keine Aufteilung, sondern eine Dublette."""
+    from app import db
+    db.anlegen(konto.TABELLE, {"id": "g1", "datum": "2026-01-26", "betrag": -185.68,
+                               "gegenpartei": "DKB", "text": "KREDITKARTENABRECHNUNG",
+                               "konto": "DE62", "umbuchung": True, "kategorie": ""})
+    for i in ("a", "b"):
+        db.anlegen("belege", {"id": i, "uploader": "x", "ts": "2026-01-24T10:00:00",
+                              "photo": "p.pdf", "merchant": "DKB", "amount": "185,68",
+                              "datum": "2026-01-24"})
+    konto.beleg_anhaengen("g1", "a")
+    assert konto.beleg_anhaengen("g1", "b") is None
+    assert konto.belege_von(konto.holen("g1")) == ["a"]
+
+
+def test_die_maske_einer_umbuchung_laesst_sich_zeichnen():
+    from app.ui import kontoblatt
+    from app import db
+    b = {"id": "g1", "datum": "2026-01-26", "betrag": -185.68, "gegenpartei": "DKB",
+         "text": "KREDITKARTENABRECHNUNG", "konto": "DE62", "umbuchung": True,
+         "kategorie": ""}
+    db.anlegen(konto.TABELLE, b)
+    _in_client(lambda: kontoblatt._beleg_knopf(b, lambda: None))

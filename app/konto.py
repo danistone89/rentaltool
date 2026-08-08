@@ -325,6 +325,16 @@ def beleg_anhaengen(bewegung_id, beleg_id):
         return None
     p = zuordnung.posten(bewegung_id)
     offen = zuordnung.rest(b)
+    if b.get("umbuchung"):
+        # Reine Dokumentation: die Kreditkartenabrechnung gehoert an ihre
+        # Sammelbuchung, damit das Steuerbuero sie dort findet. An den Zahlen
+        # aendert das nichts – Umbuchungen sind aus jeder Auswertung heraus
+        # (siehe `ueberblick`, `je_kategorie`, `verrechnung`).
+        if zuordnung.BELEG in [z["art"] for z in p]:
+            return None
+        zuordnung.hinzufuegen(bewegung_id, zuordnung.BELEG, b.get("betrag", 0.0),
+                              ziel_id=beleg_id, notiz="Dokument zur Umbuchung")
+        return db.holen(TABELLE, bewegung_id)
     if b.get("betrag", 0.0) > 0:
         ziel = [z for z in p if not z.get("ziel_id") and z["betrag"] < 0]
         for z in ziel:
@@ -423,7 +433,9 @@ def importieren(rohdaten, heute=None):
     # uebersprungen (B8).
     from app import vollstaendigkeit
     kopf = kontoauszug.kopfdaten(kontoauszug._zeilen(rohdaten), art)
-    vollstaendigkeit.merken(konto, kopf)
+    vollstaendigkeit.merken(konto, kopf,
+                            von_bewegung=min((b.get("datum", "") for b in gelesen),
+                                            default=""))
     neu = doppelt = 0
     with db.transaktion():
         for b in gelesen:

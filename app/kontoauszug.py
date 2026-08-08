@@ -54,8 +54,13 @@ def betrag(wert):
 
     Die DKB schreibt glatte Beträge ohne Nachkommastellen („-111"), mit
     Tausenderpunkt und mit Komma – alle drei müssen durch dieselbe Stelle.
+
+    **Und sie schreibt die Währung mal als „€", mal als „EUR".** Im Vorspann
+    des VISA-Auszugs steht „Saldo vom 08.08.2026:";"-548,86 EUR" – ohne das
+    zweite Wort blieb der Kartensaldo still leer, und die Saldoprobe (B8) lief
+    für die Karte nie.
     """
-    s = _text(wert).replace("€", "").replace(" ", "")
+    s = re.sub(r"(?i)\bEUR\b", "", _text(wert)).replace("€", "").replace(" ", "")
     if not s:
         return None
     s = s.replace(".", "").replace(",", ".")
@@ -157,11 +162,23 @@ def kopfdaten(zeilen, art):
     sich **Vollständigkeit gar nicht behaupten**. Erst der Vergleich zweier
     Kontostände sagt, ob zwischen zwei Auszügen Bewegungen fehlen.
 
-    Gibt `{"von", "bis", "stand"}` zurück; `stand` ist None, wenn der Vorspann
-    fehlt. Nichts zu behaupten ist besser, als eine Null zu erfinden – die
-    sähe aus wie ein leergeräumtes Konto.
+    **Der Kontostand gehört NICHT zum Zeitraum.** Am echten Export vom
+    8.8.2026 aufgefallen: die DKB schreibt immer den *heutigen* Stand, egal
+    welchen Zeitraum man gewählt hat –
+
+        Zeitraum: 01.01.2026 - 28.02.2026
+        Kontostand vom 08.08.2026: 2.428,44 €
+
+    Zwei Exporte desselben Tages tragen deshalb denselben Stand. Wer ihn dem
+    Zeitraumende zuordnet, behauptet „Ende Februar 2.428,44" und rechnet beim
+    Vergleich eine erfundene Differenz aus. Deshalb steht der Stichtag des
+    Kontostands als eigenes Feld neben dem Zeitraum.
+
+    Gibt `{"von", "bis", "stichtag", "stand"}` zurück; `stand` ist None, wenn
+    der Vorspann fehlt. Nichts zu behaupten ist besser, als eine Null zu
+    erfinden – die sähe aus wie ein leergeräumtes Konto.
     """
-    von = bis = ""
+    von = bis = stichtag = ""
     stand = None
     for zeile in zeilen[:15]:
         felder = [_text(z) for z in zeile]
@@ -172,12 +189,12 @@ def kopfdaten(zeilen, art):
             if len(teile) == 2:
                 von, bis = datum(teile[0]), datum(teile[1])
         elif kopf.startswith(("kontostand", "saldo")):
-            # „Kontostand vom 24.07.2026:" traegt den Stichtag im Schluesselwort.
+            # „Kontostand vom 08.08.2026:" – der Tag steht im Schluesselwort.
             tag = re.findall(r"(\d{2}\.\d{2}\.\d{2,4})", felder[0])
             if tag:
-                bis = bis or datum(tag[0])
+                stichtag = datum(tag[0])
             stand = betrag(wert)
-    return {"von": von, "bis": bis, "stand": stand}
+    return {"von": von, "bis": bis, "stichtag": stichtag, "stand": stand}
 
 
 def lesen(rohdaten, heute=None):

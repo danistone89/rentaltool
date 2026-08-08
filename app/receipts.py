@@ -149,7 +149,8 @@ def ocr_image(path, lang="deu"):
 _MONEY = re.compile(r"(?<![\d.,])(\d{1,4}[.,]\d{2})(?![\d.,])")
 
 # Wonach der Endbetrag benannt ist – von der staerksten Aussage abwaerts.
-_SUMMENWORT = ("zu zahlen", "zahlbetrag", "rechnungsbetrag", "gesamtbetrag",
+_SUMMENWORT = ("neuer saldo", "zu zahlen", "zahlbetrag", "rechnungsbetrag",
+               "gesamtbetrag",
                "gesamtsumme", "endbetrag", "summe", "gesamt", "total",
                # Ganz zum Schluss das schwaechste Wort: „Den Betrag von 8,79 EUR
                # buchen wir ab" ist die einzige Betragsangabe mancher Rechnung.
@@ -187,8 +188,11 @@ def guess_amount(text):
                 continue
             # Aus einer PDF-Tabelle kommen Beschriftung und Wert oft in
             # getrennten Zeilen: „Gesamtbetrag EUR" / „41,41". Deshalb bis zu
-            # zwei Zeilen weiterlesen, bevor das Schluesselwort aufgegeben wird.
-            for kandidat in zeilen[i:i + 3]:
+            # zwei Zeilen weiterlesen – und, falls dort nichts steht, zwei
+            # zurueck: in der DKB-Kreditkartenabrechnung steht der Wert VOR
+            # seiner Beschriftung („185,68 -" / „Neuer Saldo").
+            umgebung = list(zeilen[i:i + 3]) + list(reversed(zeilen[max(0, i - 2):i]))
+            for kandidat in umgebung:
                 treffer = _MONEY.findall(kandidat)
                 if treffer:
                     return treffer[-1].replace(".", ",")
@@ -502,7 +506,15 @@ _KEIN_NAME = re.compile(
     r"^(\d+\s*/\s*\d+|[\d.,\s€-]+|.*:\s*$|www\..*|.*@.*|"
     r"\d{1,2}\.\d{1,2}\.\d{2,4}.*|"
     # Anschriftzeilen des EMPFAENGERS: „01219 Dresden", „Herr", „Frau".
-    r"\d{5}\s+\S.*|(Herr|Frau|Firma|z\.\s?Hd\.?)\s*$)$", re.I)
+    r"\d{5}\s+\S.*|(Herrn?|Frau|Firma|z\.\s?Hd\.?)\s*$|"
+    # Servicenummern und Seitenangaben im Briefkopf – sie standen als
+    # „Haendler" da, wenn die eigene Anschrift darueber weggefiltert war.
+    r"(tel|telefon|fax|mobil|mail)\.?:.*|seite\s+\d+\s+von\s+\d+.*|"
+    # Karten- und Kontonummern: „4998 98XX XXXX 8136".
+    r"[\dXx•*\s-]+|"
+    # Ausgeschriebene Daten: „22. Januar 2026", „Januar 2026".
+    r"(\d{1,2}\.\s*)?(Januar|Februar|März|April|Mai|Juni|Juli|August|"
+    r"September|Oktober|November|Dezember)\s*\d{2,4})$", re.I)
 
 
 def _kopfzeilen(text, wie_viele=_KOPF_ZEILEN):
@@ -561,8 +573,14 @@ def guess_merchant(text, eigene=None):
         if _ist_firmenzeile(z):
             return _saeubern(z)
     for z in zeilen:
-        if not _KEIN_NAME.match(z) and not _ist_fliesstext(z):
+        # Ein einzelnes kurzes Wort („Betrag", „Datum") ist kein Absender.
+        # Acht Zeichen lassen „Royaljet" und „Flugplatz" durch und halten
+        # Tabellenbeschriftungen draussen.
+        if len(z) >= 8 and not _KEIN_NAME.match(z) and not _ist_fliesstext(z):
             return _saeubern(z)
+    # Lieber kein Haendler als ein falscher: ein erfundener Name wandert in die
+    # Vorschlaege und ins Kontenjournal. Am echten DKB-Abrechnungs-PDF steht
+    # der Absender nirgends maschinenlesbar – nur „www.DKB.de".
     return ""
 
 
