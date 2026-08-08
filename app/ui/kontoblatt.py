@@ -610,6 +610,24 @@ def _zuordnungsmaske(bewegung, neu_zeichnen):
                 # die Provision einer Auszahlung –, gibt eine negative Zahl ein.
                 if wert > 0 and bewegung.get("betrag", 0) < 0:
                     wert = -wert
+                # Deckt der Posten die ganze Bewegung und haengt sonst nichts
+                # dran, ist das dieselbe Entscheidung wie in der Zeile: merken
+                # und die uebrigen Zahlungen desselben Empfaengers mitnehmen.
+                # Vorher taten die beiden Wege Verschiedenes – wer die Maske
+                # benutzte, tippte jede Wiederholung einzeln (so gemeldet am
+                # 8.8.2026 an acht gleichen Targobank-Abbuchungen).
+                if (not p and kat.value
+                        and abs(wert - bewegung.get("betrag", 0.0)) < zuordnung.GENAU):
+                    satz, weitere = konto.ganz_zuordnen(bewegung["id"], kat.value)
+                    if satz and weitere:
+                        _mitgezogen_zeigen(bewegung.get("gegenpartei") or "",
+                                           kat.value, weitere, neu_zeichnen)
+                    elif satz:
+                        ui.notify(f"Zugeordnet ✓ – „{bewegung.get('gegenpartei') or ''}“ "
+                                  "ist ab jetzt gemerkt.", type="positive", timeout=2500)
+                    if satz:
+                        neu_zeichnen()
+                        return
                 satz, meldung = zuordnung.hinzufuegen(
                     bewegung["id"], zuordnung.KATEGORIE, wert, kat.value or "")
                 ui.notify(meldung, type="positive" if satz else "warning")

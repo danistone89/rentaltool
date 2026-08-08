@@ -324,6 +324,18 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
   Anrede, Servicenummer, Kartennummer und ausgeschriebene Daten sind keine
   Händler. Für dieses Dokument bleibt der Händler **leer** — der Absender steht
   dort nirgends maschinenlesbar. Lieber leer als erfunden.
+* **Zwei Wege, zwei Verhalten (8.8.2026 gemeldet, behoben).** „Wenn ich
+  Targobank zuordne, übernimmt er es nicht für alle Buchungen." Nachgesehen:
+  von acht gleichen Abbuchungen trugen zwei einen Posten, gelernt war nichts.
+  Ursache: die **Auswahl in der Zeile** setzte Feld, lernte den Empfänger und
+  zog die übrigen mit — die **Maske im aufgeklappten Bereich** legte nur den
+  Posten an. Sie ist aber der sichtbare Weg, sobald man eine Zeile aufklappt.
+  Jetzt tut die Maske im einfachen Fall dasselbe (eine Ausgabe, eine Kategorie,
+  voller Betrag); bei einer echten Aufteilung bleibt es beim reinen Posten,
+  weil nicht zu sagen wäre, welche Kategorie der Empfänger künftig bekommt.
+  Dazu `konto.aus_posten_lernen`: aus schon zugeordneten Bewegungen wird
+  nachträglich gelernt — sonst müsste man sie lösen und neu zuordnen, nur damit
+  das Lernen greift.
 * **Nächstes Paket: B9** — Übergabe ans Steuerbüro: Ablage in der Nextcloud
   nach Jahr und Monat, sprechende Dateinamen, Belegnummer auf Dokument und
   Buchung.
@@ -334,6 +346,6 @@ Details und Begründung: README → „Was auf der Ausgangsrechnung steht".
 ## Wie geprüft wird
 
 ```bash
-.venv/bin/python -m pytest -q     # 1095 Tests, Stand 8.8.2026 grün
+.venv/bin/python -m pytest -q     # 1105 Tests, Stand 8.8.2026 grün
 tools/probelauf.sh                # Port 3002 — nach Codeänderung NEU STARTEN
 ```

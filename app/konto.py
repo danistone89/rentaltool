@@ -220,6 +220,7 @@ def vorschau_gelernt():
     stillschweigend Dutzende Bewegungen umschreibt, waere nicht
     nachvollziehbar.
     """
+    aus_posten_lernen()
     raus = []
     for b in ohne_zuordnung():
         kategorie, klasse, art = erkennen(b)
@@ -231,12 +232,21 @@ def vorschau_gelernt():
 
 
 def gelerntes_anwenden(vorschau):
-    """Die Vorschlaege aus `vorschau_gelernt` schreiben. Gibt die Anzahl zurueck."""
-    n = 0
+    """Die Vorschlaege aus `vorschau_gelernt` schreiben. Gibt die Anzahl zurueck.
+
+    **Gezaehlt wird, was tatsaechlich zugeordnet wurde** – nicht, wie oft
+    zugeordnet *wurde*. Die erste Bewegung eines Empfaengers nimmt die uebrigen
+    gleich mit; die naechsten Aufrufe finden dann nichts mehr zu tun. An den
+    echten Daten meldete das „1 angewandt", waehrend sechs Targobank-Buchungen
+    zugeordnet worden waren.
+    """
+    erledigt = set()
     for v in vorschau:
-        if schnell_zuordnen(v["bewegung"]["id"], v["kategorie"])[0]:
-            n += 1
-    return n
+        satz, weitere = schnell_zuordnen(v["bewegung"]["id"], v["kategorie"])
+        if satz:
+            erledigt.add(v["bewegung"]["id"])
+            erledigt.update(weitere)
+    return len(erledigt)
 
 
 # ----------------------------------------------------------- Beleg zur Buchung
@@ -563,3 +573,55 @@ def je_kategorie(von="", bis="", konto=""):
             dazu((z.get("kategorie") or "").strip() or OHNE_KATEGORIE, z["betrag"])
         dazu(OHNE_KATEGORIE, zuordnung.rest(b))
     return summen
+
+
+def ganz_zuordnen(bewegung_id, kategorie):
+    """Wie `schnell_zuordnen`, aber auch aus der Zuordnungsmaske heraus.
+
+    **Warum es das braucht.** Bis zum 8.8.2026 taten die beiden Wege
+    Verschiedenes: die Auswahl in der Zeile setzte Feld, lernte den Empfaenger
+    und zog die uebrigen Zahlungen mit – die Maske legte nur einen Posten an.
+    Wer die Maske benutzte (sie ist der sichtbare Weg, sobald man eine Zeile
+    aufklappt), tippte jede Wiederholung einzeln. Gemeldet am Beispiel
+    Targobank: acht gleiche Abbuchungen, zwei davon einzeln zugeordnet, nichts
+    gelernt.
+
+    Nur fuer den **einfachen Fall**: eine Ausgabe, eine Kategorie, voller
+    Betrag. Bei einer echten Aufteilung waere nicht zu sagen, welche Kategorie
+    der Empfaenger kuenftig bekommt – dann bleibt es beim reinen Posten.
+    """
+    # Die Pruefung auf vorhandene Posten steckt schon in `schnell_zuordnen` –
+    # hier keine zweite, sonst laufen sie mit der Zeit auseinander.
+    return schnell_zuordnen(bewegung_id, kategorie)
+
+
+def aus_posten_lernen():
+    """Aus schon zugeordneten Bewegungen nachtraeglich den Empfaenger lernen.
+
+    **Der Bestand vom 8.8.2026:** zwei Targobank-Buchungen waren ueber die
+    Maske zugeordnet, gelernt war nichts – die uebrigen sechs blieben offen.
+    Ohne diesen Weg muesste man sie loesen und neu zuordnen, nur damit das
+    Lernen greift.
+
+    Gelernt wird nur aus dem **eindeutigen** Fall: genau ein Posten, der die
+    ganze Bewegung deckt und eine Kategorie traegt. Eine Aufteilung sagt nicht,
+    welche Kategorie der Empfaenger kuenftig bekommen soll. Was schon gelernt
+    ist, bleibt stehen – sonst nimmt ein spaeterer Lauf eine Handkorrektur
+    zurueck.
+    """
+    from app import stammdaten
+    gelernt = 0
+    for b in alle():
+        if b.get("umbuchung") or b.get("betrag", 0.0) >= 0:
+            continue
+        p = zuordnung.posten(b["id"])
+        if len(p) != 1 or not (p[0].get("kategorie") or "").strip():
+            continue
+        if abs(p[0]["betrag"] - b.get("betrag", 0.0)) > zuordnung.GENAU:
+            continue
+        vorhanden = stammdaten.kreditor_zu(b.get("gegenpartei") or "")
+        if vorhanden and (vorhanden.get("kategorie") or "").strip():
+            continue
+        if stammdaten.kategorie_lernen(b.get("gegenpartei"), p[0]["kategorie"]):
+            gelernt += 1
+    return gelernt

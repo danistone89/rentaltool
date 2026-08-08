@@ -304,3 +304,94 @@ def test_zuruecknehmen_laesst_eine_aufteilung_stehen():
     z.hinzufuegen(b["id"], z.KATEGORIE, -40.0, "Ausstattung/GWG (JYSK)")
     konto.zuruecknehmen(["w1"])
     assert len(z.posten("w1")) == 2
+
+
+# ------------- Die Maske muss dasselbe tun wie die Zeile (8.8.2026)
+# Gemeldet: "wenn ich beispielsweise Targobank zuordne uebernimmt er es nicht
+# fuer alle buchungen von targobank." Nachgesehen: zwei der acht Buchungen
+# trugen einen Posten, aber der Empfaenger war nicht gelernt - die Maske legte
+# nur den Posten an. Zwei Wege, zwei Verhalten; wer die Maske benutzt, tippt
+# achtmal.
+def test_die_maske_lernt_und_zieht_mit_wie_die_zeile():
+    _bewegung(-153.80, "TARGOBANK AG", "w1", datum="2026-01-02")
+    _bewegung(-153.80, "TARGOBANK AG", "w2", datum="2026-02-02")
+    _bewegung(-153.80, "TARGOBANK AG", "w3", datum="2026-03-02")
+    satz, weitere = konto.ganz_zuordnen("w1", "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)")
+    assert satz is not None and sorted(weitere) == ["w2", "w3"]
+    assert stammdaten.kreditor_zu("TARGOBANK AG") is not None
+
+
+def test_eine_echte_aufteilung_lernt_nichts():
+    """Bei zwei Kategorien in einer Zahlung waere nicht zu sagen, welche der
+    Empfaenger kuenftig bekommt."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    _bewegung(-100.0, "Baumarkt", "w2", datum="2026-07-01")
+    satz, weitere = konto.ganz_zuordnen("w1", "Ausstattung/GWG (JYSK)")
+    assert satz is None and weitere == []
+
+
+# ------------- Aus dem, was schon zugeordnet ist, nachtraeglich lernen
+def test_aus_vorhandenen_posten_wird_gelernt():
+    """Der Bestand vom 8.8.2026: zwei Targobank-Buchungen waren ueber die Maske
+    zugeordnet, gelernt war nichts. Ohne diesen Weg muesste man sie loesen und
+    neu zuordnen, nur damit das Lernen greift."""
+    b = _bewegung(-153.80, "TARGOBANK AG", "w1", datum="2026-02-02")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -153.80, "Immobiliendarlehen (Zins abzugsf., Tilgung neutral)")
+    _bewegung(-153.80, "TARGOBANK AG", "w2", datum="2026-03-02")
+    assert konto.aus_posten_lernen() == 1
+    assert [x["bewegung"]["id"] for x in konto.vorschau_gelernt()] == ["w2"]
+
+
+def test_aus_einer_aufteilung_wird_nichts_gelernt():
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -60.0, "Wäscherei (Rena)")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -40.0, "Ausstattung/GWG (JYSK)")
+    assert konto.aus_posten_lernen() == 0
+
+
+def test_auch_wenn_der_erste_posten_den_ganzen_betrag_traegt():
+    """Schaerfer: hier deckt schon der ERSTE Posten die Bewegung, es haengt
+    aber noch einer daran. Welche Kategorie soll der Empfaenger bekommen?
+    Keine – sonst lernt das Werkzeug eine Haelfte der Wahrheit."""
+    b = _bewegung(-100.0, "Baumarkt", "w1")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -100.0, "Wäscherei (Rena)")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -50.0, "Ausstattung/GWG (JYSK)")
+    assert konto.aus_posten_lernen() == 0
+
+
+def test_ein_belegposten_lehrt_auch(zusatz=None):
+    """Auch ueber einen Beleg zugeordnet ist eine Entscheidung des Menschen."""
+    b = _bewegung(-73.78, "Smoobu GmbH", "w1")
+    z.hinzufuegen(b["id"], z.BELEG, -73.78, "Software (Smoobu Channelmanager)",
+                  ziel_id="q1")
+    assert konto.aus_posten_lernen() == 1
+
+
+def test_was_schon_gelernt_ist_wird_nicht_ueberschrieben():
+    b = _bewegung(-153.80, "TARGOBANK AG", "w1")
+    konto.schnell_zuordnen("w1", "Wäscherei (Rena)")
+    b2 = _bewegung(-153.80, "TARGOBANK AG", "w2", datum="2026-03-02")
+    z.hinzufuegen(b2["id"], z.KATEGORIE, -153.80, "Ausstattung/GWG (JYSK)")
+    konto.aus_posten_lernen()
+    assert stammdaten.kreditor_zu("TARGOBANK AG")["kategorie"] == "Wäscherei (Rena)"
+
+
+def test_die_maske_laesst_sich_nach_dem_umbau_zeichnen():
+    from app.ui import kontoblatt
+    b = _bewegung(-153.80, "TARGOBANK AG", "w1")
+    _in_client(lambda: kontoblatt._zuordnungsmaske(b, lambda: None))
+
+
+def test_die_zahl_nennt_die_zugeordneten_bewegungen():
+    """Die erste nimmt die uebrigen mit – gezaehlt wird, was zugeordnet wurde,
+    nicht wie oft zugeordnet wurde. An den echten Daten meldete es „1", waehrend
+    sechs Targobank-Buchungen erledigt waren."""
+    b = _bewegung(-153.80, "TARGOBANK AG", "w0", datum="2026-01-02")
+    z.hinzufuegen(b["id"], z.KATEGORIE, -153.80, "Wäscherei (Rena)")
+    for i, tag in enumerate(("2026-02-02", "2026-03-02", "2026-04-01")):
+        _bewegung(-153.80, "TARGOBANK AG", f"w{i + 1}", datum=tag)
+    v = konto.vorschau_gelernt()
+    assert len(v) == 3
+    assert konto.gelerntes_anwenden(v) == 3
+    assert konto.ohne_zuordnung() == []
